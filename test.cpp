@@ -38,7 +38,7 @@ struct sparse_array_debug_config
         auto find = mem_map.find(handle);
         if(find == mem_map.end())
         {
-            _asm int 3;
+            assert(0);
         }
         ::free(find->second);
         mem_map.erase(find);
@@ -49,7 +49,7 @@ struct sparse_array_debug_config
         auto find = mem_map.find(handle);
         if(find == mem_map.end())
         {
-            _asm int 3;
+            assert(0);
         }
         return find->second;
     }
