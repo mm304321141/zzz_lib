@@ -436,7 +436,7 @@ private:
             deref_<memory_block>(block_handle_)->prev_handle = new_handle;
         }
         block_handle_ = new_handle;
-        if(block != NULL)
+        if(out_block != NULL)
         {
             *out_block = block;
         }
