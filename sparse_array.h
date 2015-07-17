@@ -1174,7 +1174,7 @@ private:
         while(!rb_is_nil_(node))
         {
             where = node;
-            if(is_left = rb_predicate_(rb_get_key_(key), rb_get_key_(node)))
+            if((is_left = rb_predicate_(rb_get_key_(key), rb_get_key_(node))))
             {
                 node = rb_get_left_(node);
             }
