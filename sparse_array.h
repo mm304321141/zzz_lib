@@ -890,7 +890,6 @@ private:
     //更新片段集合的区间
     void update_range_set_(sparse_range_set *range_set, handle_t handle)
     {
-        sparse_range *const end = (range_set->begin + range_length - 1);
         sparse_range *back = range_set->begin + (range_set->end - 1);
         if(back->end != range_set->max_index)
         {
