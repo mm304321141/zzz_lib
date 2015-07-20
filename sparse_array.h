@@ -61,6 +61,18 @@ public:
         uint32_t nil : 1;
         uint32_t length : 30;
     };
+    //数据
+    struct dump_data
+    {
+        handle_t parent_handle;
+        handle_t left_handle;
+        handle_t right_handle;
+        handle_t list_handle;
+        handle_t free_handle;
+        uint32_t free_length;
+        uint16_t free_offset;
+        uint16_t free_cross;
+    };
     //红黑树根节点+内存适配器
     class sparse_range_tree
     {
@@ -77,7 +89,14 @@ public:
         {
             return root_.alloc();
         }
-        //回收一块已分配的内存
+        config_t const &allocator() const
+        {
+            return root_;
+        }
+        config_t &allocator()
+        {
+            return root_;
+        }
         void dealloc(handle_t handle)
         {
             root_.dealloc(handle);
@@ -102,8 +121,8 @@ public:
     //空闲内存链表
     struct memory_blcok_free
     {
-        handle_t next_handle;
-        uint16_t next_offset;
+        handle_t handle;
+        uint16_t offset;
         uint16_t cross;
     };
     //数据块元素(数据/空闲链表节点)
@@ -169,8 +188,8 @@ public:
         static_assert(memory_size >= sizeof(sparse_range_set), "low memory_size");
         static_assert(sizeof(value_t) * atomic_length >= sizeof(memory_blcok_free), "low atomic_length");
         block_handle_ = handle_t(invalid_handle);
-        free_.next_handle = handle_t(invalid_handle);
-        //free_.next_offset = 0;
+        free_.handle = handle_t(invalid_handle);
+        //free_.offset = 0;
         //free_.cross = 0;
         index_tree_.root()->length = 0;
         rb_set_nil_(rb_nil_(), true);
@@ -208,6 +227,43 @@ public:
         }
     }
 
+    //内存适配器
+    config_t const &allocator() const
+    {
+        return index_tree_.allocator();
+    }
+    //内存适配器
+    config_t &allocator()
+    {
+        return index_tree_.allocator();
+    }
+    //dump(配合allocator,请自己保存allocator状态)
+    dump_data dump() const
+    {
+        dump_data d;
+        d.parent_handle = index_tree_.root()->parent_handle;
+        d.left_handle = index_tree_.root()->left_handle;
+        d.right_handle = index_tree_.root()->right_handle;
+        d.list_handle = block_handle_;
+        d.free_handle = free_.handle;
+        d.free_length = index_tree_.root()->length;
+        d.free_offset = free_.offset;
+        d.free_cross = free_.cross;
+        return d;
+    }
+    //load_dump(配合allocator,请先恢复allocator状态)
+    void load_dump(dump_data const &d)
+    {
+        clear();
+        index_tree_.root()->parent_handle = d.parent_handle;
+        index_tree_.root()->left_handle = d.left_handle;
+        index_tree_.root()->right_handle = d.right_handle;
+        block_handle_ = d.list_handle;
+        free_.handle = d.free_handle;
+        index_tree_.root()->length = d.free_length;
+        free_.offset = d.free_offset;
+        free_.cross = d.free_cross;
+    }
     //元素数量(这里不是真正数量,实际没有什么上限,这里只是对齐后的最大下标
     uint32_t size() const
     {
@@ -466,9 +522,9 @@ private:
         assert(cross >= 1);
         assert(cross <= block_length);
         memory_blcok_free *result = NULL, *parent = &free_;
-        for(memory_blcok_free *it = &free_; it->next_handle != handle_t(invalid_handle);)
+        for(memory_blcok_free *it = &free_; it->handle != handle_t(invalid_handle);)
         {
-            memory_block_data *next_data = deref_<memory_block>(it->next_handle)->data + it->next_offset;
+            memory_block_data *next_data = deref_<memory_block>(it->handle)->data + it->offset;
             if(it->cross == cross)
             {
                 result = &next_data->free;
@@ -491,25 +547,25 @@ private:
             if(cross < block_length)
             {
                 block->data[cross].free = free_;
-                free_.next_handle = new_handle;
-                free_.next_offset = cross;
+                free_.handle = new_handle;
+                free_.offset = cross;
                 free_.cross = block_length - cross;
                 index_tree_.root()->length += free_.cross;
             }
         }
         else
         {
-            out_handle = parent->next_handle;
-            out_offset = parent->next_offset;
+            out_handle = parent->handle;
+            out_offset = parent->offset;
             if(parent->cross == cross)
             {
                 *parent = *result;
             }
             else
             {
-                parent->next_offset += cross;
+                parent->offset += cross;
                 parent->cross -= cross;
-                memory_block_data *next_data = deref_<memory_block>(parent->next_handle)->data + parent->next_offset;
+                memory_block_data *next_data = deref_<memory_block>(parent->handle)->data + parent->offset;
                 next_data->free = *result;
             }
             index_tree_.root()->length -= cross;
@@ -525,25 +581,25 @@ private:
             dealloc_block_(handle);
             return;
         }
-        for(memory_blcok_free *it = &free_; it->next_handle != handle_t(invalid_handle);)
+        for(memory_blcok_free *it = &free_; it->handle != handle_t(invalid_handle);)
         {
-            memory_block_data *next_data = deref_<memory_block>(it->next_handle)->data + it->next_offset;
-            if(it->next_handle == handle)
+            memory_block_data *next_data = deref_<memory_block>(it->handle)->data + it->offset;
+            if(it->handle == handle)
             {
-                if(it->next_offset + it->cross == offset)
+                if(it->offset + it->cross == offset)
                 {
                     index_tree_.root()->length -= it->cross;
-                    offset = it->next_offset;
+                    offset = it->offset;
                     cross += it->cross;
-                    *it = deref_<memory_block>(handle)->data[it->next_offset].free;
+                    *it = deref_<memory_block>(handle)->data[it->offset].free;
                     dealloc_(handle, offset, cross);
                     return;
                 }
-                if(it->next_offset == offset + cross)
+                if(it->offset == offset + cross)
                 {
                     index_tree_.root()->length -= it->cross;
                     cross += it->cross;
-                    *it = deref_<memory_block>(handle)->data[it->next_offset].free;
+                    *it = deref_<memory_block>(handle)->data[it->offset].free;
                     dealloc_(handle, offset, cross);
                     return;
                 }
@@ -552,8 +608,8 @@ private:
         }
         index_tree_.root()->length += cross;
         deref_<memory_block>(handle)->data[offset].free = free_;
-        free_.next_handle = handle;
-        free_.next_offset = offset;
+        free_.handle = handle;
+        free_.offset = offset;
         free_.cross = cross;
     }
     //真正的批量设置元素(前面的set_multi会过滤掉为默认值的元素)

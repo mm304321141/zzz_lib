@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <fstream>
 #include <unordered_map>
 
 struct sparse_array_debug_config
@@ -63,35 +64,74 @@ int main()
     const uint32_t count = 10000000;
     typedef sparse_array<int> sa1_t;
     typedef sparse_array<int, sparse_array_debug_config> sa2_t;
-    sa1_t array1;
+    sa2_t array1;
     sa2_t array2;
-    int *array4 = new int[32768];
     int *array3 = new int[32768];
-    memset(array4, 0, sizeof(int) * 32768);
+    int *array4 = new int[32768];
     memset(array3, 0, sizeof(int) * 32768);
     for(uint32_t i = 0; i < count; ++i)
     {
-        int random = std::rand();
-        array1[random] = random;
-        array4[random] = random;
-        array2[i] = array1[i];
+        int c1, c2, r, b, e, s, l;
+        if((c1 = (std::rand() & 1)))
+        {
+            r = std::rand();
+            array1[r] = r;
+            array3[r] = r;
+        }
+        else
+        {
+            b = std::rand();
+            e = std::rand();
+            s = std::min(b, e);
+            l = std::max(b, e) - s;
+            if((c2 = (std::rand() & 1)))
+            {
+                std::fill(array3 + s, array3 + s + l, 1);
+                array1.set_multi(s, array3 + s, l);
+            }
+            else
+            {
+                std::fill(array3 + s, array3 + s + l, 0);
+                array1.clear(s, l);
+            }
+        }
+        array1.get_multi(0, array4, 32768);
+        if(std::memcmp(array3, array4, sizeof(int) * 32768) != 0)
+        {
+            auto &map = array1.allocator().mem_map;
+            auto dump = array1.dump();
+            std::ofstream ofs("./test_dump.bin", std::ios::out | std::ios::binary);
+            auto write = [&ofs](void const *p, size_t l)
+            {
+                ofs.write(reinterpret_cast<char const *>(p), l);
+            };
+            write(&dump, sizeof dump);
+            size_t map_size = map.size();
+            write(&map_size, sizeof map_size);
+            for(auto &item : map)
+            {
+                write(&item.first, sizeof item.first);
+                write(&item.second, sparse_array_debug_config::memory_size);
+            }
+            ofs.flush();
+            ofs.close();
+            if(c1)
+            {
+                printf("%d,%d error !\n", i, r);
+            }
+            else
+            {
+                printf("%d,%d,%d,%d error !\n", i, c2, s, l);
+            }
+            break;
+        }
+        else
+        {
+            //printf("%d\n", i);
+        }
     }
-    array1.get_multi(0, array3, 32768);
-    array2.set_multi(0, array3, 32768);
-    array2.clear(32768, count - 32768);
-    std::cout << std::memcmp(array4, array3, sizeof(int) * 32768) << std::endl;
-    array2.get_multi(0, array4, 32768);
-    std::cout << std::memcmp(array4, array3, sizeof(int) * 32768) << std::endl;
-    array1.clear(999, 1002);
-    memset(array4 + 999, 0, sizeof(int) * 1002);
-    array1.get_multi(0, array3, 32768);
-    std::cout << std::memcmp(array4, array3, sizeof(int) * 32768) << std::endl;
-    array1.clear();
-    std::cout << array1.size() << std::endl;
-    array2.clear();
-    std::cout << array2.size() << std::endl;
 
-    delete[] array4;
     delete[] array3;
+    delete[] array4;
     system("pause");
 }
