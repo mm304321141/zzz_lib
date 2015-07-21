@@ -251,7 +251,7 @@ public:
         d.free_cross = free_.cross;
         return d;
     }
-    //load_dump(配合allocator,请先恢复allocator状态)
+    //load_dump(配合allocator,load后恢复allocator状态)
     void load_dump(dump_data const &d)
     {
         clear();
@@ -908,6 +908,7 @@ private:
             std::memmove(range, range + 1, (range_set->end - offset - 1) * sizeof(sparse_range));
         }
         --range_set->end;
+        update_range_set_(range_set, handle);
     }
     //强制插入片段(如果满,则返回挤出的片段)
     bool force_insert_range_(sparse_range_set *range_set, sparse_range *range, sparse_range *out_range)

@@ -19,6 +19,13 @@ struct sparse_array_debug_config
         atomic_length = 4,
         invalid_handle = 0,
     };
+    ~sparse_array_debug_config()
+    {
+        for(auto &item : mem_map)
+        {
+            ::free(item.second);
+        }
+    }
     handle_t alloc()
     {
         int key;
@@ -69,6 +76,51 @@ int main()
     int *array3 = new int[32768];
     int *array4 = new int[32768];
     memset(array3, 0, sizeof(int) * 32768);
+    std::ifstream ifs("./test_dump.bin", std::ios::in | std::ios::binary);
+    if(false && ifs.good())
+    {
+        auto &allocator = array1.allocator();
+        sa2_t::dump_data dump;
+        auto read = [&ifs](void *p, size_t l)
+        {
+            ifs.read(reinterpret_cast<char *>(p), l);
+        };
+        read(&dump, sizeof dump);
+        array1.load_dump(dump);
+        size_t map_size;
+        read(&map_size, sizeof map_size);
+        while(map_size-- > 0)
+        {
+            int k;
+            read(&k, sizeof k);
+            void *ptr = ::malloc(sparse_array_debug_config::memory_size);
+            read(ptr, sparse_array_debug_config::memory_size);
+            allocator.mem_map.insert(std::make_pair(k, ptr));
+            if(k > allocator.mem_key_seed)
+            {
+                allocator.mem_key_seed = k;
+            }
+        }
+        for(int i = 1; i < allocator.mem_key_seed; ++i)
+        {
+            if(allocator.mem_map.find(i) == allocator.mem_map.end())
+            {
+                allocator.mem_key.push_back(i);
+            }
+        }
+        ifs.close();
+
+        array1.get_multi(0, array3, 32768);
+        array1[198] = 198;
+        array1.get_multi(0, array4, 32768);
+        array3[198] = 198;
+        if(std::memcmp(array3, array4, sizeof(int) * 32768) != 0)
+        {
+            assert(0);
+        }
+    }
+
+
     for(uint32_t i = 0; i < count; ++i)
     {
         int c1, c2, r, b, e, s, l;
@@ -111,7 +163,7 @@ int main()
             for(auto &item : map)
             {
                 write(&item.first, sizeof item.first);
-                write(&item.second, sparse_array_debug_config::memory_size);
+                write(item.second, sparse_array_debug_config::memory_size);
             }
             ofs.flush();
             ofs.close();
@@ -127,7 +179,10 @@ int main()
         }
         else
         {
-            //printf("%d\n", i);
+            if(i % 10000 == 0)
+            {
+                printf("%d\n", i);
+            }
         }
     }
 
