@@ -117,7 +117,6 @@ public:
     sorted_set()
     {
         set_nil_(nil_(), true);
-        set_size_(get_root_(), 0);
         set_root_(nil_());
         set_most_left_(nil_());
         set_most_right_(nil_());
@@ -125,7 +124,6 @@ public:
     sorted_set(sorted_set &&other)
     {
         set_nil_(nil_(), true);
-        set_size_(get_root_(), 0);
         set_root_(other.get_root_());
         set_most_left_(other.get_most_left_());
         set_most_right_(other.get_most_right_());
@@ -295,7 +293,7 @@ public:
     //不解释
     size_t size()
     {
-        return get_size_(get_root_());
+        return get_root_() == nil_() ? 0 : get_size_(get_root_());
     }
     //下标访问[0, size)
     iterator at(size_t index)

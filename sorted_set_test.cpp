@@ -13,6 +13,8 @@ int main()
     std::multimap<int, int> rb;
     sorted_set<int, int> sb;
 
+    sb.size();
+
     int length = 2000;
 
     auto assert = [](bool no_error)
