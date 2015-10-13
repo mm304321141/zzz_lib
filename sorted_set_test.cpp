@@ -9,50 +9,56 @@
 #include <map>
 
 
-template<class T, class node_t>
-void print_tree(T &t, node_t *node, size_t level, std::string head, std::string with, int type)
+auto assert = [](bool no_error)
 {
-    if(!T::is_nil_(node))
+    if(!no_error)
     {
-        if(T::get_size_(node) != T::get_size_(T::get_left_(node)) + T::get_size_(T::get_right_(node)) + 1)
-        {
-            _asm int 3;
-        }
-        std::string fork =
-            !T::is_nil_(T::get_left_(node)) && !T::is_nil_(T::get_right_(node)) ? "©Ï" :
-            T::is_nil_(T::get_left_(node)) && T::is_nil_(T::get_right_(node)) ? "* " :
-            !T::is_nil_(T::get_right_(node)) ? "©¿" : "©·";
-        std::string next_left = type == 0 ? "" : type == 1 ? "©§" : "  ";
-        std::string next_right = type == 0 ? "" : type == 1 ? "  " : "©§";
-        print_tree(t, T::get_right_(node), level + 1, head + next_right, "©³", 1);
-        printf("%s%d\n", (head + with + fork).c_str(), t.rank(T::iterator(node, &t)));
-        print_tree(t, T::get_left_(node), level + 1, head + next_left, "©»", 2);
+        *static_cast<int *>(0) = 0;
     }
-}
+};
 
-template<class T>
-void print_tree(T &t)
+template<class key_t, class value_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<std::pair<key_t const, value_t>>>
+class sorted_set_test : public sorted_set<key_t, value_t, comparator_t, allocator_t>
 {
-    printf("\n\n\n\n\n");
-    print_tree(t, t.get_root_(), 0, "  ", "", 0);
-}
+protected:
+    typedef sorted_set<key_t, value_t, comparator_t, allocator_t> b_t;
+
+    void print_tree(typename b_t::node_t *node, size_t level, std::string head, std::string with, int type)
+    {
+        if(!b_t::is_nil_(node))
+        {
+            if(b_t::get_size_(node) != b_t::get_size_(b_t::get_left_(node)) + b_t::get_size_(b_t::get_right_(node)) + 1)
+            {
+                assert(false);
+            }
+            std::string fork =
+                !b_t::is_nil_(b_t::get_left_(node)) && !b_t::is_nil_(b_t::get_right_(node)) ? "©Ï" :
+                b_t::is_nil_(b_t::get_left_(node)) && b_t::is_nil_(b_t::get_right_(node)) ? "* " :
+                !b_t::is_nil_(b_t::get_right_(node)) ? "©¿" : "©·";
+            std::string next_left = type == 0 ? "" : type == 1 ? "©§" : "  ";
+            std::string next_right = type == 0 ? "" : type == 1 ? "  " : "©§";
+            print_tree(b_t::get_right_(node), level + 1, head + next_right, "©³", 1);
+            printf("%s%d\n", (head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node, this)));
+            print_tree(b_t::get_left_(node), level + 1, head + next_left, "©»", 2);
+        }
+    }
+public:
+    void print_tree()
+    {
+        printf("\n\n\n\n\n");
+        print_tree(b_t::get_root_(), 0, "  ", "", 0);
+    }
+};
+
 
 int main()
 {
     std::multimap<int, int> rb;
-    sorted_set<int, int> sb;
+    sorted_set_test<int, int> sb;
 
     sb.size();
 
     int length = 2000;
-
-    auto assert = [](bool no_error)
-    {
-        if(!no_error)
-        {
-            *static_cast<int *>(0) = 0;
-        }
-    };
 
     for(int i = 0; i < length / 2; ++i)
     {
@@ -139,12 +145,12 @@ int main()
         sb.erase(it_sb);
     }
 
-    for(int i = 0; i < 20; ++i)
+    for(int i = 0; i < 50; ++i)
     {
         sb.insert(std::make_pair(rand(), i));
     }
 
-    //print_tree(sb);
+    sb.print_tree();
 
     system("pause");
 }

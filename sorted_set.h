@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <algorithm>
-#include <allocators>
+#include <memory>
 
 template<class key_t, class value_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<std::pair<key_t const, value_t>>>
 class sorted_set
