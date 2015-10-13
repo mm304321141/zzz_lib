@@ -9,6 +9,8 @@ class sorted_set
 {
 public:
     typedef std::pair<key_t const, value_t> pair_t;
+    typedef std::pair<iterator, bool> pair_ib_t;
+    typedef std::pair<iterator, iterator> pair_ii_t;
 protected:
     struct node_t
     {
@@ -117,13 +119,15 @@ public:
     sorted_set()
     {
         set_nil_(nil_(), true);
+        set_size_(get_root_(), 0);
         set_root_(nil_());
         set_most_left_(nil_());
         set_most_right_(nil_());
-        set_size_(get_root_(), 0);
     }
     sorted_set(sorted_set &&other)
     {
+        set_nil_(nil_(), true);
+        set_size_(get_root_(), 0);
         set_root_(other.get_root_());
         set_most_left_(other.get_most_left_());
         set_most_right_(other.get_most_right_());
@@ -132,11 +136,18 @@ public:
         other.set_most_right_(other.nil_());
     }
     sorted_set(sorted_set const &other) = delete;
+    sorted_set &operator = (sorted_set &&other)
+    {
+        set_root_(other.get_root_());
+        set_most_left_(other.get_most_left_());
+        set_most_right_(other.get_most_right_());
+        other.set_root_(other.nil_());
+        other.set_most_left_(other.nil_());
+        other.set_most_right_(other.nil_());
+    }
     sorted_set &operator = (sorted_set const &other) = delete;
 
-    typedef std::pair<iterator, bool> pair_ib_t;
-    typedef std::pair<iterator, iterator> pair_ii_t;
-
+    //允许重复key
     pair_ib_t insert(pair_t const &node)
     {
         value_node_t *new_node = allocator_t::rebind<value_node_t>::other(get_allocator()).allocate(1);
@@ -144,6 +155,7 @@ public:
         sbt_insert_(new_node);
         return pair_ib_t(iterator(new_node, this), true);
     }
+    //允许重复key
     pair_ib_t insert(pair_t &&node)
     {
         value_node_t *new_node = allocator_t::rebind<value_node_t>::other(get_allocator()).allocate(1);
@@ -151,6 +163,7 @@ public:
         sbt_insert_(new_node);
         return pair_ib_t(iterator(new_node, this), true);
     }
+    //返回插入了多少个
     template<class iterator_t>
     size_t insert(iterator_t begin, iterator_t end)
     {
@@ -164,17 +177,20 @@ public:
         }
         return insert_count;
     }
+    //不解释
     iterator find(key_t const &key)
     {
         node_t *where = bst_lower_bound_(key);
         return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_(), this) : iterator(where, this);
     }
+    //不解释
     void erase(iterator where)
     {
         sbt_erase_(where.ptr_);
         static_cast<value_node_t *>(where.ptr_)->~value_node_t();
         allocator_t::rebind<value_node_t>::other(get_allocator()).deallocate(static_cast<value_node_t *>(where.ptr_), 1);
     }
+    //返回移除了多少个
     size_t erase(key_t const &key)
     {
         size_t erase_count = 0;
@@ -186,19 +202,23 @@ public:
         }
         return erase_count;
     }
+    //计数该key存在个数
     size_t count(key_t const &key)
     {
         pair_ii_t range = equal_range(key);
         return std::distance(range.first, range.second);
     }
+    //计数[min, max)
     size_t count(key_t const &min, key_t const &max)
     {
         return sbt_rank_(bst_upper_bound_(max)) - sbt_rank_(bst_lower_bound_(min));
     }
+    //获取[min, max)
     pair_ii_t range(key_t const &min, key_t const &max)
     {
         return pair_ii_t(iterator(bst_lower_bound_(min), this), iterator(bst_upper_bound_(max), this));
     }
+    //获取下标begin到end之间(参数小于0反向下标)
     pair_ii_t slice(int begin = 0, int end = std::numeric_limits<int>::max())
     {
         int size_s = size();
@@ -220,40 +240,49 @@ public:
         }
         return pair_ii_t(sorted_set::begin() + begin, sorted_set::end() - (size_s - end));
     }
+    //不解释
     iterator lower_bound(key_t const &key)
     {
         return iterator(bst_lower_bound_(key), this);
     }
+    //不解释
     iterator upper_bound(key_t const &key)
     {
         return iterator(bst_upper_bound_(key), this);
     }
+    //不解释
     pair_ii_t equal_range(key_t const &key)
     {
         node_t *lower, *upper;
         bst_equal_range_(key, lower, upper);
         return pair_ii_t(iterator(lower, this), iterator(upper, this));
     }
+    //不解释
     iterator begin()
     {
         return iterator(get_most_left_(), this);
     }
+    //不解释
     iterator end()
     {
         return iterator(nil_(), this);
     }
+    //不解释
     pair_t &front()
     {
         return static_cast<value_node_t *>(get_most_left_())->value;
     }
+    //不解释
     pair_t &back()
     {
         return static_cast<value_node_t *>(get_most_right_())->value;
     }
+    //不解释
     bool empty()
     {
         return is_nil_(get_root_());
     }
+    //不解释
     void clear()
     {
         while(get_root_() != nil_())
@@ -262,18 +291,22 @@ public:
         }
         bst_clear_();
     }
+    //不解释
     size_t size()
     {
         return get_size_(get_root_());
     }
+    //下标访问[0, size)
     iterator at(size_t index)
     {
         return iterator(static_cast<value_node_t *>(sbt_at_(get_root_(), index)), this);
     }
+    //计算key的rank(相同取最末,从1开始)
     size_t rank(key_t const &key)
     {
         return sbt_rank_(bst_upper_bound_(key));
     }
+    //计算迭代器rank[1, size]
     static size_t rank(iterator where)
     {
         return sbt_rank_(&*where);
