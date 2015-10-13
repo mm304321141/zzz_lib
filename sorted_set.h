@@ -9,17 +9,12 @@ class sorted_set
 {
 public:
     typedef std::pair<key_t const, value_t> pair_t;
-    typedef std::pair<iterator, bool> pair_ib_t;
-    typedef std::pair<iterator, iterator> pair_ii_t;
 protected:
     struct node_t
     {
         node_t *parent, *left, *right;
         size_t nil : 1;
         size_t size : sizeof(size_t) * 8 - 1;
-    };
-    struct root_node_t : public node_t, public allocator_t, public comparator_t
-    {
     };
     struct value_node_t : public node_t
     {
@@ -30,6 +25,9 @@ protected:
         {
         }
         pair_t value;
+    };
+    struct root_node_t : public node_t, public allocator_t::template rebind<value_node_t>::other, public comparator_t
+    {
     };
 
 public:
@@ -147,10 +145,13 @@ public:
     }
     sorted_set &operator = (sorted_set const &other) = delete;
 
+    typedef std::pair<iterator, bool> pair_ib_t;
+    typedef std::pair<iterator, iterator> pair_ii_t;
+
     //允许重复key
     pair_ib_t insert(pair_t const &node)
     {
-        value_node_t *new_node = allocator_t::rebind<value_node_t>::other(get_allocator()).allocate(1);
+        value_node_t *new_node = get_allocator().allocate(1);
         ::new(new_node) value_node_t(node);
         sbt_insert_(new_node);
         return pair_ib_t(iterator(new_node, this), true);
@@ -158,7 +159,7 @@ public:
     //允许重复key
     pair_ib_t insert(pair_t &&node)
     {
-        value_node_t *new_node = allocator_t::rebind<value_node_t>::other(get_allocator()).allocate(1);
+        value_node_t *new_node = get_allocator().allocate(1);
         ::new(new_node) value_node_t(node);
         sbt_insert_(new_node);
         return pair_ib_t(iterator(new_node, this), true);
@@ -188,7 +189,7 @@ public:
     {
         sbt_erase_(where.ptr_);
         static_cast<value_node_t *>(where.ptr_)->~value_node_t();
-        allocator_t::rebind<value_node_t>::other(get_allocator()).deallocate(static_cast<value_node_t *>(where.ptr_), 1);
+        get_allocator().deallocate(static_cast<value_node_t *>(where.ptr_), 1);
     }
     //返回移除了多少个
     size_t erase(key_t const &key)
@@ -322,7 +323,7 @@ protected:
         return head_;
     }
 
-    allocator_t &get_allocator()
+    typename allocator_t::template rebind<value_node_t>::other &get_allocator()
     {
         return head_;
     }
