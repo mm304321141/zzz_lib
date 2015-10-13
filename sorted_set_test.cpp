@@ -8,6 +8,35 @@
 #include <vector>
 #include <map>
 
+
+template<class T, class node_t>
+void print_tree(T &t, node_t *node, size_t level, std::string head, std::string with, int type)
+{
+    if(!T::is_nil_(node))
+    {
+        if(T::get_size_(node) != T::get_size_(T::get_left_(node)) + T::get_size_(T::get_right_(node)) + 1)
+        {
+            _asm int 3;
+        }
+        std::string fork =
+            !T::is_nil_(T::get_left_(node)) && !T::is_nil_(T::get_right_(node)) ? "©Ï" :
+            T::is_nil_(T::get_left_(node)) && T::is_nil_(T::get_right_(node)) ? "* " :
+            !T::is_nil_(T::get_right_(node)) ? "©¿" : "©·";
+        std::string next_left = type == 0 ? "" : type == 1 ? "©§" : "  ";
+        std::string next_right = type == 0 ? "" : type == 1 ? "  " : "©§";
+        print_tree(t, T::get_right_(node), level + 1, head + next_right, "©³", 1);
+        printf("%s%d\n", (head + with + fork).c_str(), t.rank(T::iterator(node, &t)));
+        print_tree(t, T::get_left_(node), level + 1, head + next_left, "©»", 2);
+    }
+}
+
+template<class T>
+void print_tree(T &t)
+{
+    printf("\n\n\n\n\n");
+    print_tree(t, t.get_root_(), 0, "  ", "", 0);
+}
+
 int main()
 {
     std::multimap<int, int> rb;
@@ -109,6 +138,13 @@ int main()
         rb.erase(it_rb);
         sb.erase(it_sb);
     }
+
+    for(int i = 0; i < 20; ++i)
+    {
+        sb.insert(std::make_pair(rand(), i));
+    }
+
+    //print_tree(sb);
 
     system("pause");
 }

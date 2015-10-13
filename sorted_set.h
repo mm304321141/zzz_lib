@@ -67,7 +67,7 @@ public:
         }
         difference_type operator - (iterator const &other)
         {
-            return static_cast<int>(set_->sbt_rank_(ptr_)) - static_cast<int>(sorted_set::sbt_rank_(other.ptr_));
+            return static_cast<difference_type>(set_->sbt_rank_(ptr_)) - static_cast<difference_type>(sorted_set::sbt_rank_(other.ptr_));
         }
         iterator &operator++()
         {
@@ -117,6 +117,7 @@ public:
     sorted_set()
     {
         set_nil_(nil_(), true);
+        set_size_(nil_(), 0);
         set_root_(nil_());
         set_most_left_(nil_());
         set_most_right_(nil_());
@@ -124,6 +125,7 @@ public:
     sorted_set(sorted_set &&other)
     {
         set_nil_(nil_(), true);
+        set_size_(nil_(), 0);
         set_root_(other.get_root_());
         set_most_left_(other.get_most_left_());
         set_most_right_(other.get_most_right_());
@@ -308,7 +310,7 @@ public:
     //¼ÆËãµü´úÆ÷rank[1, size]
     static size_t rank(iterator where)
     {
-        return sbt_rank_(&*where);
+        return sbt_rank_(where.ptr_);
     }
 
 protected:
