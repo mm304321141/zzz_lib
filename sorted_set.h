@@ -13,8 +13,7 @@ protected:
     struct node_t
     {
         node_t *parent, *left, *right;
-        size_t nil : 1;
-        size_t size : sizeof(size_t) * 8 - 1;
+        size_t size;
     };
     struct value_node_t : public node_t
     {
@@ -200,7 +199,6 @@ public:
 public:
     sorted_set()
     {
-        set_nil_(nil_(), true);
         set_size_(nil_(), 0);
         set_root_(nil_());
         set_most_left_(nil_());
@@ -208,7 +206,6 @@ public:
     }
     sorted_set(sorted_set &&other)
     {
-        set_nil_(nil_(), true);
         set_size_(nil_(), 0);
         set_root_(other.get_root_());
         set_most_left_(other.get_most_left_());
@@ -217,7 +214,14 @@ public:
         other.set_most_left_(other.nil_());
         other.set_most_right_(other.nil_());
     }
-    sorted_set(sorted_set const &other) = delete;
+    sorted_set(sorted_set const &other) : sorted_set()
+    {
+        insert(other.begin(), other.end());
+    }
+    ~sorted_set()
+    {
+        clear();
+    }
     sorted_set &operator = (sorted_set &&other)
     {
         set_root_(other.get_root_());
@@ -227,7 +231,26 @@ public:
         other.set_most_left_(other.nil_());
         other.set_most_right_(other.nil_());
     }
-    sorted_set &operator = (sorted_set const &other) = delete;
+    sorted_set &operator = (sorted_set const &other)
+    {
+        sorted_set temp_set = std::move(*this);
+        const_iterator it = other.begin();
+        while(!temp_set.empty())
+        {
+            if(it == other.end())
+            {
+                temp_set.clear();
+                return *this;
+            }
+            node_t *node = temp_set.get_root_();
+            temp_set.sbt_erase_(node);
+            static_cast<value_node_t *>(node)->~value_node_t();
+            ::new(node) value_node_t(*it++);
+            sbt_insert_(node);
+        }
+        insert(it, other.end());
+        return *this;
+    }
 
     typedef std::pair<iterator, bool> pair_ib_t;
     typedef std::pair<iterator, iterator> pair_ii_t;
@@ -429,7 +452,7 @@ public:
     //不解释
     void clear()
     {
-        while(get_root_() != nil_())
+        while(!is_nil_(get_root_()))
         {
             erase(iterator(get_root_(), this));
         }
@@ -437,7 +460,7 @@ public:
     //不解释
     size_t size() const
     {
-        return get_root_() == nil_() ? 0 : get_size_(get_root_());
+        return get_size_(get_root_());
     }
     //下标访问[0, size)
     iterator at(size_t index)
@@ -527,14 +550,9 @@ protected:
         return static_cast<value_node_t const *>(node)->value.first;
     }
 
-    static void set_nil_(node_t *node, bool nil)
-    {
-        node->nil = nil;
-    }
-
     static bool is_nil_(node_t const *node)
     {
-        return node->nil;
+        return node->size == 0;
     }
 
     static node_t *get_parent_(node_t const *node)
@@ -610,7 +628,6 @@ protected:
 
     node_t *bst_init_node_(node_t *parent, node_t *node)
     {
-        set_nil_(node, false);
         set_parent_(node, parent);
         set_left_(node, nil_());
         set_right_(node, nil_());

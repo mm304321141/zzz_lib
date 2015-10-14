@@ -54,8 +54,23 @@ int main()
 {
     std::multimap<int, int> rb;
     sorted_set_test<int, int> sb;
-
-    sb.size();
+    
+    [&]()
+    {
+        sorted_set_test<int, int> sb1;
+        assert(sb.size() == sb1.size());
+        for(int i = 0; i < 100; ++i)
+        {
+            sb.insert(std::make_pair(rand(), i));
+            sb.insert(std::make_pair(rand(), i));
+            sb1.insert(std::make_pair(rand(), i));
+        }
+        sb1 = sb;
+        sorted_set_test<int, int> sb2 = sb;
+        assert(sb.size() == sb1.size());
+        assert(sb.size() == sb2.size());
+        sb.clear();
+    }();
 
     int length = 2000;
 
@@ -143,6 +158,7 @@ int main()
         rb.erase(it_rb);
         sb.erase(it_sb);
     }
+    
 
     //for(int i = 0; ; ++i)
     //{
