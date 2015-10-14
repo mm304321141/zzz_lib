@@ -433,7 +433,6 @@ public:
         {
             erase(iterator(get_root_(), this));
         }
-        bst_clear_();
     }
     //不解释
     size_t size() const

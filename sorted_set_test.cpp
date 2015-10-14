@@ -145,20 +145,37 @@ int main()
         sb.erase(it_sb);
     }
 
-    for(int i = 0; ; ++i)
-    {
-        sb.insert(std::make_pair(rand(), i));
-        sb.print_tree();
-        system("pause");
-    }
+    //for(int i = 0; ; ++i)
+    //{
+    //    sb.insert(std::make_pair(rand(), i));
+    //    sb.print_tree();
+    //    system("pause");
+    //}
 
     system("pause");
 
-    sorted_set_test<int, int> const *psb = &sb;
+    sb.clear();
 
-    for(auto it = psb->begin(); it != psb->end(); ++it)
+    for(int i = 0; i < 20000000; ++i)
     {
-        it->second;
+        sb.insert(std::make_pair(rand(), i));
     }
 
+    auto t = std::chrono::high_resolution_clock::now;
+
+    auto a1 = t();
+
+    auto c1 = sb.count(1000, 2000);
+    auto c2 = sb.at(rand())->second;
+    auto c3 = sb.slice(1000, 2000).second->second;
+
+    auto a2 = t();
+
+    std::cout
+        << "sb.count(1000, 2000); " << c1 << std::endl
+        << "sb.at(rand());        " << c2 << std::endl
+        << "sb.slice(1000, 2000); " << c3 << std::endl
+        << "time(s) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(a2 - a1).count() << std::endl;
+
+    system("pause");
 }
