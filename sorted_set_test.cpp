@@ -65,6 +65,7 @@ int main()
             sb.insert(std::make_pair(rand(), i));
             sb1.insert(std::make_pair(rand(), i));
         }
+        sb.rank(sb.begin() + 2);
         sb1 = sb;
         sorted_set_test<int, int> sb2 = sb;
         assert(sb.size() == sb1.size());

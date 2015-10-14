@@ -717,12 +717,12 @@ public:
         return const_iterator(sbt_at_(index));
     }
 
-    //计算key的rank(相同取最末,从1开始)
+    //计算key的rank(相同取最末,从0开始)
     size_type rank(key_t const &key) const
     {
         return sbt_rank_(bst_upper_bound_(key));
     }
-    //计算迭代器rank[1, size]
+    //计算迭代器rank[0, size),end的rank为size
     static size_type rank(const_iterator where)
     {
         return sbt_rank_(where.node);
