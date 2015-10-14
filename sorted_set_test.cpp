@@ -182,9 +182,17 @@ int main()
 
     auto t = std::chrono::high_resolution_clock::now;
     std::mt19937 mt;
-    auto mtr = std::uniform_int<int>(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
+    auto mtr = std::uniform_int_distribution<int>(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
 
-    auto test = [&mtr, &mt](auto &c)
+    auto testsb = [&mtr, &mt, &c = sb]()
+    {
+        for(int i = 0; i < 20000000; ++i)
+        {
+            c.insert(std::make_pair(mtr(mt), i));
+        }
+        c.clear();
+    };
+    auto testrb = [&mtr, &mt, &c = rb]()
     {
         for(int i = 0; i < 20000000; ++i)
         {
@@ -194,22 +202,22 @@ int main()
     };
 
     auto ss1 = t();
-    test(sb);
+    testsb();
     auto se1 = t();
     auto rs1 = t();
-    test(rb);
+    testrb();
     auto re1 = t();
     auto ss2 = t();
-    test(sb);
+    testsb();
     auto se2 = t();
     auto rs2 = t();
-    test(rb);
+    testrb();
     auto re2 = t();
     auto ss3 = t();
-    test(sb);
+    testsb();
     auto se3 = t();
     auto rs3 = t();
-    test(rb);
+    testrb();
     auto re3 = t();
 
 

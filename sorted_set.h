@@ -11,8 +11,8 @@ public:
     typedef key_t key_type;
     typedef value_t mapped_type;
     typedef std::pair<key_t const, value_t> value_type;
-    typedef size_t size_type;
-    typedef ptrdiff_t difference_type;
+    typedef std::size_t size_type;
+    typedef std::ptrdiff_t difference_type;
     typedef comparator_t key_compare;
     typedef allocator_t allocator_type;
     typedef value_type &reference;
@@ -33,8 +33,8 @@ protected:
         value_node_t(value_type const &v) : value(v)
         {
         }
-        template<class... Args>
-        value_node_t(Args&&... args) : value(args...)
+        template<class ...args_t>
+        value_node_t(args_t &&...args) : value(args...)
         {
         }
         value_type value;
@@ -493,8 +493,8 @@ public:
     {
         insert(ilist.begin(), ilist.end());
     }
-    template<class... Args>
-    iterator emplace(Args&&... args)
+    template<class ...args_t>
+    iterator emplace(args_t &&...args)
     {
         value_node_t *new_node = get_value_allocator().allocate(1);
         ::new(new_node) value_node_t(args...);
@@ -587,13 +587,13 @@ public:
         }
         if(begin > end || begin >= size_s)
         {
-            return pair_ii_t(sorted_set::end(), sorted_set::end());
+            return pair_cici_t(sorted_set::cend(), sorted_set::cend());
         }
         if(end > size_s)
         {
             end = size_s;
         }
-        return pair_cici_t(sorted_set::begin() + begin, sorted_set::end() - (size_s - end));
+        return pair_cici_t(sorted_set::cbegin() + begin, sorted_set::cend() - (size_s - end));
     }
 
     iterator lower_bound(key_t const &key)
@@ -686,11 +686,11 @@ public:
 
     value_type const &front() const
     {
-        return static_cast<value_node_t *>(get_most_left_())->value;
+        return static_cast<value_node_t const *>(get_most_left_())->value;
     }
     value_type const &back() const
     {
-        return static_cast<value_node_t *>(get_most_right_())->value;
+        return static_cast<value_node_t const *>(get_most_right_())->value;
     }
 
     bool empty() const
@@ -716,12 +716,12 @@ public:
     //下标访问[0, size)
     iterator at(size_type index)
     {
-        return iterator(static_cast<value_node_t *>(sbt_at_(get_root_(), index)), this);
+        return iterator(sbt_at_(get_root_(), index), this);
     }
     //下标访问[0, size)
     const_iterator at(size_type index) const
     {
-        return iterator(static_cast<value_node_t *>(sbt_at_(get_root_(), index)), this);
+        return iterator(sbt_at_(get_root_(), index), this);
     }
 
     //计算key的rank(相同取最末,从1开始)
