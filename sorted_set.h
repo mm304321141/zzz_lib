@@ -33,8 +33,7 @@ protected:
         value_node_t(value_type const &v) : value(v)
         {
         }
-        template<class ...args_t>
-        value_node_t(args_t &&...args) : value(args...)
+        template<class ...args_t> value_node_t(args_t &&...args) : value(args...)
         {
         }
         value_type value;
@@ -54,42 +53,42 @@ public:
         typedef typename sorted_set::pointer pointer;
         typedef typename sorted_set::reference reference;
     public:
-        iterator(node_t *node, sorted_set *set) : ptr_(node), set_(set)
+        explicit iterator(node_t *in_node) : node(in_node)
         {
         }
-        iterator(iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        iterator(iterator const &other) : node(other.node)
         {
         }
         iterator &operator += (difference_type diff)
         {
-            ptr_ = set_->sbt_advance_(ptr_, diff);
+            node = sorted_set::sbt_advance_(node, diff);
             return *this;
         }
         iterator &operator -= (difference_type diff)
         {
-            ptr_ = set_->sbt_advance_(ptr_, -diff);
+            node = sorted_set::sbt_advance_(node, -diff);
             return *this;
         }
         iterator operator + (difference_type diff) const
         {
-            return iterator(set_->sbt_advance_(ptr_, diff), set_);
+            return iterator(sorted_set::sbt_advance_(node, diff));
         }
         iterator operator - (difference_type diff) const
         {
-            return iterator(set_->sbt_advance_(ptr_, -diff), set_);
+            return iterator(sorted_set::sbt_advance_(node, -diff));
         }
         difference_type operator - (iterator const &other) const
         {
-            return static_cast<difference_type>(set_->sbt_rank_(ptr_)) - static_cast<difference_type>(sorted_set::sbt_rank_(other.ptr_));
+            return static_cast<difference_type>(sorted_set::sbt_rank_(node)) - static_cast<difference_type>(sorted_set::sbt_rank_(other.node));
         }
         iterator &operator++()
         {
-            ptr_ = sorted_set::bst_move_<true>(ptr_);
+            node = sorted_set::bst_move_<true>(node);
             return *this;
         }
         iterator &operator--()
         {
-            ptr_ = sorted_set::bst_move_<false>(ptr_);
+            node = sorted_set::bst_move_<false>(node);
             return *this;
         }
         iterator operator++(int)
@@ -106,24 +105,23 @@ public:
         }
         value_type &operator *() const
         {
-            return static_cast<value_node_t *>(ptr_)->value;
+            return static_cast<value_node_t *>(node)->value;
         }
         value_type *operator->() const
         {
-            return &static_cast<value_node_t *>(ptr_)->value;
+            return &static_cast<value_node_t *>(node)->value;
         }
         bool operator == (iterator const &other) const
         {
-            return ptr_ == other.ptr_;
+            return node == other.node;
         }
         bool operator != (iterator const &other) const
         {
-            return ptr_ != other.ptr_;
+            return node != other.node;
         }
     private:
         friend class sorted_set;
-        node_t *ptr_;
-        sorted_set *set_;
+        node_t *node;
     };
     class const_iterator
     {
@@ -134,45 +132,45 @@ public:
         typedef typename sorted_set::pointer pointer;
         typedef typename sorted_set::reference reference;
     public:
-        const_iterator(node_t const *node, sorted_set const *set) : ptr_(node), set_(set)
+        explicit const_iterator(node_t const *in_node) : node(in_node)
         {
         }
-        const_iterator(iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        const_iterator(iterator const &other) : node(other.node)
         {
         }
-        const_iterator(const_iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        const_iterator(const_iterator const &other) : node(other.node)
         {
         }
         const_iterator &operator += (difference_type diff)
         {
-            ptr_ = set_->sbt_advance_(ptr_, diff);
+            node = sorted_set::sbt_advance_(node, diff);
             return *this;
         }
         const_iterator &operator -= (difference_type diff)
         {
-            ptr_ = set_->sbt_advance_(ptr_, -diff);
+            node = sorted_set::sbt_advance_(node, -diff);
             return *this;
         }
         const_iterator operator + (difference_type diff) const
         {
-            return const_iterator(set_->sbt_advance_(ptr_, diff), set_);
+            return const_iterator(sorted_set::sbt_advance_(node, diff));
         }
         const_iterator operator - (difference_type diff) const
         {
-            return const_iterator(set_->sbt_advance_(ptr_, -diff), set_);
+            return const_iterator(sorted_set::sbt_advance_(node, -diff));
         }
         difference_type operator - (const_iterator const &other) const
         {
-            return static_cast<difference_type>(set_->sbt_rank_(ptr_)) - static_cast<difference_type>(sorted_set::sbt_rank_(other.ptr_));
+            return static_cast<difference_type>(sorted_set::sbt_rank_(node)) - static_cast<difference_type>(sorted_set::sbt_rank_(other.node));
         }
         const_iterator &operator++()
         {
-            ptr_ = sorted_set::bst_move_<true>(ptr_);
+            node = sorted_set::bst_move_<true>(node);
             return *this;
         }
         const_iterator &operator--()
         {
-            ptr_ = sorted_set::bst_move_<false>(ptr_);
+            node = sorted_set::bst_move_<false>(node);
             return *this;
         }
         const_iterator operator++(int)
@@ -189,24 +187,23 @@ public:
         }
         value_type const &operator *() const
         {
-            return static_cast<value_node_t const *>(ptr_)->value;
+            return static_cast<value_node_t const *>(node)->value;
         }
         value_type const *operator->() const
         {
-            return &static_cast<value_node_t const *>(ptr_)->value;
+            return &static_cast<value_node_t const *>(node)->value;
         }
         bool operator == (const_iterator const &other) const
         {
-            return ptr_ == other.ptr_;
+            return node == other.node;
         }
         bool operator != (const_iterator const &other) const
         {
-            return ptr_ != other.ptr_;
+            return node != other.node;
         }
     private:
         friend class sorted_set;
-        node_t const *ptr_;
-        sorted_set const *set_;
+        node_t const *node;
     };
     class reverse_iterator
     {
@@ -217,46 +214,46 @@ public:
         typedef typename sorted_set::pointer pointer;
         typedef typename sorted_set::reference reference;
     public:
-        reverse_iterator(node_t *node, sorted_set *set) : ptr_(node), set_(set)
+        explicit reverse_iterator(node_t *in_node) : node(in_node)
         {
         }
-        explicit reverse_iterator(iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        explicit reverse_iterator(iterator const &other) : node(other.node)
         {
             ++*this;
         }
-        reverse_iterator(reverse_iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        reverse_iterator(reverse_iterator const &other) : node(other.node)
         {
         }
         reverse_iterator &operator += (difference_type diff)
         {
-            ptr_ = set_->sbt_advance_(ptr_, -diff);
+            node = sorted_set::sbt_advance_(node, -diff);
             return *this;
         }
         reverse_iterator &operator -= (difference_type diff)
         {
-            ptr_ = set_->sbt_advance_(ptr_, diff);
+            node = sorted_set::sbt_advance_(node, diff);
             return *this;
         }
         reverse_iterator operator + (difference_type diff) const
         {
-            return reverse_iterator(set_->sbt_advance_(ptr_, -diff), set_);
+            return reverse_iterator(sorted_set::sbt_advance_(node, -diff));
         }
         reverse_iterator operator - (difference_type diff) const
         {
-            return reverse_iterator(set_->sbt_advance_(ptr_, diff), set_);
+            return reverse_iterator(sorted_set::sbt_advance_(node, diff));
         }
         difference_type operator - (reverse_iterator const &other) const
         {
-            return static_cast<difference_type>(sorted_set::sbt_rank_(other.ptr_)) - static_cast<difference_type>(set_->sbt_rank_(ptr_));
+            return static_cast<difference_type>(sorted_set::sbt_rank_(other.node)) - static_cast<difference_type>(sorted_set::sbt_rank_(node));
         }
         reverse_iterator &operator++()
         {
-            ptr_ = sorted_set::bst_move_<false>(ptr_);
+            node = sorted_set::bst_move_<false>(node);
             return *this;
         }
         reverse_iterator &operator--()
         {
-            ptr_ = sorted_set::bst_move_<true>(ptr_);
+            node = sorted_set::bst_move_<true>(node);
             return *this;
         }
         reverse_iterator operator++(int)
@@ -273,28 +270,27 @@ public:
         }
         value_type &operator *() const
         {
-            return static_cast<value_node_t *>(ptr_)->value;
+            return static_cast<value_node_t *>(node)->value;
         }
         value_type *operator->() const
         {
-            return &static_cast<value_node_t *>(ptr_)->value;
+            return &static_cast<value_node_t *>(node)->value;
         }
         bool operator == (reverse_iterator const &other) const
         {
-            return ptr_ == other.ptr_;
+            return node == other.node;
         }
         bool operator != (reverse_iterator const &other) const
         {
-            return ptr_ != other.ptr_;
+            return node != other.node;
         }
         iterator base() const
         {
-            return ++iterator(ptr_, set_);
+            return ++iterator(node);
         }
     private:
         friend class sorted_set;
-        node_t *ptr_;
-        sorted_set *set_;
+        node_t *node;
     };
     class const_reverse_iterator
     {
@@ -305,49 +301,49 @@ public:
         typedef typename sorted_set::pointer pointer;
         typedef typename sorted_set::reference reference;
     public:
-        const_reverse_iterator(node_t const *node, sorted_set const *set) : ptr_(node), set_(set)
+        explicit const_reverse_iterator(node_t const *in_node) : node(in_node)
         {
         }
-        explicit const_reverse_iterator(const_iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        explicit const_reverse_iterator(const_iterator const &other) : node(other.node)
         {
             ++*this;
         }
-        const_reverse_iterator(reverse_iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        const_reverse_iterator(reverse_iterator const &other) : node(other.node)
         {
         }
-        const_reverse_iterator(const_reverse_iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        const_reverse_iterator(const_reverse_iterator const &other) : node(other.node)
         {
         }
         const_reverse_iterator &operator += (difference_type diff)
         {
-            ptr_ = set_->sbt_advance_(ptr_, -diff);
+            node = sorted_set::sbt_advance_(node, -diff);
             return *this;
         }
         const_reverse_iterator &operator -= (difference_type diff)
         {
-            ptr_ = set_->sbt_advance_(ptr_, diff);
+            node = sorted_set::sbt_advance_(node, diff);
             return *this;
         }
         const_reverse_iterator operator + (difference_type diff) const
         {
-            return const_reverse_iterator(set_->sbt_advance_(ptr_, -diff), set_);
+            return const_reverse_iterator(sorted_set::sbt_advance_(node, -diff));
         }
         const_reverse_iterator operator - (difference_type diff) const
         {
-            return const_reverse_iterator(set_->sbt_advance_(ptr_, diff), set_);
+            return const_reverse_iterator(sorted_set::sbt_advance_(node, diff));
         }
         difference_type operator - (const_reverse_iterator const &other) const
         {
-            return static_cast<difference_type>(sorted_set::sbt_rank_(other.ptr_)) - static_cast<difference_type>(set_->sbt_rank_(ptr_));
+            return static_cast<difference_type>(sorted_set::sbt_rank_(other.node)) - static_cast<difference_type>(sorted_set::sbt_rank_(node));
         }
         const_reverse_iterator &operator++()
         {
-            ptr_ = sorted_set::bst_move_<false>(ptr_);
+            node = sorted_set::bst_move_<false>(node);
             return *this;
         }
         const_reverse_iterator &operator--()
         {
-            ptr_ = sorted_set::bst_move_<true>(ptr_);
+            node = sorted_set::bst_move_<true>(node);
             return *this;
         }
         const_reverse_iterator operator++(int)
@@ -364,28 +360,27 @@ public:
         }
         value_type const &operator *() const
         {
-            return static_cast<value_node_t const *>(ptr_)->value;
+            return static_cast<value_node_t const *>(node)->value;
         }
         value_type const *operator->() const
         {
-            return &static_cast<value_node_t const *>(ptr_)->value;
+            return &static_cast<value_node_t const *>(node)->value;
         }
         bool operator == (const_reverse_iterator const &other) const
         {
-            return ptr_ == other.ptr_;
+            return node == other.node;
         }
         bool operator != (const_reverse_iterator const &other) const
         {
-            return ptr_ != other.ptr_;
+            return node != other.node;
         }
         const_iterator base() const
         {
-            return ++iterator(ptr_, set_);
+            return ++iterator(node);
         }
     private:
         friend class sorted_set;
-        node_t const *ptr_;
-        sorted_set const *set_;
+        node_t const *node;
     };
 
 public:
@@ -465,24 +460,23 @@ public:
         value_node_t *new_node = get_value_allocator().allocate(1);
         ::new(new_node) value_node_t(node);
         sbt_insert_(new_node);
-        return iterator(new_node, this);
+        return iterator(new_node);
     }
     iterator insert(const_iterator hint, value_type const &node)
     {
         value_node_t *new_node = get_value_allocator().allocate(1);
         ::new(new_node) value_node_t(node);
         sbt_insert_(new_node);
-        return iterator(new_node, this);
+        return iterator(new_node);
     }
     iterator insert(value_type &&node)
     {
         value_node_t *new_node = get_value_allocator().allocate(1);
         ::new(new_node) value_node_t(node);
         sbt_insert_(new_node);
-        return iterator(new_node, this);
+        return iterator(new_node);
     }
-    template<class iterator_t>
-    void insert(iterator_t begin, iterator_t end)
+    template<class iterator_t> void insert(iterator_t begin, iterator_t end)
     {
         for(; begin != end; ++begin)
         {
@@ -493,31 +487,30 @@ public:
     {
         insert(ilist.begin(), ilist.end());
     }
-    template<class ...args_t>
-    iterator emplace(args_t &&...args)
+    template<class ...args_t> iterator emplace(args_t &&...args)
     {
         value_node_t *new_node = get_value_allocator().allocate(1);
         ::new(new_node) value_node_t(args...);
         sbt_insert_(new_node);
-        return iterator(new_node, this);
+        return iterator(new_node);
     }
 
     iterator find(key_t const &key)
     {
         node_t *where = bst_lower_bound_(key);
-        return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_(), this) : iterator(where, this);
+        return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_()) : iterator(where);
     }
     const_iterator find(key_t const &key) const
     {
         node_t *where = bst_lower_bound_(key);
-        return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_(), this) : iterator(where, this);
+        return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_()) : iterator(where);
     }
 
     void erase(iterator where)
     {
-        sbt_erase_(where.ptr_);
-        static_cast<value_node_t *>(where.ptr_)->~value_node_t();
-        get_value_allocator().deallocate(static_cast<value_node_t *>(where.ptr_), 1);
+        sbt_erase_(where.node);
+        static_cast<value_node_t *>(where.node)->~value_node_t();
+        get_value_allocator().deallocate(static_cast<value_node_t *>(where.node), 1);
     }
     size_type erase(key_t const &key)
     {
@@ -545,134 +538,134 @@ public:
     //获取[min, max)
     pair_ii_t range(key_t const &min, key_t const &max)
     {
-        return pair_ii_t(iterator(bst_lower_bound_(min), this), iterator(bst_upper_bound_(max), this));
+        return pair_ii_t(iterator(bst_lower_bound_(min)), iterator(bst_upper_bound_(max)));
     }
     pair_cici_t range(key_t const &min, key_t const &max) const
     {
-        return pair_cici_t(const_iterator(bst_lower_bound_(min), this), const_iterator(bst_upper_bound_(max), this));
+        return pair_cici_t(const_iterator(bst_lower_bound_(min)), const_iterator(bst_upper_bound_(max)));
     }
 
     //获取下标begin到end之间(参数小于0反向下标)
     pair_ii_t slice(int begin = 0, int end = std::numeric_limits<int>::max())
     {
-        int size_s = size();
+        difference_type s_size = size();
         if(begin < 0)
         {
-            begin = std::max(size_s + begin, 0);
+            begin = std::max(s_size + begin, 0);
         }
         if(end < 0)
         {
-            end = size_s + end;
+            end = s_size + end;
         }
-        if(begin > end || begin >= size_s)
+        if(begin > end || begin >= s_size)
         {
             return pair_ii_t(sorted_set::end(), sorted_set::end());
         }
-        if(end > size_s)
+        if(end > s_size)
         {
-            end = size_s;
+            end = s_size;
         }
-        return pair_ii_t(sorted_set::begin() + begin, sorted_set::end() - (size_s - end));
+        return pair_ii_t(sorted_set::begin() + begin, sorted_set::end() - (s_size - end));
     }
     pair_cici_t slice(int begin = 0, int end = std::numeric_limits<int>::max()) const
     {
-        int size_s = size();
+        int s_size = size();
         if(begin < 0)
         {
-            begin = std::max(size_s + begin, 0);
+            begin = std::max(s_size + begin, 0);
         }
         if(end < 0)
         {
-            end = size_s + end;
+            end = s_size + end;
         }
-        if(begin > end || begin >= size_s)
+        if(begin > end || begin >= s_size)
         {
             return pair_cici_t(sorted_set::cend(), sorted_set::cend());
         }
-        if(end > size_s)
+        if(end > s_size)
         {
-            end = size_s;
+            end = s_size;
         }
-        return pair_cici_t(sorted_set::cbegin() + begin, sorted_set::cend() - (size_s - end));
+        return pair_cici_t(sorted_set::cbegin() + begin, sorted_set::cend() - (s_size - end));
     }
 
     iterator lower_bound(key_t const &key)
     {
-        return iterator(bst_lower_bound_(key), this);
+        return iterator(bst_lower_bound_(key));
     }
     const_iterator lower_bound(key_t const &key) const
     {
-        return const_iterator(bst_lower_bound_(key), this);
+        return const_iterator(bst_lower_bound_(key));
     }
     iterator upper_bound(key_t const &key)
     {
-        return iterator(bst_upper_bound_(key), this);
+        return iterator(bst_upper_bound_(key));
     }
     const_iterator upper_bound(key_t const &key) const
     {
-        return const_iterator(bst_upper_bound_(key), this);
+        return const_iterator(bst_upper_bound_(key));
     }
 
     pair_ii_t equal_range(key_t const &key)
     {
         node_t *lower, *upper;
         bst_equal_range_(key, lower, upper);
-        return pair_ii_t(iterator(lower, this), iterator(upper, this));
+        return pair_ii_t(iterator(lower), iterator(upper));
     }
     pair_cici_t equal_range(key_t const &key) const
     {
         node_t const *lower, *upper;
         bst_equal_range_(key, lower, upper);
-        return pair_cici_t(const_iterator(lower, this), const_iterator(upper, this));
+        return pair_cici_t(const_iterator(lower), const_iterator(upper));
     }
 
     iterator begin()
     {
-        return iterator(get_most_left_(), this);
+        return iterator(get_most_left_());
     }
     iterator end()
     {
-        return iterator(nil_(), this);
+        return iterator(nil_());
     }
     const_iterator begin() const
     {
-        return const_iterator(get_most_left_(), this);
+        return const_iterator(get_most_left_());
     }
     const_iterator end() const
     {
-        return const_iterator(nil_(), this);
+        return const_iterator(nil_());
     }
     const_iterator cbegin() const
     {
-        return const_iterator(get_most_left_(), this);
+        return const_iterator(get_most_left_());
     }
     const_iterator cend() const
     {
-        return const_iterator(nil_(), this);
+        return const_iterator(nil_());
     }
     reverse_iterator rbegin()
     {
-        return reverse_iterator(get_most_right_(), this);
+        return reverse_iterator(get_most_right_());
     }
     reverse_iterator rend()
     {
-        return reverse_iterator(nil_(), this);
+        return reverse_iterator(nil_());
     }
     const_reverse_iterator rbegin() const
     {
-        return const_reverse_iterator(get_most_right_(), this);
+        return const_reverse_iterator(get_most_right_());
     }
     const_reverse_iterator rend() const
     {
-        return const_reverse_iterator(nil_(), this);
+        return const_reverse_iterator(nil_());
     }
     const_reverse_iterator crbegin() const
     {
-        return const_reverse_iterator(get_most_right_(), this);
+        return const_reverse_iterator(get_most_right_());
     }
     const_reverse_iterator crend() const
     {
-        return const_reverse_iterator(nil_(), this);
+        return const_reverse_iterator(nil_());
     }
 
     value_type &front()
@@ -701,7 +694,7 @@ public:
     {
         while(!is_nil_(get_root_()))
         {
-            erase(iterator(get_root_(), this));
+            erase(iterator(get_root_()));
         }
     }
     size_type size() const
@@ -716,12 +709,12 @@ public:
     //下标访问[0, size)
     iterator at(size_type index)
     {
-        return iterator(sbt_at_(get_root_(), index), this);
+        return iterator(sbt_at_(index));
     }
     //下标访问[0, size)
     const_iterator at(size_type index) const
     {
-        return iterator(sbt_at_(get_root_(), index), this);
+        return const_iterator(sbt_at_(index));
     }
 
     //计算key的rank(相同取最末,从1开始)
@@ -732,7 +725,7 @@ public:
     //计算迭代器rank[1, size]
     static size_type rank(const_iterator where)
     {
-        return sbt_rank_(where.ptr_);
+        return sbt_rank_(where.node);
     }
 
 protected:
@@ -856,8 +849,7 @@ protected:
         set_size_(node, get_size_(get_left_(node)) + get_size_(get_right_(node)) + 1);
     }
 
-    template<bool is_left>
-    static void set_child_(node_t *node, node_t *child)
+    template<bool is_left> static void set_child_(node_t *node, node_t *child)
     {
         if(is_left)
         {
@@ -869,8 +861,7 @@ protected:
         }
     }
 
-    template<bool is_left>
-    static node_t *get_child_(node_t const *node)
+    template<bool is_left> static node_t *get_child_(node_t const *node)
     {
         if(is_left)
         {
@@ -890,8 +881,7 @@ protected:
         return node;
     }
 
-    template<bool is_next, typename in_node_t>
-    static in_node_t *bst_move_(in_node_t *node)
+    template<bool is_next, typename in_node_t> static in_node_t *bst_move_(in_node_t *node)
     {
         if(!is_nil_(node))
         {
@@ -920,8 +910,7 @@ protected:
         return node;
     }
 
-    template<bool is_min>
-    static node_t *bst_most_(node_t *node)
+    template<bool is_min> static node_t *bst_most_(node_t *node)
     {
         while(!is_nil_(get_child_<is_min>(node)))
         {
@@ -1078,11 +1067,12 @@ protected:
         upper_node = upper;
     }
 
-    static node_t *sbt_at_(node_t *node, size_type index)
+    node_t *sbt_at_(size_type index)
     {
+        node_t *node = get_root_();
         if(index >= get_size_(node))
         {
-            return nullptr;
+            return nil_();
         }
         size_type rank = get_size_(get_left_(node));
         while(index != rank)
@@ -1101,7 +1091,31 @@ protected:
         return node;
     }
 
-    static node_t *sbt_advance_(node_t *node, difference_type step)
+    node_t const *sbt_at_(size_type index) const
+    {
+        node_t const *node = get_root_();
+        if(index >= get_size_(node))
+        {
+            return nil_();
+        }
+        size_type rank = get_size_(get_left_(node));
+        while(index != rank)
+        {
+            if(index < rank)
+            {
+                node = get_left_(node);
+            }
+            else
+            {
+                index -= rank + 1;
+                node = get_right_(node);
+            }
+            rank = get_size_(get_left_(node));
+        }
+        return node;
+    }
+
+    template<typename in_node_t> static in_node_t *sbt_advance_(in_node_t *node, difference_type step)
     {
         if(is_nil_(node))
         {
@@ -1188,8 +1202,7 @@ protected:
         return rank;
     }
 
-    template<bool is_left>
-    node_t *sbt_rotate_(node_t *node)
+    template<bool is_left> node_t *sbt_rotate_(node_t *node)
     {
         node_t *child = get_child_<!is_left>(node), *parent = get_parent_(node);
         set_child_<!is_left>(node, get_child_<is_left>(child));
@@ -1273,8 +1286,7 @@ protected:
         }
     }
 
-    template<bool is_left>
-    node_t *sbt_maintain_(node_t *node)
+    template<bool is_left> node_t *sbt_maintain_(node_t *node)
     {
         if(is_nil_(get_child_<is_left>(node)))
         {
@@ -1366,8 +1378,7 @@ protected:
         }
     }
 
-    template<bool is_left>
-    void sbt_erase_on_(node_t *node)
+    template<bool is_left> void sbt_erase_on_(node_t *node)
     {
         node_t *erase_node = node;
         node_t *fix_node;

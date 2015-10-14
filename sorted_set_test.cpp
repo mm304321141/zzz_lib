@@ -38,7 +38,7 @@ protected:
             std::string next_left = type == 0 ? "" : type == 1 ? "┃" : "  ";
             std::string next_right = type == 0 ? "" : type == 1 ? "  " : "┃";
             print_tree(b_t::get_right_(node), level + 1, head + next_right, "┏", 1);
-            printf("%s%d\n", (head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node, this)));
+            printf("%s%d\n", (head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node)));
             print_tree(b_t::get_left_(node), level + 1, head + next_left, "┗", 2);
         }
     }
@@ -134,29 +134,30 @@ int main()
     }
     for(int i = 0; i < length; ++i)
     {
-        typedef decltype(sb.begin()) iter_t;
-        int off = rand() % sb.size();
-        iter_t it = sb.at(off);
-        assert(it - sb.begin() == off);
-        assert(it - off == sb.begin());
-        assert(sb.begin() + off == it);
-        assert(sb.begin() + off == sb.end() - (sb.size() - off));
-        iter_t begin = sb.begin(), end = sb.end();
+        decltype(sb) const &csb = sb;
+        typedef decltype(csb.begin()) iter_t;
+        int off = rand() % csb.size();
+        iter_t it = csb.at(off);
+        assert(it - csb.begin() == off);
+        assert(it - off == csb.begin());
+        assert(csb.begin() + off == it);
+        assert(csb.begin() + off == csb.end() - (csb.size() - off));
+        iter_t begin = csb.begin(), end = csb.end();
         for(int i = 0; i < off; ++i)
         {
             --it;
             ++begin;
             --end;
         }
-        assert(sb.end() - end == off);
-        assert(sb.begin() + off == begin);
-        assert(sb.begin() == it);
-        int part = sb.size() / 4;
+        assert(csb.end() - end == off);
+        assert(csb.begin() + off == begin);
+        assert(csb.begin() == it);
+        int part = csb.size() / 4;
         int a = part + rand() % (part * 2);
         int b = rand() % part;
-        assert(sb.at(a) + b == sb.at(a + b));
-        assert(sb.begin() + a == sb.at(a + b) - b);
-        assert(sb.at(a) - sb.at(b) == a - b);
+        assert(csb.at(a) + b == csb.at(a + b));
+        assert(csb.begin() + a == csb.at(a + b) - b);
+        assert(csb.at(a) - csb.at(b) == a - b);
     }
 
     for(int i = 0; i < length * 2 + length / 2; ++i)
@@ -172,12 +173,10 @@ int main()
 
     //for(int i = 0; ; ++i)
     //{
-    //    sb.insert(std::make_pair(i/*rand()*/, i));
+    //    sb.insert(std::make_pair(rand(), i));
     //    sb.print_tree();
     //    system("pause");
     //}
-
-    system("pause");
 
 
     auto t = std::chrono::high_resolution_clock::now;
