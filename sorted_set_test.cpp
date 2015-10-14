@@ -69,6 +69,14 @@ int main()
         sorted_set_test<int, int> sb2 = sb;
         assert(sb.size() == sb1.size());
         assert(sb.size() == sb2.size());
+        assert(sb1.rbegin()->second == (--sb1.end())->second);
+        typedef decltype(sb1.rbegin()) riter_t;
+        riter_t rit(sb1.begin());
+        assert(rit.base() == sb1.begin());
+        assert(rit == sb1.rend());
+        assert(sb2.rbegin() + 10 == sb2.rend() - 190);
+        sb.clear();
+        sb.insert(sb1.rbegin(), sb1.rend());
         sb.clear();
     }();
 
@@ -151,12 +159,12 @@ int main()
 
     for(int i = 0; i < length * 2 + length / 2; ++i)
     {
-        auto it_rb = rb.begin();
-        auto it_sb = sb.begin();
+        auto it_rb = rb.rbegin();
+        auto it_sb = sb.rbegin();
         std::advance(it_rb, rand() % rb.size());
         std::advance(it_sb, rand() % sb.size());
-        rb.erase(it_rb);
-        sb.erase(it_sb);
+        rb.erase(--(it_rb.base()));
+        sb.erase(--(it_sb.base()));
     }
     
 
