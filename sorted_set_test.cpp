@@ -1,4 +1,4 @@
-
+Ôªø
 #define _SCL_SECURE_NO_WARNINGS
 
 #include "sorted_set.h"
@@ -32,14 +32,14 @@ protected:
                 assert(false);
             }
             std::string fork =
-                !b_t::is_nil_(b_t::get_left_(node)) && !b_t::is_nil_(b_t::get_right_(node)) ? "©œ" :
+                !b_t::is_nil_(b_t::get_left_(node)) && !b_t::is_nil_(b_t::get_right_(node)) ? "‚î´" :
                 b_t::is_nil_(b_t::get_left_(node)) && b_t::is_nil_(b_t::get_right_(node)) ? "* " :
-                !b_t::is_nil_(b_t::get_right_(node)) ? "©ø" : "©∑";
-            std::string next_left = type == 0 ? "" : type == 1 ? "©ß" : "  ";
-            std::string next_right = type == 0 ? "" : type == 1 ? "  " : "©ß";
-            print_tree(b_t::get_right_(node), level + 1, head + next_right, "©≥", 1);
+                !b_t::is_nil_(b_t::get_right_(node)) ? "‚îõ" : "‚îì";
+            std::string next_left = type == 0 ? "" : type == 1 ? "‚îÉ" : "  ";
+            std::string next_right = type == 0 ? "" : type == 1 ? "  " : "‚îÉ";
+            print_tree(b_t::get_right_(node), level + 1, head + next_right, "‚îè", 1);
             printf("%s%d\n", (head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node, this)));
-            print_tree(b_t::get_left_(node), level + 1, head + next_left, "©ª", 2);
+            print_tree(b_t::get_left_(node), level + 1, head + next_left, "‚îó", 2);
         }
     }
 public:
@@ -145,12 +145,20 @@ int main()
         sb.erase(it_sb);
     }
 
-    for(int i = 0; i < 50; ++i)
+    for(int i = 0; ; ++i)
     {
         sb.insert(std::make_pair(rand(), i));
+        sb.print_tree();
+        system("pause");
     }
 
-    sb.print_tree();
-
     system("pause");
+
+    sorted_set_test<int, int> const *psb = &sb;
+
+    for(auto it = psb->begin(); it != psb->end(); ++it)
+    {
+        it->second;
+    }
+
 }

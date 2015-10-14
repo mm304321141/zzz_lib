@@ -1,4 +1,4 @@
-
+ï»¿#pragma once
 
 #include <cstdint>
 #include <algorithm>
@@ -57,15 +57,15 @@ public:
             ptr_ = set_->sbt_advance_(ptr_, -diff);
             return *this;
         }
-        iterator operator + (difference_type diff)
+        iterator operator + (difference_type diff) const
         {
             return iterator(set_->sbt_advance_(ptr_, diff), set_);
         }
-        iterator operator - (difference_type diff)
+        iterator operator - (difference_type diff) const
         {
             return iterator(set_->sbt_advance_(ptr_, -diff), set_);
         }
-        difference_type operator - (iterator const &other)
+        difference_type operator - (iterator const &other) const
         {
             return static_cast<difference_type>(set_->sbt_rank_(ptr_)) - static_cast<difference_type>(sorted_set::sbt_rank_(other.ptr_));
         }
@@ -91,11 +91,11 @@ public:
             --*this;
             return save;
         }
-        pair_t &operator *()
+        pair_t &operator *() const
         {
             return static_cast<value_node_t *>(ptr_)->value;
         }
-        pair_t *operator->()
+        pair_t *operator->() const
         {
             return &static_cast<value_node_t *>(ptr_)->value;
         }
@@ -111,6 +111,90 @@ public:
         friend class sorted_set;
         node_t *ptr_;
         sorted_set *set_;
+    };
+    class const_iterator
+    {
+    public:
+        typedef std::random_access_iterator_tag iterator_category;
+        typedef node_t value_type;
+        typedef int difference_type;
+        typedef unsigned int distance_type;
+        typedef node_t *pointer;
+        typedef node_t reference;
+    public:
+        const_iterator(node_t const *node, sorted_set const *set) : ptr_(node), set_(set)
+        {
+        }
+        const_iterator(iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        {
+        }
+        const_iterator(const_iterator const &other) : ptr_(other.ptr_), set_(other.set_)
+        {
+        }
+        const_iterator &operator += (difference_type diff)
+        {
+            ptr_ = set_->sbt_advance_(ptr_, diff);
+            return *this;
+        }
+        const_iterator &operator -= (difference_type diff)
+        {
+            ptr_ = set_->sbt_advance_(ptr_, -diff);
+            return *this;
+        }
+        const_iterator operator + (difference_type diff) const
+        {
+            return const_iterator(set_->sbt_advance_(ptr_, diff), set_);
+        }
+        const_iterator operator - (difference_type diff) const
+        {
+            return const_iterator(set_->sbt_advance_(ptr_, -diff), set_);
+        }
+        difference_type operator - (const_iterator const &other) const
+        {
+            return static_cast<difference_type>(set_->sbt_rank_(ptr_)) - static_cast<difference_type>(sorted_set::sbt_rank_(other.ptr_));
+        }
+        const_iterator &operator++()
+        {
+            ptr_ = sorted_set::bst_move_<true>(ptr_);
+            return *this;
+        }
+        const_iterator &operator--()
+        {
+            ptr_ = sorted_set::bst_move_<false>(ptr_);
+            return *this;
+        }
+        const_iterator operator++(int)
+        {
+            const_iterator save(*this);
+            ++*this;
+            return save;
+        }
+        const_iterator operator--(int)
+        {
+            const_iterator save(*this);
+            --*this;
+            return save;
+        }
+        pair_t const &operator *() const
+        {
+            return static_cast<value_node_t const *>(ptr_)->value;
+        }
+        pair_t const *operator->() const
+        {
+            return &static_cast<value_node_t const *>(ptr_)->value;
+        }
+        bool operator == (const_iterator const &other) const
+        {
+            return ptr_ == other.ptr_;
+        }
+        bool operator != (const_iterator const &other) const
+        {
+            return ptr_ != other.ptr_;
+        }
+    private:
+        friend class sorted_set;
+        node_t const *ptr_;
+        sorted_set const *set_;
     };
 
 public:
@@ -147,8 +231,9 @@ public:
 
     typedef std::pair<iterator, bool> pair_ib_t;
     typedef std::pair<iterator, iterator> pair_ii_t;
+    typedef std::pair<const_iterator, const_iterator> pair_cici_t;
 
-    //ÔÊĞíÖØ¸´key
+    //å…è®¸é‡å¤key
     pair_ib_t insert(pair_t const &node)
     {
         value_node_t *new_node = get_allocator().allocate(1);
@@ -156,7 +241,7 @@ public:
         sbt_insert_(new_node);
         return pair_ib_t(iterator(new_node, this), true);
     }
-    //ÔÊĞíÖØ¸´key
+    //å…è®¸é‡å¤key
     pair_ib_t insert(pair_t &&node)
     {
         value_node_t *new_node = get_allocator().allocate(1);
@@ -164,7 +249,7 @@ public:
         sbt_insert_(new_node);
         return pair_ib_t(iterator(new_node, this), true);
     }
-    //·µ»Ø²åÈëÁË¶àÉÙ¸ö
+    //è¿”å›æ’å…¥äº†å¤šå°‘ä¸ª
     template<class iterator_t>
     size_t insert(iterator_t begin, iterator_t end)
     {
@@ -178,20 +263,24 @@ public:
         }
         return insert_count;
     }
-    //²»½âÊÍ
     iterator find(key_t const &key)
     {
         node_t *where = bst_lower_bound_(key);
         return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_(), this) : iterator(where, this);
     }
-    //²»½âÊÍ
+    const_iterator find(key_t const &key) const
+    {
+        node_t *where = bst_lower_bound_(key);
+        return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_(), this) : iterator(where, this);
+    }
+    //ä¸è§£é‡Š
     void erase(iterator where)
     {
         sbt_erase_(where.ptr_);
         static_cast<value_node_t *>(where.ptr_)->~value_node_t();
         get_allocator().deallocate(static_cast<value_node_t *>(where.ptr_), 1);
     }
-    //·µ»ØÒÆ³ıÁË¶àÉÙ¸ö
+    //è¿”å›ç§»é™¤äº†å¤šå°‘ä¸ª
     size_t erase(key_t const &key)
     {
         size_t erase_count = 0;
@@ -203,23 +292,27 @@ public:
         }
         return erase_count;
     }
-    //¼ÆÊı¸Ãkey´æÔÚ¸öÊı
-    size_t count(key_t const &key)
+    //è®¡æ•°è¯¥keyå­˜åœ¨ä¸ªæ•°
+    size_t count(key_t const &key) const
     {
-        pair_ii_t range = equal_range(key);
+        pair_cici_t range = equal_range(key);
         return std::distance(range.first, range.second);
     }
-    //¼ÆÊı[min, max)
-    size_t count(key_t const &min, key_t const &max)
+    //è®¡æ•°[min, max)
+    size_t count(key_t const &min, key_t const &max) const
     {
         return sbt_rank_(bst_upper_bound_(max)) - sbt_rank_(bst_lower_bound_(min));
     }
-    //»ñÈ¡[min, max)
+    //è·å–[min, max)
     pair_ii_t range(key_t const &min, key_t const &max)
     {
         return pair_ii_t(iterator(bst_lower_bound_(min), this), iterator(bst_upper_bound_(max), this));
     }
-    //»ñÈ¡ÏÂ±êbeginµ½endÖ®¼ä(²ÎÊıĞ¡ÓÚ0·´ÏòÏÂ±ê)
+    pair_cici_t range(key_t const &min, key_t const &max) const
+    {
+        return pair_cici_t(const_iterator(bst_lower_bound_(min), this), const_iterator(bst_upper_bound_(max), this));
+    }
+    //è·å–ä¸‹æ ‡beginåˆ°endä¹‹é—´(å‚æ•°å°äº0åå‘ä¸‹æ ‡)
     pair_ii_t slice(int begin = 0, int end = std::numeric_limits<int>::max())
     {
         int size_s = size();
@@ -241,49 +334,99 @@ public:
         }
         return pair_ii_t(sorted_set::begin() + begin, sorted_set::end() - (size_s - end));
     }
-    //²»½âÊÍ
+    pair_cici_t slice(int begin = 0, int end = std::numeric_limits<int>::max()) const
+    {
+        int size_s = size();
+        if(begin < 0)
+        {
+            begin = std::max(size_s + begin, 0);
+        }
+        if(end < 0)
+        {
+            end = size_s + end;
+        }
+        if(begin > end || begin >= size_s)
+        {
+            return pair_ii_t(sorted_set::end(), sorted_set::end());
+        }
+        if(end > size_s)
+        {
+            end = size_s;
+        }
+        return pair_cici_t(sorted_set::begin() + begin, sorted_set::end() - (size_s - end));
+    }
+
     iterator lower_bound(key_t const &key)
     {
         return iterator(bst_lower_bound_(key), this);
     }
-    //²»½âÊÍ
+    const_iterator lower_bound(key_t const &key) const
+    {
+        return const_iterator(bst_lower_bound_(key), this);
+    }
     iterator upper_bound(key_t const &key)
     {
         return iterator(bst_upper_bound_(key), this);
     }
-    //²»½âÊÍ
+    const_iterator upper_bound(key_t const &key) const
+    {
+        return const_iterator(bst_upper_bound_(key), this);
+    }
+
     pair_ii_t equal_range(key_t const &key)
     {
         node_t *lower, *upper;
         bst_equal_range_(key, lower, upper);
         return pair_ii_t(iterator(lower, this), iterator(upper, this));
     }
-    //²»½âÊÍ
+    pair_cici_t equal_range(key_t const &key) const
+    {
+        node_t const *lower, *upper;
+        bst_equal_range_(key, lower, upper);
+        return pair_cici_t(const_iterator(lower, this), const_iterator(upper, this));
+    }
+
     iterator begin()
     {
         return iterator(get_most_left_(), this);
     }
-    //²»½âÊÍ
     iterator end()
     {
         return iterator(nil_(), this);
     }
-    //²»½âÊÍ
+    const_iterator begin() const
+    {
+        return const_iterator(get_most_left_(), this);
+    }
+    const_iterator end() const
+    {
+        return const_iterator(nil_(), this);
+    }
+
     pair_t &front()
     {
         return static_cast<value_node_t *>(get_most_left_())->value;
     }
-    //²»½âÊÍ
     pair_t &back()
     {
         return static_cast<value_node_t *>(get_most_right_())->value;
     }
-    //²»½âÊÍ
-    bool empty()
+
+    pair_t const &front() const
+    {
+        return static_cast<value_node_t *>(get_most_left_())->value;
+    }
+    pair_t const &back() const
+    {
+        return static_cast<value_node_t *>(get_most_right_())->value;
+    }
+
+    //ä¸è§£é‡Š
+    bool empty() const
     {
         return is_nil_(get_root_());
     }
-    //²»½âÊÍ
+    //ä¸è§£é‡Š
     void clear()
     {
         while(get_root_() != nil_())
@@ -292,23 +435,28 @@ public:
         }
         bst_clear_();
     }
-    //²»½âÊÍ
-    size_t size()
+    //ä¸è§£é‡Š
+    size_t size() const
     {
         return get_root_() == nil_() ? 0 : get_size_(get_root_());
     }
-    //ÏÂ±ê·ÃÎÊ[0, size)
+    //ä¸‹æ ‡è®¿é—®[0, size)
     iterator at(size_t index)
     {
         return iterator(static_cast<value_node_t *>(sbt_at_(get_root_(), index)), this);
     }
-    //¼ÆËãkeyµÄrank(ÏàÍ¬È¡×îÄ©,´Ó1¿ªÊ¼)
-    size_t rank(key_t const &key)
+    //ä¸‹æ ‡è®¿é—®[0, size)
+    const_iterator at(size_t index) const
+    {
+        return iterator(static_cast<value_node_t *>(sbt_at_(get_root_(), index)), this);
+    }
+    //è®¡ç®—keyçš„rank(ç›¸åŒå–æœ€æœ«,ä»1å¼€å§‹)
+    size_t rank(key_t const &key) const
     {
         return sbt_rank_(bst_upper_bound_(key));
     }
-    //¼ÆËãµü´úÆ÷rank[1, size]
-    static size_t rank(iterator where)
+    //è®¡ç®—è¿­ä»£å™¨rank[1, size]
+    static size_t rank(const_iterator where)
     {
         return sbt_rank_(where.ptr_);
     }
@@ -318,7 +466,7 @@ protected:
 
 protected:
 
-    comparator_t &get_comparator()
+    comparator_t const &get_comparator() const
     {
         return head_;
     }
@@ -332,8 +480,16 @@ protected:
     {
         return &head_;
     }
+    node_t const *nil_() const
+    {
+        return &head_;
+    }
 
     node_t *get_root_()
+    {
+        return get_parent_(&head_);
+    }
+    node_t const *get_root_() const
     {
         return get_parent_(&head_);
     }
@@ -344,6 +500,10 @@ protected:
     }
 
     node_t *get_most_left_()
+    {
+        return get_left_(&head_);
+    }
+    node_t const *get_most_left_() const
     {
         return get_left_(&head_);
     }
@@ -363,9 +523,9 @@ protected:
         set_right_(&head_, right);
     }
 
-    static key_t const &get_key_(node_t *node)
+    static key_t const &get_key_(node_t const *node)
     {
-        return static_cast<value_node_t *>(node)->value.first;
+        return static_cast<value_node_t const *>(node)->value.first;
     }
 
     static void set_nil_(node_t *node, bool nil)
@@ -373,12 +533,12 @@ protected:
         node->nil = nil;
     }
 
-    static bool is_nil_(node_t *node)
+    static bool is_nil_(node_t const *node)
     {
         return node->nil;
     }
 
-    static node_t *get_parent_(node_t *node)
+    static node_t *get_parent_(node_t const *node)
     {
         return node->parent;
     }
@@ -388,7 +548,7 @@ protected:
         node->parent = parent;
     }
 
-    static node_t *get_left_(node_t *node)
+    static node_t *get_left_(node_t const *node)
     {
         return node->left;
     }
@@ -398,7 +558,7 @@ protected:
         node->left = left;
     }
 
-    static node_t *get_right_(node_t *node)
+    static node_t *get_right_(node_t const *node)
     {
         return node->right;
     }
@@ -408,7 +568,7 @@ protected:
         node->right = right;
     }
 
-    static size_t get_size_(node_t *node)
+    static size_t get_size_(node_t const *node)
     {
         return node->size;
     }
@@ -437,7 +597,7 @@ protected:
     }
 
     template<bool is_left>
-    static node_t *get_child_(node_t *node)
+    static node_t *get_child_(node_t const *node)
     {
         if(is_left)
         {
@@ -449,13 +609,6 @@ protected:
         }
     }
 
-    void bst_clear_()
-    {
-        set_root_(nil_());
-        set_most_left_(nil_());
-        set_most_right_(nil_());
-    }
-
     node_t *bst_init_node_(node_t *parent, node_t *node)
     {
         set_nil_(node, false);
@@ -465,8 +618,8 @@ protected:
         return node;
     }
 
-    template<bool is_next>
-    static node_t *bst_move_(node_t *node)
+    template<bool is_next, typename in_node_t>
+    static in_node_t *bst_move_(in_node_t *node)
     {
         if(!is_nil_(node))
         {
@@ -480,7 +633,7 @@ protected:
             }
             else
             {
-                node_t *parent;
+                in_node_t *parent;
                 while(!is_nil_(parent = get_parent_(node)) && node == get_child_<!is_next>(parent))
                 {
                     node = parent;
@@ -523,9 +676,45 @@ protected:
         return where;
     }
 
+    node_t const *bst_lower_bound_(key_t const &key) const
+    {
+        node_t const *node = get_root_(), *where = nil_();
+        while(!is_nil_(node))
+        {
+            if(get_comparator()(get_key_(node), key))
+            {
+                node = get_right_(node);
+            }
+            else
+            {
+                where = node;
+                node = get_left_(node);
+            }
+        }
+        return where;
+    }
+
     node_t *bst_upper_bound_(key_t const &key)
     {
         node_t *node = get_root_(), *where = nil_();
+        while(!is_nil_(node))
+        {
+            if(get_comparator()(key, get_key_(node)))
+            {
+                where = node;
+                node = get_left_(node);
+            }
+            else
+            {
+                node = get_right_(node);
+            }
+        }
+        return where;
+    }
+
+    node_t const *bst_upper_bound_(key_t const &key) const
+    {
+        node_t const *node = get_root_(), *where = nil_();
         while(!is_nil_(node))
         {
             if(get_comparator()(key, get_key_(node)))
@@ -579,31 +768,42 @@ protected:
         upper_node = upper;
     }
 
-    template<bool is_left>
-    node_t *bst_rotate_(node_t *node)
+    void bst_equal_range_(key_t const &key, node_t const *&lower_node, node_t const *&upper_node) const
     {
-        node_t *child = get_child_<!is_left>(node), *parent = get_parent_(node);
-        set_child_<!is_left>(node, get_child_<is_left>(child));
-        if(!is_nil_(get_child_<is_left>(child)))
+        node_t const *node = get_root_();
+        node_t const *lower = nil_();
+        node_t const *upper = nil_();
+        while(!is_nil_(node))
         {
-            set_parent_(get_child_<is_left>(child), node);
+            if(get_comparator()(get_key_(node), key))
+            {
+                node = get_right_(node);
+            }
+            else
+            {
+                if(is_nil_(upper) && get_comparator()(key, get_key_(node)))
+                {
+                    upper = node;
+                }
+                lower = node;
+                node = get_left_(node);
+            }
         }
-        set_parent_(child, parent);
-        if(node == get_root_())
+        node = is_nil_(upper) ? get_root_() : get_left_(upper);
+        while(!is_nil_(node))
         {
-            set_root_(child);
+            if(get_comparator()(key, get_key_(node)))
+            {
+                upper = node;
+                node = get_left_(node);
+            }
+            else
+            {
+                node = get_right_(node);
+            }
         }
-        else if(node == get_child_<is_left>(parent))
-        {
-            set_child_<is_left>(parent, child);
-        }
-        else
-        {
-            set_child_<!is_left>(parent, child);
-        }
-        set_child_<is_left>(child, node);
-        set_parent_(node, child);
-        return child;
+        lower_node = lower;
+        upper_node = upper;
     }
 
     static node_t *sbt_at_(node_t *node, size_t index)
@@ -696,7 +896,7 @@ protected:
         return node;
     }
 
-    static size_t sbt_rank_(node_t *node)
+    static size_t sbt_rank_(node_t const *node)
     {
         if(is_nil_(node))
         {

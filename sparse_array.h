@@ -1,4 +1,4 @@
-
+ï»¿#pragma once
 
 #include <cstdint>
 #include <algorithm>
@@ -10,21 +10,21 @@ struct sparse_array_default_config
     typedef void *handle_t;
     enum
     {
-        memory_size = 512,  //ÄÚ´æÊÇ°´¿é·ÖÅä,ÕâÀï¶¨ÒåÃ¿¸öÄÚ´æ¿é´óĞ¡(ÀàĞÍ²»Í¬,×îĞ¡ÖµÒ²²»Í¬,¹ıĞ¡±àÒë±¨´í)
-        atomic_length = 4,  //×îĞ¡Á¬ĞøÊı¾İ³¤¶È(ÀàĞÍ²»Í¬,×îĞ¡ÖµÒ²²»Í¬,¹ıĞ¡±àÒë±¨´í)
-        invalid_handle = 0, //·Ç·¨ÄÚ´æ¾ä±ú(¿ÉÒÔÈÏÎªÊÇnil)
+        memory_size = 512,  //å†…å­˜æ˜¯æŒ‰å—åˆ†é…,è¿™é‡Œå®šä¹‰æ¯ä¸ªå†…å­˜å—å¤§å°(ç±»å‹ä¸åŒ,æœ€å°å€¼ä¹Ÿä¸åŒ,è¿‡å°ç¼–è¯‘æŠ¥é”™)
+        atomic_length = 4,  //æœ€å°è¿ç»­æ•°æ®é•¿åº¦(ç±»å‹ä¸åŒ,æœ€å°å€¼ä¹Ÿä¸åŒ,è¿‡å°ç¼–è¯‘æŠ¥é”™)
+        invalid_handle = 0, //éæ³•å†…å­˜å¥æŸ„(å¯ä»¥è®¤ä¸ºæ˜¯nil)
     };
-    //·ÖÅäÒ»¿émemory_size³¤¶ÈµÄÄÚ´æ
+    //åˆ†é…ä¸€å—memory_sizeé•¿åº¦çš„å†…å­˜
     handle_t alloc()
     {
         return ::malloc(memory_size);
     }
-    //»ØÊÕÒ»¿éÒÑ·ÖÅäµÄÄÚ´æ
+    //å›æ”¶ä¸€å—å·²åˆ†é…çš„å†…å­˜
     void dealloc(handle_t handle)
     {
         ::free(handle);
     }
-    //´ÓÄÚ´æ¾ä±úµÃµ½ÄÚ´æµØÖ·
+    //ä»å†…å­˜å¥æŸ„å¾—åˆ°å†…å­˜åœ°å€
     void *get(handle_t handle)
     {
         return handle;
@@ -43,7 +43,7 @@ public:
         atomic_length = config_t::atomic_length,
         invalid_handle = config_t::invalid_handle,
     };
-    //ÄÚ´æÆ¬¶Î
+    //å†…å­˜ç‰‡æ®µ
     struct sparse_range
     {
         uint32_t end;
@@ -51,7 +51,7 @@ public:
         uint16_t offset;
         handle_t handle;
     };
-    //ºìºÚÊ÷½Úµã
+    //çº¢é»‘æ ‘èŠ‚ç‚¹
     struct sparse_range_set_base
     {
         handle_t parent_handle;
@@ -61,7 +61,7 @@ public:
         uint32_t nil : 1;
         uint32_t length : 30;
     };
-    //Êı¾İ
+    //æ•°æ®
     struct dump_data
     {
         handle_t parent_handle;
@@ -73,7 +73,7 @@ public:
         uint16_t free_offset;
         uint16_t free_cross;
     };
-    //ºìºÚÊ÷¸ù½Úµã+ÄÚ´æÊÊÅäÆ÷
+    //çº¢é»‘æ ‘æ ¹èŠ‚ç‚¹+å†…å­˜é€‚é…å™¨
     class sparse_range_tree
     {
     public:
@@ -111,21 +111,21 @@ public:
         };
         mutable sparse_range_root root_;
     };
-    //ºìºÚÊ÷Êı¾İ½Úµã,ÄÚ´æÆ¬¶Î¼¯ºÏ(Êı¾İÊÇÓĞĞòµÄ)
+    //çº¢é»‘æ ‘æ•°æ®èŠ‚ç‚¹,å†…å­˜ç‰‡æ®µé›†åˆ(æ•°æ®æ˜¯æœ‰åºçš„)
     struct sparse_range_set : public sparse_range_set_base
     {
         uint32_t max_index;
         uint32_t end;
         sparse_range begin[1];
     };
-    //¿ÕÏĞÄÚ´æÁ´±í
+    //ç©ºé—²å†…å­˜é“¾è¡¨
     struct memory_blcok_free
     {
         handle_t handle;
         uint16_t offset;
         uint16_t cross;
     };
-    //Êı¾İ¿éÔªËØ(Êı¾İ/¿ÕÏĞÁ´±í½Úµã)
+    //æ•°æ®å—å…ƒç´ (æ•°æ®/ç©ºé—²é“¾è¡¨èŠ‚ç‚¹)
     struct memory_block_data
     {
         union
@@ -134,7 +134,7 @@ public:
             memory_blcok_free free;
         };
     };
-    //Êı¾İ¿é
+    //æ•°æ®å—
     struct memory_block
     {
         handle_t next_handle;
@@ -150,12 +150,12 @@ public:
     };
     enum
     {
-        //Ã¿¸öÆ¬¶Î¼¯ºÏÓĞ¶àÉÙ¸öÆ¬¶Î
+        //æ¯ä¸ªç‰‡æ®µé›†åˆæœ‰å¤šå°‘ä¸ªç‰‡æ®µ
         range_length = (memory_size - sizeof(sparse_range_set)) / sizeof(sparse_range) + 1,
-        //Ã¿¸öÊı¾İ¿éÓĞ¶àÉÙ¸öÔªËØ
+        //æ¯ä¸ªæ•°æ®å—æœ‰å¤šå°‘ä¸ªå…ƒç´ 
         block_length = (memory_size - sizeof(memory_block)) / sizeof(memory_block_data) + 1,
     };
-    //operator[]´úÀí
+    //operator[]ä»£ç†
     class index_proxy
     {
     public:
@@ -201,7 +201,7 @@ public:
     {
         for(handle_t rb_it = rb_get_most_left_(); rb_it != rb_nil_(); )
         {
-            //·ÇPOD¶ÔÏó,Ã»±ØÒªÎö¹¹
+            //éPODå¯¹è±¡,æ²¡å¿…è¦ææ„
             if(!std::is_pod<value_t>::value)
             {
                 sparse_range_set *range_set = deref_<sparse_range_set>(rb_it);
@@ -227,17 +227,17 @@ public:
         }
     }
 
-    //ÄÚ´æÊÊÅäÆ÷
+    //å†…å­˜é€‚é…å™¨
     config_t const &allocator() const
     {
         return index_tree_.allocator();
     }
-    //ÄÚ´æÊÊÅäÆ÷
+    //å†…å­˜é€‚é…å™¨
     config_t &allocator()
     {
         return index_tree_.allocator();
     }
-    //dump(ÅäºÏallocator,Çë×Ô¼º±£´æallocator×´Ì¬)
+    //dump(é…åˆallocator,è¯·è‡ªå·±ä¿å­˜allocatorçŠ¶æ€)
     dump_data dump() const
     {
         dump_data d;
@@ -251,7 +251,7 @@ public:
         d.free_cross = free_.cross;
         return d;
     }
-    //load_dump(ÅäºÏallocator,loadºó»Ö¸´allocator×´Ì¬)
+    //load_dump(é…åˆallocator,loadåæ¢å¤allocatorçŠ¶æ€)
     void load_dump(dump_data const &d)
     {
         clear();
@@ -264,7 +264,7 @@ public:
         free_.offset = d.free_offset;
         free_.cross = d.free_cross;
     }
-    //ÔªËØÊıÁ¿(ÕâÀï²»ÊÇÕæÕıÊıÁ¿,Êµ¼ÊÃ»ÓĞÊ²Ã´ÉÏÏŞ,ÕâÀïÖ»ÊÇ¶ÔÆëºóµÄ×î´óÏÂ±ê
+    //å…ƒç´ æ•°é‡(è¿™é‡Œä¸æ˜¯çœŸæ­£æ•°é‡,å®é™…æ²¡æœ‰ä»€ä¹ˆä¸Šé™,è¿™é‡Œåªæ˜¯å¯¹é½åçš„æœ€å¤§ä¸‹æ ‡
     uint32_t size() const
     {
         if(rb_is_nil_(rb_get_root_()))
@@ -276,7 +276,7 @@ public:
             return deref_<sparse_range_set>(rb_get_most_right_())->max_index;
         }
     }
-    //»ñÈ¡ÔªËØ
+    //è·å–å…ƒç´ 
     value_t get(uint32_t index) const
     {
         sparse_range *range = find_index_(index, NULL);
@@ -286,7 +286,7 @@ public:
         }
         return deref_<memory_block>(range->handle)->data[range->offset].data[index + range->length - range->end];
     }
-    //Ìí¼ÓÔªËØ
+    //æ·»åŠ å…ƒç´ 
     void set(uint32_t index, value_t const &value)
     {
         handle_t find;
@@ -300,7 +300,7 @@ public:
             create_new_range_(find, index, &value, 1);
         }
     }
-    //ÅúÁ¿»ñÈ¡ÔªËØ
+    //æ‰¹é‡è·å–å…ƒç´ 
     void get_multi(uint32_t index, value_t *out_arr, uint32_t length) const
     {
         assert(length == 0 || out_arr != NULL);
@@ -333,7 +333,7 @@ public:
             out_arr += copy_length;
         }
     }
-    //ÅúÁ¿ÉèÖÃÔªËØ
+    //æ‰¹é‡è®¾ç½®å…ƒç´ 
     void set_multi(uint32_t index, value_t const *in_arr, uint32_t length)
     {
         assert(length == 0 || in_arr != NULL);
@@ -404,30 +404,30 @@ public:
             }
         }
     }
-    //Çå¿Õ
+    //æ¸…ç©º
     void clear()
     {
         self_t::~sparse_array();
         ::new(this) self_t();
     }
-    //²Á³ı²¿·ÖÇø¼ä
+    //æ“¦é™¤éƒ¨åˆ†åŒºé—´
     void clear(uint32_t index, uint32_t length)
     {
         erase_index_range_(index, length);
     }
-    //ÏÂ±ê·½Ê½·ÃÎÊ
+    //ä¸‹æ ‡æ–¹å¼è®¿é—®
     value_t operator[](uint32_t index) const
     {
         return get(index);
     }
-    //ÏÂ±ê·½Ê½·ÃÎÊ
+    //ä¸‹æ ‡æ–¹å¼è®¿é—®
     index_proxy operator[](uint32_t index)
     {
         return index_proxy(index, *this);
     }
 
 private:
-    //´ÓÆ¬¶Î¼¯ºÏÊ÷ÖĞÕÒµ½Æ¬¶Î¼¯ºÏ
+    //ä»ç‰‡æ®µé›†åˆæ ‘ä¸­æ‰¾åˆ°ç‰‡æ®µé›†åˆ
     handle_t find_handle_(uint32_t index) const
     {
         handle_t find = rb_lower_bound_(index);
@@ -437,7 +437,7 @@ private:
         }
         return find;
     }
-    //´ÓÆ¬¶Î¼¯ºÏÖĞÕÒµ½Æ¬¶Î
+    //ä»ç‰‡æ®µé›†åˆä¸­æ‰¾åˆ°ç‰‡æ®µ
     bool find_range_(uint32_t index, sparse_range_set *range_set, sparse_range *&range) const
     {
         sparse_range *const end = range_set->begin + range_set->end;
@@ -456,7 +456,7 @@ private:
         }
         return true;
     }
-    //´ÓÆ¬¶Î¼¯ºÏÊ÷ÖĞÕÒµ½Æ¬¶Î
+    //ä»ç‰‡æ®µé›†åˆæ ‘ä¸­æ‰¾åˆ°ç‰‡æ®µ
     sparse_range *find_index_(uint32_t index, handle_t *out_handle) const
     {
         handle_t find = find_handle_(index);
@@ -480,7 +480,7 @@ private:
         }
         return range;
     }
-    //·ÖÅäÒ»¸öÊı¾İ¿é
+    //åˆ†é…ä¸€ä¸ªæ•°æ®å—
     handle_t alloc_block_(memory_block **out_block)
     {
         handle_t new_handle = index_tree_.alloc();
@@ -498,7 +498,7 @@ private:
         }
         return block_handle_;
     }
-    //»ØÊÕÒ»¸öÊı¾İ¿é
+    //å›æ”¶ä¸€ä¸ªæ•°æ®å—
     void dealloc_block_(handle_t handle)
     {
         memory_block *block = deref_<memory_block>(handle);
@@ -516,7 +516,7 @@ private:
         }
         index_tree_.dealloc(handle);
     }
-    //·ÖÅäÒ»¿éÄÚ´æ(ÓÅÏÈÆ¥ÅäºÏÊÊ´óĞ¡,ÕÒ²»µ½¾Í²ğ·Ö´óÄÚ´æ,ÔÙÕÒ²»µ½¾Í¿ª±ÙĞÂÄÚ´æ¿é)
+    //åˆ†é…ä¸€å—å†…å­˜(ä¼˜å…ˆåŒ¹é…åˆé€‚å¤§å°,æ‰¾ä¸åˆ°å°±æ‹†åˆ†å¤§å†…å­˜,å†æ‰¾ä¸åˆ°å°±å¼€è¾Ÿæ–°å†…å­˜å—)
     void alloc_(uint32_t cross, handle_t &out_handle, uint16_t &out_offset)
     {
         assert(cross >= 1);
@@ -571,7 +571,7 @@ private:
             index_tree_.root()->length -= cross;
         }
     }
-    //»ØÊÕÒ»¿éÄÚ´æ(ÓÅÏÈºÏ²¢µ½ÏàÁÚÄÚ´æ)
+    //å›æ”¶ä¸€å—å†…å­˜(ä¼˜å…ˆåˆå¹¶åˆ°ç›¸é‚»å†…å­˜)
     void dealloc_(handle_t handle, uint16_t offset, uint32_t cross)
     {
         assert(cross >= 1);
@@ -612,7 +612,7 @@ private:
         free_.offset = offset;
         free_.cross = cross;
     }
-    //ÕæÕıµÄÅúÁ¿ÉèÖÃÔªËØ(Ç°ÃæµÄset_multi»á¹ıÂËµôÎªÄ¬ÈÏÖµµÄÔªËØ)
+    //çœŸæ­£çš„æ‰¹é‡è®¾ç½®å…ƒç´ (å‰é¢çš„set_multiä¼šè¿‡æ»¤æ‰ä¸ºé»˜è®¤å€¼çš„å…ƒç´ )
     void set_multi_without_check_(uint32_t index, value_t const *in_arr, uint32_t length)
     {
         handle_t find;
@@ -640,7 +640,7 @@ private:
             in_arr += copy_length;
         }
     }
-    //²Á³ıÒ»¶ÎÊı¾İ(»Ö¸´µ½Ä¬ÈÏÖµ)
+    //æ“¦é™¤ä¸€æ®µæ•°æ®(æ¢å¤åˆ°é»˜è®¤å€¼)
     void erase_index_range_(uint32_t index, uint32_t length)
     {
         handle_t find;
@@ -673,14 +673,14 @@ private:
             index += erase_length;
         }
     }
-    //³õÊ¼»¯Æ¬¶Î¼¯ºÏ
+    //åˆå§‹åŒ–ç‰‡æ®µé›†åˆ
     void init_range_set_(sparse_range_set *range_set)
     {
         range_set->max_index = 0;
         range_set->length = 0;
         range_set->end = 0;
     }
-    //´´½¨Ò»¸öĞÂµÄÆ¬¶Î
+    //åˆ›å»ºä¸€ä¸ªæ–°çš„ç‰‡æ®µ
     void create_new_range_(handle_t where, uint32_t index, value_t const *arr, uint32_t length)
     {
         assert(index % atomic_length + length <= atomic_length);
@@ -704,7 +704,7 @@ private:
             insert_range_(where, &range_insert);
         }
     }
-    //³õÊ¼»¯Æ¬¶ÎÊı¾İ
+    //åˆå§‹åŒ–ç‰‡æ®µæ•°æ®
     void init_range_data_(value_t *ptr, value_t *begin, value_t *end, value_t const *arr, uint32_t length)
     {
         for(value_t *it = begin; it != end; )
@@ -723,7 +723,7 @@ private:
             }
         }
     }
-    //µ÷ÕûÆ¬¶ÎÍ·²¿´óĞ¡
+    //è°ƒæ•´ç‰‡æ®µå¤´éƒ¨å¤§å°
     void adjust_range_head_(handle_t handle, sparse_range *range, int32_t change)
     {
         assert(change != 0);
@@ -761,7 +761,7 @@ private:
         *range = adjust;
         update_range_set_(deref_<sparse_range_set>(handle), handle);
     }
-    //µ÷ÕûÆ¬¶ÎÎ²²¿´óĞ¡
+    //è°ƒæ•´ç‰‡æ®µå°¾éƒ¨å¤§å°
     void adjust_range_tail_(handle_t handle, sparse_range *range, int32_t change)
     {
         assert(change != 0);
@@ -786,7 +786,7 @@ private:
             uint32_t cut_length = uint32_t(-change) * atomic_length;
             for(value_t *end = from + (range->length - cut_length); from != end; ++from, ++to)
             {
-                ::new(to) value_t (std::move(*from));
+                ::new(to) value_t(std::move(*from));
                 from->~value_t();
             }
             for(value_t *end = from + cut_length; from != end; ++from)
@@ -800,7 +800,7 @@ private:
         *range = adjust;
         update_range_set_(deref_<sparse_range_set>(handle), handle);
     }
-    //³¢ÊÔºÏ²¢Êı¾İµ½ÏàÁÚµÄÆ¬¶Î
+    //å°è¯•åˆå¹¶æ•°æ®åˆ°ç›¸é‚»çš„ç‰‡æ®µ
     bool merge_range_(uint32_t index, value_t const *arr, uint32_t length)
     {
         uint32_t fix_index = index - index % atomic_length;
@@ -849,7 +849,7 @@ private:
         }
         return false;
     }
-    //²åÈëÒ»¿éÆ¬¶Î,µ½Æ¬¶Î¼¯ºÏÊ÷Ä©Î²
+    //æ’å…¥ä¸€å—ç‰‡æ®µ,åˆ°ç‰‡æ®µé›†åˆæ ‘æœ«å°¾
     void insert_tail_range_(sparse_range *range)
     {
         handle_t handle = index_tree_.alloc();
@@ -861,7 +861,7 @@ private:
         *range_set->begin = *range;
         rb_insert_(handle);
     }
-    //²åÈëÒ»¿éÆ¬¶Î
+    //æ’å…¥ä¸€å—ç‰‡æ®µ
     void insert_range_(handle_t find, sparse_range *range)
     {
         if(find == rb_nil_())
@@ -891,7 +891,7 @@ private:
             }
         }
     }
-    //ÒÆ³ıÒ»¸öÆ¬¶Î
+    //ç§»é™¤ä¸€ä¸ªç‰‡æ®µ
     void remove_range_(handle_t handle, sparse_range *range)
     {
         dealloc_(range->handle, range->offset, range->length / atomic_length);
@@ -910,7 +910,7 @@ private:
         --range_set->end;
         update_range_set_(range_set, handle);
     }
-    //Ç¿ÖÆ²åÈëÆ¬¶Î(Èç¹ûÂú,Ôò·µ»Ø¼·³öµÄÆ¬¶Î)
+    //å¼ºåˆ¶æ’å…¥ç‰‡æ®µ(å¦‚æœæ»¡,åˆ™è¿”å›æŒ¤å‡ºçš„ç‰‡æ®µ)
     bool force_insert_range_(sparse_range_set *range_set, sparse_range *range, sparse_range *out_range)
     {
         sparse_range *const end = range_set->begin + range_set->end;
@@ -944,7 +944,7 @@ private:
             return false;
         }
     }
-    //¸üĞÂÆ¬¶Î¼¯ºÏµÄÇø¼ä
+    //æ›´æ–°ç‰‡æ®µé›†åˆçš„åŒºé—´
     void update_range_set_(sparse_range_set *range_set, handle_t handle)
     {
         sparse_range *back = range_set->begin + (range_set->end - 1);
@@ -956,13 +956,13 @@ private:
         }
         range_set->length = back->end - (range_set->begin->end - range_set->begin->length);
     }
-    //´Ó¾ä±úµÃµ½¶ÔÏó
+    //ä»å¥æŸ„å¾—åˆ°å¯¹è±¡
     template<typename T> T *deref_(handle_t handle) const
     {
         assert(handle != handle_t(invalid_handle));
         return static_cast<T *>(index_tree_.deref(handle));
     }
-    //ºìºÚÊ÷½Úµã
+    //çº¢é»‘æ ‘èŠ‚ç‚¹
     sparse_range_set_base const *rb_deref_(handle_t handle) const
     {
         return handle == handle_t(invalid_handle) ? (sparse_range_set_base const *)&index_tree_ : (sparse_range_set_base const *)deref_<sparse_range_set>(handle);
@@ -1470,10 +1470,10 @@ private:
     }
 
 private:
-    //Ë÷ÒıÊ÷
+    //ç´¢å¼•æ ‘
     sparse_range_tree index_tree_;
-    //Êı¾İÁ´±í(´¿´âÎªÁËÎö¹¹)
+    //æ•°æ®é“¾è¡¨(çº¯ç²¹ä¸ºäº†ææ„)
     handle_t block_handle_;
-    //¿ÕÏĞÊı¾İÁ´±í
+    //ç©ºé—²æ•°æ®é“¾è¡¨
     memory_blcok_free free_;
 };
