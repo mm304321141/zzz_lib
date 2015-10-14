@@ -12,7 +12,7 @@ public:
     typedef value_t mapped_type;
     typedef std::pair<key_t const, value_t> value_type;
     typedef size_t size_type;
-    typedef std::ptrdiff_t difference_type;
+    typedef ptrdiff_t difference_type;
     typedef comparator_t key_compare;
     typedef allocator_t allocator_type;
     typedef value_type &reference;
@@ -23,7 +23,9 @@ public:
 protected:
     struct node_t
     {
-        node_t *parent, *left, *right;
+        node_t *parent;
+        node_t *left;
+        node_t *right;
         size_t size;
     };
     struct value_node_t : public node_t
@@ -31,7 +33,8 @@ protected:
         value_node_t(value_type const &v) : value(v)
         {
         }
-        value_node_t(value_type &&v) : value(v)
+        template<class... Args>
+        value_node_t(Args&&... args) : value(args...)
         {
         }
         value_type value;
@@ -47,8 +50,8 @@ public:
         typedef std::random_access_iterator_tag iterator_category;
         typedef typename sorted_set::value_type value_type;
         typedef typename sorted_set::difference_type difference_type;
-        typedef value_type *pointer;
-        typedef value_type &reference;
+        typedef typename sorted_set::pointer pointer;
+        typedef typename sorted_set::reference reference;
     public:
         iterator(node_t *node, sorted_set *set) : ptr_(node), set_(set)
         {
@@ -127,8 +130,8 @@ public:
         typedef std::random_access_iterator_tag iterator_category;
         typedef typename sorted_set::value_type value_type;
         typedef typename sorted_set::difference_type difference_type;
-        typedef value_type *pointer;
-        typedef value_type &reference;
+        typedef typename sorted_set::pointer pointer;
+        typedef typename sorted_set::reference reference;
     public:
         const_iterator(node_t const *node, sorted_set const *set) : ptr_(node), set_(set)
         {
@@ -210,8 +213,8 @@ public:
         typedef std::random_access_iterator_tag iterator_category;
         typedef typename sorted_set::value_type value_type;
         typedef typename sorted_set::difference_type difference_type;
-        typedef value_type *pointer;
-        typedef value_type &reference;
+        typedef typename sorted_set::pointer pointer;
+        typedef typename sorted_set::reference reference;
     public:
         reverse_iterator(node_t *node, sorted_set *set) : ptr_(node), set_(set)
         {
@@ -298,8 +301,8 @@ public:
         typedef std::random_access_iterator_tag iterator_category;
         typedef typename sorted_set::value_type value_type;
         typedef typename sorted_set::difference_type difference_type;
-        typedef value_type *pointer;
-        typedef value_type &reference;
+        typedef typename sorted_set::pointer pointer;
+        typedef typename sorted_set::reference reference;
     public:
         const_reverse_iterator(node_t const *node, sorted_set const *set) : ptr_(node), set_(set)
         {
@@ -418,6 +421,7 @@ public:
         other.set_root_(other.nil_());
         other.set_most_left_(other.nil_());
         other.set_most_right_(other.nil_());
+        return *this;
     }
     sorted_set &operator = (sorted_set const &other)
     {
@@ -440,40 +444,62 @@ public:
         return *this;
     }
 
-    typedef std::pair<iterator, bool> pair_ib_t;
+    allocator_type get_allocator() const
+    {
+        return allocator_type(head_);
+    }
+
+    void swap(sorted_set &other)
+    {
+        std::swap(*this, other);
+    }
+
     typedef std::pair<iterator, iterator> pair_ii_t;
     typedef std::pair<const_iterator, const_iterator> pair_cici_t;
 
     //允许重复key
-    pair_ib_t insert(value_type const &node)
+    iterator insert(value_type const &node)
     {
-        value_node_t *new_node = get_allocator().allocate(1);
+        value_node_t *new_node = get_value_allocator().allocate(1);
         ::new(new_node) value_node_t(node);
         sbt_insert_(new_node);
-        return pair_ib_t(iterator(new_node, this), true);
+        return iterator(new_node, this);
     }
-    //允许重复key
-    pair_ib_t insert(value_type &&node)
+    iterator insert(const_iterator hint, value_type const &node)
     {
-        value_node_t *new_node = get_allocator().allocate(1);
+        value_node_t *new_node = get_value_allocator().allocate(1);
         ::new(new_node) value_node_t(node);
         sbt_insert_(new_node);
-        return pair_ib_t(iterator(new_node, this), true);
+        return iterator(new_node, this);
     }
-    //返回插入了多少个
+    iterator insert(value_type &&node)
+    {
+        value_node_t *new_node = get_value_allocator().allocate(1);
+        ::new(new_node) value_node_t(node);
+        sbt_insert_(new_node);
+        return iterator(new_node, this);
+    }
     template<class iterator_t>
-    size_t insert(iterator_t begin, iterator_t end)
+    void insert(iterator_t begin, iterator_t end)
     {
-        size_t insert_count = 0;
         for(; begin != end; ++begin)
         {
-            if(insert(*begin).second)
-            {
-                ++insert_count;
-            }
+            insert(*begin);
         }
-        return insert_count;
     }
+    void insert(std::initializer_list<value_type> ilist)
+    {
+        insert(ilist.begin(), ilist.end());
+    }
+    template<class... Args>
+    iterator emplace(Args&&... args)
+    {
+        value_node_t *new_node = get_value_allocator().allocate(1);
+        ::new(new_node) value_node_t(args...);
+        sbt_insert_(new_node);
+        return iterator(new_node, this);
+    }
+
     iterator find(key_t const &key)
     {
         node_t *where = bst_lower_bound_(key);
@@ -484,17 +510,16 @@ public:
         node_t *where = bst_lower_bound_(key);
         return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_(), this) : iterator(where, this);
     }
-    //不解释
+
     void erase(iterator where)
     {
         sbt_erase_(where.ptr_);
         static_cast<value_node_t *>(where.ptr_)->~value_node_t();
-        get_allocator().deallocate(static_cast<value_node_t *>(where.ptr_), 1);
+        get_value_allocator().deallocate(static_cast<value_node_t *>(where.ptr_), 1);
     }
-    //返回移除了多少个
-    size_t erase(key_t const &key)
+    size_type erase(key_t const &key)
     {
-        size_t erase_count = 0;
+        size_type erase_count = 0;
         pair_ii_t range = equal_range(key);
         while(range.first != range.second)
         {
@@ -503,17 +528,18 @@ public:
         }
         return erase_count;
     }
-    //计数该key存在个数
-    size_t count(key_t const &key) const
+
+    size_type count(key_t const &key) const
     {
         pair_cici_t range = equal_range(key);
         return std::distance(range.first, range.second);
     }
     //计数[min, max)
-    size_t count(key_t const &min, key_t const &max) const
+    size_type count(key_t const &min, key_t const &max) const
     {
         return sbt_rank_(bst_upper_bound_(max)) - sbt_rank_(bst_lower_bound_(min));
     }
+
     //获取[min, max)
     pair_ii_t range(key_t const &min, key_t const &max)
     {
@@ -523,6 +549,7 @@ public:
     {
         return pair_cici_t(const_iterator(bst_lower_bound_(min), this), const_iterator(bst_upper_bound_(max), this));
     }
+
     //获取下标begin到end之间(参数小于0反向下标)
     pair_ii_t slice(int begin = 0, int end = std::numeric_limits<int>::max())
     {
@@ -675,29 +702,33 @@ public:
             erase(iterator(get_root_(), this));
         }
     }
-    size_t size() const
+    size_type size() const
     {
         return get_size_(get_root_());
     }
+    size_type max_size() const
+    {
+        return std::numeric_limits<size_type>::max();
+    }
 
     //下标访问[0, size)
-    iterator at(size_t index)
+    iterator at(size_type index)
     {
         return iterator(static_cast<value_node_t *>(sbt_at_(get_root_(), index)), this);
     }
     //下标访问[0, size)
-    const_iterator at(size_t index) const
+    const_iterator at(size_type index) const
     {
         return iterator(static_cast<value_node_t *>(sbt_at_(get_root_(), index)), this);
     }
 
     //计算key的rank(相同取最末,从1开始)
-    size_t rank(key_t const &key) const
+    size_type rank(key_t const &key) const
     {
         return sbt_rank_(bst_upper_bound_(key));
     }
     //计算迭代器rank[1, size]
-    static size_t rank(const_iterator where)
+    static size_type rank(const_iterator where)
     {
         return sbt_rank_(where.ptr_);
     }
@@ -712,7 +743,7 @@ protected:
         return head_;
     }
 
-    typename allocator_t::template rebind<value_node_t>::other &get_allocator()
+    typename allocator_t::template rebind<value_node_t>::other &get_value_allocator()
     {
         return head_;
     }
@@ -808,12 +839,12 @@ protected:
         node->right = right;
     }
 
-    static size_t get_size_(node_t const *node)
+    static size_type get_size_(node_t const *node)
     {
         return node->size;
     }
 
-    static void set_size_(node_t *node, size_t size)
+    static void set_size_(node_t *node, size_type size)
     {
         node->size = size;
     }
@@ -1045,13 +1076,13 @@ protected:
         upper_node = upper;
     }
 
-    static node_t *sbt_at_(node_t *node, size_t index)
+    static node_t *sbt_at_(node_t *node, size_type index)
     {
         if(index >= get_size_(node))
         {
             return nullptr;
         }
-        size_t rank = get_size_(get_left_(node));
+        size_type rank = get_size_(get_left_(node));
         while(index != rank)
         {
             if(index < rank)
@@ -1068,7 +1099,7 @@ protected:
         return node;
     }
 
-    static node_t *sbt_advance_(node_t *node, int step)
+    static node_t *sbt_advance_(node_t *node, difference_type step)
     {
         if(is_nil_(node))
         {
@@ -1091,7 +1122,7 @@ protected:
                 return node;
             }
         }
-        size_t u_step;
+        size_type u_step;
         while(step != 0)
         {
             if(step > 0)
@@ -1135,13 +1166,13 @@ protected:
         return node;
     }
 
-    static size_t sbt_rank_(node_t const *node)
+    static size_type sbt_rank_(node_t const *node)
     {
         if(is_nil_(node))
         {
             return get_size_(get_parent_(node));
         }
-        size_t rank = get_size_(get_left_(node));
+        size_type rank = get_size_(get_left_(node));
         node_t *parent = get_parent_(node);
         while(!is_nil_(parent))
         {

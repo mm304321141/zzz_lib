@@ -77,7 +77,9 @@ int main()
         assert(sb2.rbegin() + 10 == sb2.rend() - 190);
         sb.clear();
         sb.insert(sb1.rbegin(), sb1.rend());
-        sb.clear();
+        assert(sb.get_allocator() == sb2.get_allocator());
+        sb1.clear();
+        sb.swap(sb1);
     }();
 
     int length = 2000;
@@ -88,8 +90,8 @@ int main()
         rb.insert(n);
         sb.insert(n);
         n = std::make_pair(i, i);
-        rb.insert(n);
-        sb.insert(n);
+        rb.emplace(i, i);
+        sb.emplace(i, i);
     }
     assert(rb.find(0) == rb.begin());
     assert(sb.find(0) == sb.begin());
