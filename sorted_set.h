@@ -39,7 +39,8 @@ protected:
         }
         value_type value;
     };
-    struct root_node_t : public node_t, public allocator_t::template rebind<value_node_t>::other, public comparator_t
+    typedef typename allocator_t::template rebind<value_node_t>::other value_allocator_t;
+    struct root_node_t : public node_t, public value_allocator_t, public comparator_t
     {
     };
 
@@ -395,15 +396,9 @@ public:
         set_most_left_(nil_());
         set_most_right_(nil_());
     }
-    sorted_set(sorted_set &&other)
+    sorted_set(sorted_set &&other) : sorted_set()
     {
-        set_size_(nil_(), 0);
-        set_root_(other.get_root_());
-        set_most_left_(other.get_most_left_());
-        set_most_right_(other.get_most_right_());
-        other.set_root_(other.nil_());
-        other.set_most_left_(other.nil_());
-        other.set_most_right_(other.nil_());
+        *this = std::move(other);
     }
     sorted_set(sorted_set const &other) : sorted_set()
     {
@@ -415,12 +410,19 @@ public:
     }
     sorted_set &operator = (sorted_set &&other)
     {
-        set_root_(other.get_root_());
-        set_most_left_(other.get_most_left_());
-        set_most_right_(other.get_most_right_());
-        other.set_root_(other.nil_());
-        other.set_most_left_(other.nil_());
-        other.set_most_right_(other.nil_());
+        if(other.empty())
+        {
+            clear();
+        }
+        else
+        {
+            set_root_(other.get_root_());
+            set_most_left_(other.get_most_left_());
+            set_most_right_(other.get_most_right_());
+            other.set_root_(other.nil_());
+            other.set_most_left_(other.nil_());
+            other.set_most_right_(other.nil_());
+        }
         return *this;
     }
     sorted_set &operator = (sorted_set const &other)
@@ -743,7 +745,7 @@ protected:
         return head_;
     }
 
-    typename allocator_t::template rebind<value_node_t>::other &get_value_allocator()
+    value_allocator_t &get_value_allocator()
     {
         return head_;
     }
