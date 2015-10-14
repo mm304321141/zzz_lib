@@ -5,7 +5,7 @@
 
 #include <chrono>
 #include <iostream>
-#include <vector>
+#include <random>
 #include <map>
 
 
@@ -49,7 +49,6 @@ public:
         print_tree(b_t::get_root_(), 0, "  ", "", 0);
     }
 };
-
 
 int main()
 {
@@ -147,35 +146,63 @@ int main()
 
     //for(int i = 0; ; ++i)
     //{
-    //    sb.insert(std::make_pair(rand(), i));
+    //    sb.insert(std::make_pair(i/*rand()*/, i));
     //    sb.print_tree();
     //    system("pause");
     //}
 
     system("pause");
 
-    sb.clear();
-
-    for(int i = 0; i < 20000000; ++i)
-    {
-        sb.insert(std::make_pair(rand(), i));
-    }
 
     auto t = std::chrono::high_resolution_clock::now;
+    std::mt19937 mt;
+    auto mtr = std::uniform_int<int>(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
 
-    auto a1 = t();
+    auto test = [&mtr, &mt](auto &c)
+    {
+        for(int i = 0; i < 20000000; ++i)
+        {
+            c.insert(std::make_pair(mtr(mt), i));
+        }
+        c.clear();
+    };
 
-    auto c1 = sb.count(1000, 2000);
-    auto c2 = sb.at(rand())->second;
-    auto c3 = sb.slice(1000, 2000).second->second;
+    auto ss1 = t();
+    test(sb);
+    auto se1 = t();
+    auto rs1 = t();
+    test(rb);
+    auto re1 = t();
+    auto ss2 = t();
+    test(sb);
+    auto se2 = t();
+    auto rs2 = t();
+    test(rb);
+    auto re2 = t();
+    auto ss3 = t();
+    test(sb);
+    auto se3 = t();
+    auto rs3 = t();
+    test(rb);
+    auto re3 = t();
 
-    auto a2 = t();
+
+    rb.clear();
 
     std::cout
-        << "sb.count(1000, 2000); " << c1 << std::endl
-        << "sb.at(rand());        " << c2 << std::endl
-        << "sb.slice(1000, 2000); " << c3 << std::endl
-        << "time(s) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(a2 - a1).count() << std::endl;
+        << "sb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se1 - ss1).count() << std::endl
+        << "rb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re1 - rs1).count() << std::endl
+        << "sb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se2 - ss2).count() << std::endl
+        << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl
+        << "sb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se3 - ss3).count() << std::endl
+        << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl
+        ;
 
     system("pause");
+
+    //for(int i = 0; i < 20000000; ++i)
+    //{
+    //    sb.insert(std::make_pair(mtr(mt), i));
+    //}
+    //sb.print_tree();
 }
