@@ -77,6 +77,17 @@ int main()
         assert(rit == sb1.rend());
         assert(sb2.rbegin() + 10 == sb2.rend() - 190);
         sb.clear();
+        sb.emplace(0, 1);
+        sb.emplace(0, 0);
+        sb.emplace(0, 3);
+        sb.emplace(0, 4);
+        sb.emplace(0, 2);
+        assert(sb.at(0)->second == 1);
+        assert(sb.at(1)->second == 0);
+        assert(sb.at(2)->second == 3);
+        assert(sb.at(3)->second == 4);
+        assert(sb.at(4)->second == 2);
+        assert(sb.erase(0) == 5);
         sb.insert(sb1.rbegin(), sb1.rend());
         assert(sb.get_allocator() == sb2.get_allocator());
         sb1.clear();
@@ -108,6 +119,7 @@ int main()
     assert(sb.range(0, length) == sb.slice());
     assert(sb.front().second == (*sb.begin()).second);
     assert(sb.back().second == (*--sb.end()).second);
+    assert(sb.back().second == sb.rend()->second);
     assert(sb.rank(0) == 2);
     assert(sb.rank(1) == 4);
     assert(sb.rank(length) == sb.size());
