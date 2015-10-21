@@ -54,6 +54,19 @@ int main()
 {
     std::multimap<int, int> rb;
     sorted_set_test<int, int> sb;
+
+    [&]()
+    {
+        sorted_set_test<std::string, std::string> sss;
+        sss.emplace("0", "0");
+        sss.emplace(std::make_pair("1", "1"));
+        sss.insert(std::make_pair("2", "2"));
+        sss.emplace("0", "00");
+        sss.emplace("2", "22");
+        assert(sss.erase("0") == 2);
+        assert((sss.find("2") + 1)->second == "22");
+        sss.clear();
+    }();
     
     [&]()
     {
@@ -117,9 +130,10 @@ int main()
     assert(sb.range(0, 2) == std::make_pair(sb.begin(), sb.begin() + 6));
     assert(sb.range(2, 3) == sb.slice(4, 8));
     assert(sb.range(0, length) == sb.slice());
-    assert(sb.front().second == (*sb.begin()).second);
-    assert(sb.back().second == (*--sb.end()).second);
-    assert(sb.back().second == sb.rend()->second);
+    assert(sb.front().second == sb.begin()->second);
+    assert(sb.front().second == (--sb.rend())->second);
+    assert(sb.back().second == (--sb.end())->second);
+    assert(sb.back().second == sb.rbegin()->second);
     assert(sb.rank(0) == 2);
     assert(sb.rank(1) == 4);
     assert(sb.rank(length) == sb.size());
