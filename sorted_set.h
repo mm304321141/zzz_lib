@@ -546,12 +546,12 @@ public:
     }
 
     //获取下标begin到end之间(参数小于0反向下标)
-    pair_ii_t slice(int begin = 0, int end = std::numeric_limits<int>::max())
+    pair_ii_t slice(difference_type begin = 0, difference_type end = std::numeric_limits<difference_type>::max())
     {
         difference_type s_size = size();
         if(begin < 0)
         {
-            begin = std::max(s_size + begin, 0);
+            begin = std::max<difference_type>(s_size + begin, 0);
         }
         if(end < 0)
         {
@@ -567,9 +567,9 @@ public:
         }
         return pair_ii_t(sorted_set::begin() + begin, sorted_set::end() - (s_size - end));
     }
-    pair_cici_t slice(int begin = 0, int end = std::numeric_limits<int>::max()) const
+    pair_cici_t slice(difference_type begin = 0, difference_type end = std::numeric_limits<difference_type>::max()) const
     {
-        int s_size = size();
+        difference_type s_size = size();
         if(begin < 0)
         {
             begin = std::max(s_size + begin, 0);

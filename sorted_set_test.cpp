@@ -38,7 +38,7 @@ protected:
             std::string next_left = type == 0 ? "" : type == 1 ? "┃" : "  ";
             std::string next_right = type == 0 ? "" : type == 1 ? "  " : "┃";
             print_tree(b_t::get_right_(node), level + 1, head + next_right, "┏", 1);
-            printf("%s%d\n", (head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node)));
+            printf("%s%zd\n", (head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node)));
             print_tree(b_t::get_left_(node), level + 1, head + next_left, "┗", 2);
         }
     }
@@ -97,13 +97,13 @@ int main()
             {
                 sb.emplace(rand(), 0);
             }
-            else if(r < 60)
+            else if(r < 55)
             {
                 sb.erase(sb.at(rand() % sb.size()));
             }
             else
             {
-                sb.erase(sb.at(rand() % (sb.size() / 3 + 1)));
+                sb.erase(sb.at(rand() % (sb.size() / 4 + 1)));
             }
         }
     }
@@ -232,9 +232,9 @@ int main()
         assert(csb.end() - end == off);
         assert(csb.begin() + off == begin);
         assert(csb.begin() == it);
-        int part = csb.size() / 4;
-        int a = part + rand() % (part * 2);
-        int b = rand() % part;
+        size_t part = csb.size() / 4;
+        size_t a = part + rand() % (part * 2);
+        size_t b = rand() % part;
         assert(csb.at(a) + b == csb.at(a + b));
         assert(csb.begin() + a == csb.at(a + b) - b);
         assert(csb.at(a) - csb.at(b) == a - b);
@@ -266,15 +266,15 @@ int main()
 
     auto testsb = [&mtr, &mt, &c = sb, &v]()
     {
-        for(size_t i = 0; i < v.size(); ++i)
+        for(int i = 0; i < int(v.size()); ++i)
         {
             c.insert(std::make_pair(i, i));
         }
-        for(size_t i = 0; i < v.size(); ++i)
+        for(int i = 0; i < int(v.size()); ++i)
         {
             c.insert(std::make_pair(v[i], i));
         }
-        for(size_t i = v.size(); i < v.size(); ++i)
+        for(int i = 0; i < int(v.size()); ++i)
         {
             c.erase(v[i]);
         }
@@ -282,15 +282,15 @@ int main()
     };
     auto testrb = [&mtr, &mt, &c = rb, &v]()
     {
-        for(size_t i = 0; i < v.size(); ++i)
+        for(int i = 0; i < int(v.size()); ++i)
         {
             c.insert(std::make_pair(i, i));
         }
-        for(size_t i = 0; i < v.size(); ++i)
+        for(int i = 0; i < int(v.size()); ++i)
         {
             c.insert(std::make_pair(v[i], i));
         }
-        for(size_t i = v.size(); i < v.size(); ++i)
+        for(int i = 0; i < int(v.size()); ++i)
         {
             c.erase(v[i]);
         }
