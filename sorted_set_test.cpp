@@ -45,7 +45,7 @@ protected:
 public:
     void print_tree()
     {
-        printf("\n\n\n\n\n");
+        printf("\n");
         print_tree(b_t::get_root_(), 0, "  ", "", 0);
     }
 };
@@ -54,6 +54,19 @@ int main()
 {
     std::multimap<int, int> rb;
     sorted_set_test<int, int> sb;
+    
+    //for(int i = 0; i < 128; ++i)
+    //{
+    //    sb.print_tree();
+    //    system("pause");
+    //    sb.emplace(i, i);
+    //}
+    //while(!sb.empty())
+    //{
+    //    sb.print_tree();
+    //    system("pause");
+    //    sb.erase(sb.at(rand() % (sb.size() / 3 + 1)));
+    //}
 
     [&]()
     {
@@ -67,7 +80,7 @@ int main()
         assert((sss.find("2") + 1)->second == "22");
         sss.clear();
     }();
-    
+
     [&]()
     {
         sorted_set_test<int, int> sb1;
@@ -196,49 +209,68 @@ int main()
         rb.erase(--(it_rb.base()));
         sb.erase(--(it_sb.base()));
     }
-    
-
-    //for(int i = 0; ; ++i)
-    //{
-    //    sb.insert(std::make_pair(rand(), i));
-    //    sb.print_tree();
-    //    system("pause");
-    //}
-
 
     auto t = std::chrono::high_resolution_clock::now;
     std::mt19937 mt;
     auto mtr = std::uniform_int_distribution<int>(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
 
-    auto testsb = [&mtr, &mt, &c = sb]()
+    std::vector<int> v;
+    v.resize(20000000);
+    auto reset = [&mtr, &mt, &v]()
     {
-        for(int i = 0; i < 20000000; ++i)
+        for(auto &value : v)
         {
-            c.insert(std::make_pair(mtr(mt), i));
+            value = mtr(mt);
         }
-        c.clear();
-    };
-    auto testrb = [&mtr, &mt, &c = rb]()
-    {
-        for(int i = 0; i < 20000000; ++i)
-        {
-            c.insert(std::make_pair(mtr(mt), i));
-        }
-        c.clear();
     };
 
+    auto testsb = [&mtr, &mt, &c = sb, &v]()
+    {
+        for(size_t i = 0; i < v.size(); ++i)
+        {
+            c.insert(std::make_pair(i, i));
+        }
+        for(size_t i = 0; i < v.size(); ++i)
+        {
+            c.insert(std::make_pair(v[i], i));
+        }
+        for(size_t i = v.size(); i < v.size(); ++i)
+        {
+            c.erase(v[i]);
+        }
+        c.clear();
+    };
+    auto testrb = [&mtr, &mt, &c = rb, &v]()
+    {
+        for(size_t i = 0; i < v.size(); ++i)
+        {
+            c.insert(std::make_pair(i, i));
+        }
+        for(size_t i = 0; i < v.size(); ++i)
+        {
+            c.insert(std::make_pair(v[i], i));
+        }
+        for(size_t i = v.size(); i < v.size(); ++i)
+        {
+            c.erase(v[i]);
+        }
+        c.clear();
+    };
+    reset();
     auto ss1 = t();
     testsb();
     auto se1 = t();
     auto rs1 = t();
     testrb();
     auto re1 = t();
+    reset();
     auto ss2 = t();
     testsb();
     auto se2 = t();
     auto rs2 = t();
     testrb();
     auto re2 = t();
+    reset();
     auto ss3 = t();
     testsb();
     auto se3 = t();
@@ -246,8 +278,7 @@ int main()
     testrb();
     auto re3 = t();
 
-
-    rb.clear();
+    v.clear();
 
     std::cout
         << "sb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se1 - ss1).count() << std::endl

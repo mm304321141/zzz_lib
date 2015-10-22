@@ -432,7 +432,7 @@ public:
                 return *this;
             }
             node_t *node = temp_set.get_root_();
-            temp_set.sbt_erase_(node);
+            temp_set.sbt_erase_<true>(node);
             static_cast<value_node_t *>(node)->~value_node_t();
             ::new(node) value_node_t(*it++);
             sbt_insert_(node);
@@ -508,7 +508,7 @@ public:
 
     void erase(iterator where)
     {
-        sbt_erase_(where.node);
+        sbt_erase_<false>(where.node);
         static_cast<value_node_t *>(where.node)->~value_node_t();
         get_value_allocator().deallocate(static_cast<value_node_t *>(where.node), 1);
     }
@@ -692,9 +692,11 @@ public:
     }
     void clear()
     {
-        while(!is_nil_(get_root_()))
+        for(node_t *root = get_root_(); !is_nil_(root); root = get_root_())
         {
-            erase(iterator(get_root_()));
+            sbt_erase_<true>(root);
+            static_cast<value_node_t *>(root)->~value_node_t();
+            get_value_allocator().deallocate(static_cast<value_node_t *>(root), 1);
         }
     }
     size_type size() const
@@ -1230,6 +1232,41 @@ protected:
         return child;
     }
 
+    template<bool is_left> node_t *sbt_maintain_(node_t *node)
+    {
+        if(is_nil_(get_child_<is_left>(node)))
+        {
+            return node;
+        }
+        if(get_size_(get_child_<is_left>(get_child_<is_left>(node))) > get_size_(get_child_<!is_left>(node)))
+        {
+            node = sbt_rotate_<!is_left>(node);
+        }
+        else
+        {
+            if(get_size_(get_child_<!is_left>(get_child_<is_left>(node))) > get_size_(get_child_<!is_left>(node)))
+            {
+                sbt_rotate_<is_left>(get_child_<is_left>(node));
+                node = sbt_rotate_<!is_left>(node);
+            }
+            else
+            {
+                return node;
+            };
+        };
+        if(!is_nil_(get_child_<true>(node)))
+        {
+            sbt_maintain_<true>(get_child_<true>(node));
+        }
+        if(!is_nil_(get_child_<false>(node)))
+        {
+            sbt_maintain_<false>(get_child_<false>(node));
+        }
+        node = sbt_maintain_<true>(node);
+        node = sbt_maintain_<false>(node);
+        return node;
+    }
+
     void sbt_insert_(node_t *key)
     {
         set_size_(key, 1);
@@ -1271,6 +1308,11 @@ protected:
                 set_most_right_(node);
             }
         }
+        sbt_insert_maintain_(where, node);
+    }
+
+    void sbt_insert_maintain_(node_t *where, node_t *node)
+    {
         while(!is_nil_(where))
         {
             if(node == get_left_(where))
@@ -1286,68 +1328,48 @@ protected:
         }
     }
 
-    template<bool is_left> node_t *sbt_maintain_(node_t *node)
-    {
-        if(is_nil_(get_child_<is_left>(node)))
-        {
-            return node;
-        }
-        if(get_size_(get_child_<is_left>(get_child_<is_left>(node))) > get_size_(get_child_<!is_left>(node)))
-        {
-            node = sbt_rotate_<!is_left>(node);
-        }
-        else
-        {
-            if(get_size_(get_child_<!is_left>(get_child_<is_left>(node))) > get_size_(get_child_<!is_left>(node)))
-            {
-                sbt_rotate_<is_left>(get_child_<is_left>(node));
-                node = sbt_rotate_<!is_left>(node);
-            }
-            else
-            {
-                return node;
-            };
-        };
-        if(!is_nil_(get_child_<true>(node)))
-        {
-            sbt_maintain_<true>(get_child_<true>(node));
-        }
-        if(!is_nil_(get_child_<false>(node)))
-        {
-            sbt_maintain_<false>(get_child_<false>(node));
-        }
-        node = sbt_maintain_<true>(node);
-        node = sbt_maintain_<false>(node);
-        return node;
-    }
-
-    void sbt_erase_(node_t *node)
+    template<bool is_clear> void sbt_erase_(node_t *node)
     {
         node_t *erase_node = node;
-        node_t *fix_node = node;
+        node_t *fix_node;
         node_t *fix_node_parent;
-        while(!is_nil_((fix_node = get_parent_(fix_node))))
+        bool is_left;
+        if(!is_clear)
         {
-            set_size_(fix_node, get_size_(fix_node) - 1);
+            fix_node = node;
+            while(!is_nil_((fix_node = get_parent_(fix_node))))
+            {
+                set_size_(fix_node, get_size_(fix_node) - 1);
+            }
         }
 
         if(is_nil_(get_left_(node)))
         {
             fix_node = get_right_(node);
+            is_left = true;
         }
         else if(is_nil_(get_right_(node)))
         {
             fix_node = get_left_(node);
+            is_left = false;
         }
         else
         {
             if(get_size_(get_left_(node)) > get_size_(get_right_(node)))
             {
-                sbt_erase_on_<true>(node);
+                node = sbt_erase_on_<is_clear, true>(node);
+                if(!is_clear)
+                {
+                    sbt_erase_maintain_(node, true);
+                }
             }
             else
             {
-                sbt_erase_on_<false>(node);
+                node = sbt_erase_on_<is_clear, false>(node);
+                if(!is_clear)
+                {
+                    sbt_erase_maintain_(node, false);
+                }
             }
             return;
         }
@@ -1363,10 +1385,18 @@ protected:
         else if(get_left_(fix_node_parent) == erase_node)
         {
             set_left_(fix_node_parent, fix_node);
+            if(!is_clear)
+            {
+                sbt_erase_maintain_(fix_node_parent, true);
+            }
         }
         else
         {
             set_right_(fix_node_parent, fix_node);
+            if(!is_clear)
+            {
+                sbt_erase_maintain_(fix_node_parent, false);
+            }
         }
         if(get_most_left_() == erase_node)
         {
@@ -1378,17 +1408,20 @@ protected:
         }
     }
 
-    template<bool is_left> void sbt_erase_on_(node_t *node)
+    template<bool is_clear, bool is_left> node_t *sbt_erase_on_(node_t *node)
     {
         node_t *erase_node = node;
         node_t *fix_node;
         node_t *fix_node_parent;
         node = bst_move_<!is_left>(node);
         fix_node = get_child_<is_left>(node);
-        fix_node_parent = node;
-        while((fix_node_parent = get_parent_(fix_node_parent)) != erase_node)
+        if(!is_clear)
         {
-            set_size_(fix_node_parent, get_size_(fix_node_parent) - 1);
+            fix_node_parent = node;
+            while((fix_node_parent = get_parent_(fix_node_parent)) != erase_node)
+            {
+                set_size_(fix_node_parent, get_size_(fix_node_parent) - 1);
+            }
         }
         set_parent_(get_child_<!is_left>(erase_node), node);
         set_child_<!is_left>(node, get_child_<!is_left>(erase_node));
@@ -1420,6 +1453,37 @@ protected:
             set_child_<is_left>(get_parent_(erase_node), node);
         }
         set_parent_(node, get_parent_(erase_node));
-        sbt_refresh_size_(node);
+        if(!is_clear)
+        {
+            sbt_refresh_size_(node);
+        }
+        return fix_node_parent;
+    }
+
+    void sbt_erase_maintain_(node_t *where, bool is_left)
+    {
+        if(is_left)
+        {
+            where = sbt_maintain_<false>(where);
+        }
+        else
+        {
+            where = sbt_maintain_<true>(where);
+        }
+        node_t *node = where;
+        where = get_parent_(where);
+        while(!is_nil_(where))
+        {
+            if(node == get_left_(where))
+            {
+                where = sbt_maintain_<false>(where);
+            }
+            else
+            {
+                where = sbt_maintain_<true>(where);
+            }
+            node = where;
+            where = get_parent_(where);
+        }
     }
 };
