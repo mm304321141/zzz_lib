@@ -42,11 +42,34 @@ protected:
             print_tree(b_t::get_left_(node), level + 1, head + next_left, "┗", 2);
         }
     }
-public:
-    void print_tree()
+
+    uint64_t calc_depth(node_t *node, size_t level)
     {
-        printf("\n");
-        print_tree(b_t::get_root_(), 0, "  ", "", 0);
+        return level
+            + (b_t::is_nil_(b_t::get_left_(node)) ? 0 : calc_depth(b_t::get_left_(node), level + 1))
+            + (b_t::is_nil_(b_t::get_right_(node)) ? 0 : calc_depth(b_t::get_right_(node), level + 1))
+            ;
+    }
+    double calc_diff(double avg, node_t *node, size_t level)
+    {
+        return std::abs(double(level) - avg)
+            + (b_t::is_nil_(b_t::get_left_(node)) ? 0 : calc_diff(avg, b_t::get_left_(node), level + 1))
+            + (b_t::is_nil_(b_t::get_right_(node)) ? 0 : calc_diff(avg, b_t::get_right_(node), level + 1))
+            ;
+    }
+public:
+    void print_tree(bool body = true)
+    {
+        if(body)
+        {
+            print_tree(b_t::get_root_(), 0, "  ", "", 0);
+        }
+        if(!b_t::empty())
+        {
+            double avg = double(calc_depth(get_root_(), 0)) / double(b_t::size());
+            double diff = calc_diff(avg, get_root_(), 0) / double(b_t::size());
+            printf("avg = %f\t diff = %f\n", avg, diff);
+        }
     }
 };
 
@@ -55,18 +78,35 @@ int main()
     std::multimap<int, int> rb;
     sorted_set_test<int, int> sb;
     
-    //for(int i = 0; i < 128; ++i)
-    //{
-    //    sb.print_tree();
-    //    system("pause");
-    //    sb.emplace(i, i);
-    //}
-    //while(!sb.empty())
-    //{
-    //    sb.print_tree();
-    //    system("pause");
-    //    sb.erase(sb.at(rand() % (sb.size() / 3 + 1)));
-    //}
+    while(true)
+    {
+        sb.print_tree();
+        system("pause");
+        if(sb.size() < 48)
+        {
+            sb.emplace(rand(), 0);
+        }
+        else if(sb.size() >= 64)
+        {
+            sb.erase(sb.at(rand() % sb.size()));
+        }
+        else
+        {
+            int r = rand() % 100;
+            if(rand() % 100 < 50)
+            {
+                sb.emplace(rand(), 0);
+            }
+            else if(r < 60)
+            {
+                sb.erase(sb.at(rand() % sb.size()));
+            }
+            else
+            {
+                sb.erase(sb.at(rand() % (sb.size() / 3 + 1)));
+            }
+        }
+    }
 
     [&]()
     {
