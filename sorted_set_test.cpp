@@ -7,6 +7,7 @@
 #include <iostream>
 #include <random>
 #include <map>
+#include <cstring>
 
 
 auto assert = [](bool no_error)
@@ -23,7 +24,7 @@ class sorted_set_test : public sorted_set<key_t, value_t, comparator_t, allocato
 protected:
     typedef sorted_set<key_t, value_t, comparator_t, allocator_t> b_t;
 
-    void print_tree(typename b_t::node_t *node, size_t level, std::string head, std::string with, int type)
+    template<class view_value> void print_tree_fork(view_value &view, typename b_t::node_t *node, size_t level, std::string head, std::string with, int type)
     {
         if(!b_t::is_nil_(node))
         {
@@ -37,20 +38,21 @@ protected:
                 !b_t::is_nil_(b_t::get_right_(node)) ? "┛" : "┓";
             std::string next_left = type == 0 ? "" : type == 1 ? "┃" : "  ";
             std::string next_right = type == 0 ? "" : type == 1 ? "  " : "┃";
-            print_tree(b_t::get_right_(node), level + 1, head + next_right, "┏", 1);
-            printf("%s%zd\n", (head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node)));
-            print_tree(b_t::get_left_(node), level + 1, head + next_left, "┗", 2);
+            typename b_t::value_type const &pair = static_cast<typename b_t::value_node_t *>(node)->value;
+            print_tree_fork(view, b_t::get_right_(node), level + 1, head + next_right, "┏", 1);
+            view((head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node)), pair.first, pair.second);
+            print_tree_fork(view, b_t::get_left_(node), level + 1, head + next_left, "┗", 2);
         }
     }
 
-    uint64_t calc_depth(node_t *node, size_t level)
+    uint64_t calc_depth(typename b_t::node_t *node, size_t level)
     {
         return level
             + (b_t::is_nil_(b_t::get_left_(node)) ? 0 : calc_depth(b_t::get_left_(node), level + 1))
             + (b_t::is_nil_(b_t::get_right_(node)) ? 0 : calc_depth(b_t::get_right_(node), level + 1))
             ;
     }
-    double calc_diff(double avg, node_t *node, size_t level)
+    double calc_diff(double avg, typename b_t::node_t *node, size_t level)
     {
         return std::abs(double(level) - avg)
             + (b_t::is_nil_(b_t::get_left_(node)) ? 0 : calc_diff(avg, b_t::get_left_(node), level + 1))
@@ -58,18 +60,32 @@ protected:
             ;
     }
 public:
-    void print_tree(bool body = true)
+    template<class view_value> void print_tree(bool body = true)
     {
         if(body)
         {
-            print_tree(b_t::get_root_(), 0, "  ", "", 0);
+            view_value view;
+            print_tree_fork(view, b_t::get_root_(), 0, "  ", "", 0);
         }
         if(!b_t::empty())
         {
-            double avg = double(calc_depth(get_root_(), 0)) / double(b_t::size());
-            double diff = calc_diff(avg, get_root_(), 0) / double(b_t::size());
-            printf("avg = %f\t diff = %f\n", avg, diff);
+            double avg = double(calc_depth(b_t::get_root_(), 0)) / double(b_t::size());
+            double diff = calc_diff(avg, b_t::get_root_(), 0) / double(b_t::size());
+            printf("avg = %f diff = %f\n", avg, diff);
         }
+        std::wcout.flush();
+    }
+};
+
+struct print_tree_value
+{
+    void operator()(char const *tree, size_t rank, int k, int v)
+    {
+        char buffer[256];
+        snprintf(buffer, sizeof buffer, "%s%zd", tree, rank);
+        char format[32];
+        snprintf(format, sizeof format, "%%s%%%dzd\n", 79 - strlen(buffer));
+        printf(format, buffer, k);
     }
 };
 
@@ -77,10 +93,10 @@ int main()
 {
     std::multimap<int, int> rb;
     sorted_set_test<int, int> sb;
-    
+
     while(true)
     {
-        sb.print_tree();
+        sb.print_tree<print_tree_value>();
         system("pause");
         if(sb.size() < 48)
         {
@@ -93,7 +109,7 @@ int main()
         else
         {
             int r = rand() % 100;
-            if(rand() % 100 < 50)
+            if(r < 50)
             {
                 sb.emplace(rand(), 0);
             }
