@@ -1,7 +1,8 @@
 ﻿
 #define _SCL_SECURE_NO_WARNINGS
 
-#include "sorted_set.h"
+#include "sbtree_map.h"
+#include "sbtree_set.h"
 
 #include <chrono>
 #include <iostream>
@@ -18,11 +19,11 @@ auto assert = [](bool no_error)
     }
 };
 
-template<class key_t, class value_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<std::pair<key_t const, value_t>>>
-class sorted_set_test : public sorted_set<key_t, value_t, comparator_t, allocator_t>
+template<class value_t, class comparator_t = std::less<value_t>, class allocator_t = std::allocator<value_t>>
+class sbtree_mset_test : public sbtree_multiset<value_t, comparator_t, allocator_t>
 {
 protected:
-    typedef sorted_set<key_t, value_t, comparator_t, allocator_t> b_t;
+    typedef sbtree_multiset<value_t, comparator_t, allocator_t> b_t;
 
     template<class view_value> void print_tree_fork(view_value &view, typename b_t::node_t *node, size_t level, std::string head, std::string with, int type)
     {
@@ -38,9 +39,8 @@ protected:
                 !b_t::is_nil_(b_t::get_right_(node)) ? "┛" : "┓";
             std::string next_left = type == 0 ? "" : type == 1 ? "┃" : "  ";
             std::string next_right = type == 0 ? "" : type == 1 ? "  " : "┃";
-            typename b_t::value_type const &pair = static_cast<typename b_t::value_node_t *>(node)->value;
             print_tree_fork(view, b_t::get_right_(node), level + 1, head + next_right, "┏", 1);
-            view((head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node)), pair.first, pair.second);
+            view((head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node)), static_cast<typename b_t::value_node_t *>(node)->value);
             print_tree_fork(view, b_t::get_left_(node), level + 1, head + next_left, "┗", 2);
         }
     }
@@ -79,54 +79,58 @@ public:
 
 struct print_tree_value
 {
-    void operator()(char const *tree, size_t rank, int k, int v)
+    void operator()(char const *tree, size_t rank, int v)
     {
         char buffer[256];
         snprintf(buffer, sizeof buffer, "%s%zd", tree, rank);
         char format[32];
         snprintf(format, sizeof format, "%%s%%%dzd\n", 79 - strlen(buffer));
-        printf(format, buffer, k);
+        printf(format, buffer, v);
     }
 };
 
 int main()
 {
     std::multimap<int, int> rb;
-    sorted_set_test<int, int> sb;
+    sbtree_multimap<int, int> sb;
 
-    while(true)
+    []()
     {
-        sb.print_tree<print_tree_value>();
-        system("pause");
-        if(sb.size() < 48)
+        sbtree_mset_test<int> sb;
+        while(true)
         {
-            sb.emplace(rand(), 0);
-        }
-        else if(sb.size() >= 64)
-        {
-            sb.erase(sb.at(rand() % sb.size()));
-        }
-        else
-        {
-            int r = rand() % 100;
-            if(r < 50)
+            sb.print_tree<print_tree_value>();
+            system("pause");
+            if(sb.size() < 48)
             {
-                sb.emplace(rand(), 0);
+                sb.emplace(rand());
             }
-            else if(r < 55)
+            else if(sb.size() >= 64)
             {
                 sb.erase(sb.at(rand() % sb.size()));
             }
             else
             {
-                sb.erase(sb.at(rand() % (sb.size() / 4 + 1)));
+                int r = rand() % 100;
+                if(r < 50)
+                {
+                    sb.emplace(rand());
+                }
+                else if(r < 55)
+                {
+                    sb.erase(sb.at(rand() % sb.size()));
+                }
+                else
+                {
+                    sb.erase(sb.at(rand() % (sb.size() / 4 + 1)));
+                }
             }
         }
-    }
+    }();
 
     [&]()
     {
-        sorted_set_test<std::string, std::string> sss;
+        sbtree_multimap<std::string, std::string> sss;
         sss.emplace("0", "0");
         sss.emplace(std::make_pair("1", "1"));
         sss.insert(std::make_pair("2", "2"));
@@ -139,7 +143,7 @@ int main()
 
     [&]()
     {
-        sorted_set_test<int, int> sb1;
+        sbtree_multimap<int, int> sb1;
         assert(sb.size() == sb1.size());
         for(int i = 0; i < 100; ++i)
         {
@@ -149,7 +153,7 @@ int main()
         }
         sb.rank(sb.begin() + 2);
         sb1 = sb;
-        sorted_set_test<int, int> sb2 = sb;
+        sbtree_multimap<int, int> sb2 = sb;
         assert(sb.size() == sb1.size());
         assert(sb.size() == sb2.size());
         assert(sb1.rbegin()->second == (--sb1.end())->second);
