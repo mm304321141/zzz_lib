@@ -84,7 +84,7 @@ struct print_tree_value
         char buffer[256];
         snprintf(buffer, sizeof buffer, "%s%zd", tree, rank);
         char format[32];
-        snprintf(format, sizeof format, "%%s%%%dzd\n", 79 - strlen(buffer));
+        snprintf(format, sizeof format, "%%s%%%zdzd\n", 79 - strlen(buffer));
         printf(format, buffer, v);
     }
 };
