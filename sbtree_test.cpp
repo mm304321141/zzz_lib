@@ -124,7 +124,7 @@ int main()
     []()
     {
         sbtree_mset_test<int> sb;
-        while(true)
+        while(false)
         {
             sb.print_tree<print_tree_value>();
             system("pause");
@@ -174,27 +174,6 @@ int main()
 
     [&]()
     {
-        for(int i = 0; i < 10000; ++i)
-        {
-            int key = rand();
-            int val = rand();
-            int where = rand() % std::max<size_t>(1, sb.size() + 1);
-            sb.emplace_hint(std::next(sb.begin(), where), key, val);
-            rb.emplace_hint(std::next(rb.begin(), where), key, val);
-            assert(sb.check());
-            auto sit = sb.begin();
-            auto rit = rb.begin();
-            for(int j = 0; j < int(sb.size()); ++j, ++sit, ++rit)
-            {
-                assert(sit->second == rit->second);
-            }
-        }
-        sb.clear();
-        rb.clear();
-    }();
-
-    [&]()
-    {
         sbtree_mmap_test<int, int> sb1;
         assert(sb.size() == sb1.size());
         for(int i = 0; i < 100; ++i)
@@ -232,95 +211,119 @@ int main()
         sb.swap(sb1);
     }();
 
-    int length = 2000;
+    [&]()
+    {
+        int length = 2000;
 
-    for(int i = 0; i < length / 2; ++i)
-    {
-        auto n = std::make_pair(i, i);
-        rb.insert(n);
-        sb.insert(n);
-        n = std::make_pair(i, i);
-        rb.emplace(i, i);
-        sb.emplace(i, i);
-    }
-    assert(rb.find(0) == rb.begin());
-    assert(sb.find(0) == sb.begin());
-    assert(rb.find(length / 2 - 1) == ----rb.end());
-    assert(sb.find(length / 2 - 1) == sb.end() - 2);
-    assert(rb.count(1) == 2);
-    assert(sb.count(1) == 2);
-    assert(sb.count(1, 2) == 4);
-    assert(sb.count(1, 3) == 6);
-    assert(sb.range(1, 3) == std::make_pair(sb.find(1), sb.find(4)));
-    assert(sb.range(0, 2) == std::make_pair(sb.begin(), sb.begin() + 6));
-    assert(sb.range(2, 3) == sb.slice(4, 8));
-    assert(sb.range(0, length) == sb.slice());
-    assert(sb.front().second == sb.begin()->second);
-    assert(sb.front().second == (--sb.rend())->second);
-    assert(sb.back().second == (--sb.end())->second);
-    assert(sb.back().second == sb.rbegin()->second);
-    assert(sb.rank(0) == 2);
-    assert(sb.rank(1) == 4);
-    assert(sb.rank(length) == sb.size());
-    assert(sb.rank(length / 2) == sb.size());
-    assert(sb.rank(length / 2 - 1) == sb.size());
-    assert(sb.rank(length / 2 - 2) == sb.size() - 2);
-    assert(rb.equal_range(2).first == rb.lower_bound(2));
-    assert(sb.equal_range(2).second == sb.upper_bound(2));
-    assert(sb.erase(3) == 2);
-    assert(rb.erase(3) == 2);
-    for(int i = 0; i < length / 2; ++i)
-    {
-        auto it_rb = rb.begin();
-        auto it_sb = sb.begin();
-        std::advance(it_rb, rand() % rb.size());
-        std::advance(it_sb, rand() % sb.size());
-        rb.erase(it_rb);
-        sb.erase(it_sb);
-    }
-    for(int i = 0; i < length * 2 + 2; ++i)
-    {
-        auto n = std::make_pair(rand(), rand());
-        rb.insert(n);
-        sb.insert(n);
-    }
-    for(int i = 0; i < length; ++i)
-    {
-        decltype(sb) const &csb = sb;
-        typedef decltype(csb.begin()) iter_t;
-        int off = rand() % csb.size();
-        iter_t it = csb.at(off);
-        assert(it - csb.begin() == off);
-        assert(it - off == csb.begin());
-        assert(csb.begin() + off == it);
-        assert(csb.begin() + off == csb.end() - (csb.size() - off));
-        iter_t begin = csb.begin(), end = csb.end();
-        for(int i = 0; i < off; ++i)
+        for(int i = 0; i < length / 2; ++i)
         {
-            --it;
-            ++begin;
-            --end;
+            auto n = std::make_pair(i, i);
+            rb.insert(n);
+            sb.insert(n);
+            n = std::make_pair(i, i);
+            rb.emplace(i, i);
+            sb.emplace(i, i);
         }
-        assert(csb.end() - end == off);
-        assert(csb.begin() + off == begin);
-        assert(csb.begin() == it);
-        size_t part = csb.size() / 4;
-        size_t a = part + rand() % (part * 2);
-        size_t b = rand() % part;
-        assert(csb.at(a) + b == csb.at(a + b));
-        assert(csb.begin() + a == csb.at(a + b) - b);
-        assert(csb.at(a) - csb.at(b) == a - b);
-    }
+        assert(rb.find(0) == rb.begin());
+        assert(sb.find(0) == sb.begin());
+        assert(rb.find(length / 2 - 1) == ----rb.end());
+        assert(sb.find(length / 2 - 1) == sb.end() - 2);
+        assert(rb.count(1) == 2);
+        assert(sb.count(1) == 2);
+        assert(sb.count(1, 2) == 4);
+        assert(sb.count(1, 3) == 6);
+        assert(sb.range(1, 3) == std::make_pair(sb.find(1), sb.find(4)));
+        assert(sb.range(0, 2) == std::make_pair(sb.begin(), sb.begin() + 6));
+        assert(sb.range(2, 3) == sb.slice(4, 8));
+        assert(sb.range(0, length) == sb.slice());
+        assert(sb.front().second == sb.begin()->second);
+        assert(sb.front().second == (--sb.rend())->second);
+        assert(sb.back().second == (--sb.end())->second);
+        assert(sb.back().second == sb.rbegin()->second);
+        assert(sb.rank(0) == 2);
+        assert(sb.rank(1) == 4);
+        assert(sb.rank(length) == sb.size());
+        assert(sb.rank(length / 2) == sb.size());
+        assert(sb.rank(length / 2 - 1) == sb.size());
+        assert(sb.rank(length / 2 - 2) == sb.size() - 2);
+        assert(rb.equal_range(2).first == rb.lower_bound(2));
+        assert(sb.equal_range(2).second == sb.upper_bound(2));
+        assert(sb.erase(3) == 2);
+        assert(rb.erase(3) == 2);
+        for(int i = 0; i < length / 2; ++i)
+        {
+            auto it_rb = rb.begin();
+            auto it_sb = sb.begin();
+            std::advance(it_rb, rand() % rb.size());
+            std::advance(it_sb, rand() % sb.size());
+            rb.erase(it_rb);
+            sb.erase(it_sb);
+        }
+        for(int i = 0; i < length * 2 + 2; ++i)
+        {
+            auto n = std::make_pair(rand(), rand());
+            rb.insert(n);
+            sb.insert(n);
+        }
+        for(int i = 0; i < length; ++i)
+        {
+            decltype(sb) const &csb = sb;
+            typedef decltype(csb.begin()) iter_t;
+            int off = rand() % csb.size();
+            iter_t it = csb.at(off);
+            assert(it - csb.begin() == off);
+            assert(it - off == csb.begin());
+            assert(csb.begin() + off == it);
+            assert(csb.begin() + off == csb.end() - (csb.size() - off));
+            iter_t begin = csb.begin(), end = csb.end();
+            for(int i = 0; i < off; ++i)
+            {
+                --it;
+                ++begin;
+                --end;
+            }
+            assert(csb.end() - end == off);
+            assert(csb.begin() + off == begin);
+            assert(csb.begin() == it);
+            size_t part = csb.size() / 4;
+            size_t a = part + rand() % (part * 2);
+            size_t b = rand() % part;
+            assert(csb.at(a) + b == csb.at(a + b));
+            assert(csb.begin() + a == csb.at(a + b) - b);
+            assert(csb.at(a) - csb.at(b) == a - b);
+        }
 
-    for(int i = 0; i < length * 2 + length / 2; ++i)
+        for(int i = 0; i < length * 2 + length / 2; ++i)
+        {
+            auto it_rb = rb.rbegin();
+            auto it_sb = sb.rbegin();
+            std::advance(it_rb, rand() % rb.size());
+            std::advance(it_sb, rand() % sb.size());
+            rb.erase(--(it_rb.base()));
+            sb.erase(--(it_sb.base()));
+        }
+    }();
+
+    [&]()
     {
-        auto it_rb = rb.rbegin();
-        auto it_sb = sb.rbegin();
-        std::advance(it_rb, rand() % rb.size());
-        std::advance(it_sb, rand() % sb.size());
-        rb.erase(--(it_rb.base()));
-        sb.erase(--(it_sb.base()));
-    }
+        for(int i = 0; i < 10000; ++i)
+        {
+            int key = rand();
+            int val = rand();
+            int where = rand() % std::max<size_t>(1, sb.size() + 1);
+            sb.emplace_hint(std::next(sb.begin(), where), key, val);
+            rb.emplace_hint(std::next(rb.begin(), where), key, val);
+            assert(sb.check());
+            auto sit = sb.begin();
+            auto rit = rb.begin();
+            for(int j = 0; j < int(sb.size()); ++j, ++sit, ++rit)
+            {
+                assert(sit->second == rit->second);
+            }
+        }
+        sb.clear();
+        rb.clear();
+    }();
 
     auto t = std::chrono::high_resolution_clock::now;
     std::mt19937 mt;
