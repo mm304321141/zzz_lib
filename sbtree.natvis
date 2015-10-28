@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="size_balanced_tree&lt;*&gt;">
+    <DisplayString>{{ size={head_.parent-&gt;size} }}</DisplayString>
+    <Expand>
+      <Item Name="[comparator]" ExcludeView="simple">(*(key_compare *)&amp;head_)</Item>
+      <Item Name="[allocator]" ExcludeView="simple">(*(allocator_type *)&amp;head_)</Item>
+      <TreeItems>
+        <Size>head_.parent-&gt;size</Size>
+        <HeadPointer>head_.parent</HeadPointer>
+        <LeftPointer>left</LeftPointer>
+        <RightPointer>right</RightPointer>
+        <ValueNode Condition="size != 0">((value_node_t *)this)-&gt;value</ValueNode>
+      </TreeItems>
+    </Expand>
+  </Type>
+  <Type Name="size_balanced_tree&lt;*&gt;::iterator">
+    <AlternativeType Name="size_balanced_tree&lt;*&gt;::const_iterator" />
+    <AlternativeType Name="size_balanced_tree&lt;*&gt;::reverse_iterator" />
+    <AlternativeType Name="size_balanced_tree&lt;*&gt;::const_reverse_iterator" />
+    <DisplayString Condition="node-&gt;size != 0">{((value_node_t *)node)-&gt;value}</DisplayString>
+    <DisplayString Condition="node-&gt;size == 0">end</DisplayString>
+    <Expand>
+      <Item Condition="node-&gt;size != 0" Name="[ptr]">((value_node_t *)node)-&gt;value</Item>
+    </Expand>
+  </Type>
+  <Type Name="size_balanced_tree&lt;*&gt;::node_t">
+    <DisplayString Condition="size != 0">{((value_node_t *)this)-&gt;value}</DisplayString>
+    <DisplayString Condition="size == 0">nil</DisplayString>
+    <Expand>
+      <Item Condition="size != 0" Name="[parent]">parent</Item>
+      <Item Condition="size != 0" Name="[left]">left</Item>
+      <Item Condition="size != 0" Name="[right]">right</Item>
+      <Item Condition="size != 0" Name="[size]">size</Item>
+      <Item Condition="size != 0" Name="[value]">((value_node_t *)this)-&gt;value</Item>
+      <Item Condition="size == 0" Name="[tree root]">parent</Item>
+      <Item Condition="size == 0" Name="[most left]">left</Item>
+      <Item Condition="size == 0" Name="[most right]">right</Item>
+      <Item Condition="size == 0" Name="[tree size]">parent-&gt;size</Item>
+    </Expand>
+  </Type>
+</AutoVisualizer>
