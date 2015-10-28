@@ -130,7 +130,7 @@ int main()
             system("pause");
             if(sb.size() < 48)
             {
-                sb.emplace_hint(std::next(sb.begin(), rand() % std::max<int>(1, sb.size() + 1)), rand());
+                sb.emplace_hint(std::next(sb.begin(), rand() % std::max<size_t>(1, sb.size() + 1)), rand());
             }
             else if(sb.size() >= 64)
             {
@@ -145,7 +145,7 @@ int main()
                 }
                 else if(r < 50)
                 {
-                    sb.emplace_hint(std::next(sb.begin(), rand() % std::max<int>(1, sb.size() + 1)), rand());
+                    sb.emplace_hint(std::next(sb.begin(), rand() % std::max<size_t>(1, sb.size() + 1)), rand());
                 }
                 else if(r < 55)
                 {
@@ -178,7 +178,7 @@ int main()
         {
             int key = rand();
             int val = rand();
-            int where = rand() % std::max<int>(1, sb.size() + 1);
+            int where = rand() % std::max<size_t>(1, sb.size() + 1);
             sb.emplace_hint(std::next(sb.begin(), where), key, val);
             rb.emplace_hint(std::next(rb.begin(), where), key, val);
             assert(sb.check());
