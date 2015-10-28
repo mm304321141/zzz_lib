@@ -436,7 +436,7 @@ public:
             temp_set.sbt_erase_<true>(node);
             static_cast<value_node_t *>(node)->~value_node_t();
             ::new(node) value_node_t(*it++);
-            sbt_insert_(node);
+            sbt_insert_hint_(nil_(), node);
         }
         insert(it, other.end());
         return *this;
@@ -456,32 +456,29 @@ public:
     typedef std::pair<const_iterator, const_iterator> pair_cici_t;
 
     //允许重复key
-    iterator insert(value_type const &node)
+    iterator insert(value_type const &value)
     {
-        value_node_t *new_node = get_value_allocator().allocate(1);
-        ::new(new_node) value_node_t(node);
-        sbt_insert_(new_node);
+        node_t *new_node = sbt_create_node_(value);
+        sbt_insert_<false>(new_node);
         return iterator(new_node);
     }
-    iterator insert(const_iterator hint, value_type const &node)
+    iterator insert(iterator hint, value_type const &value)
     {
-        value_node_t *new_node = get_value_allocator().allocate(1);
-        ::new(new_node) value_node_t(node);
-        sbt_insert_(new_node);
+        node_t *new_node = sbt_create_node_(value);
+        sbt_insert_hint_(hint.node, new_node);
         return iterator(new_node);
     }
-    iterator insert(value_type &&node)
+    iterator insert(value_type &&value)
     {
-        value_node_t *new_node = get_value_allocator().allocate(1);
-        ::new(new_node) value_node_t(node);
-        sbt_insert_(new_node);
+        node_t *new_node = sbt_create_node_(value);
+        sbt_insert_<false>(new_node);
         return iterator(new_node);
     }
     template<class iterator_t> void insert(iterator_t begin, iterator_t end)
     {
         for(; begin != end; ++begin)
         {
-            insert(*begin);
+            insert(size_balanced_tree::end(), *begin);
         }
     }
     void insert(std::initializer_list<value_type> ilist)
@@ -490,9 +487,14 @@ public:
     }
     template<class ...args_t> iterator emplace(args_t &&...args)
     {
-        value_node_t *new_node = get_value_allocator().allocate(1);
-        ::new(new_node) value_node_t(args...);
-        sbt_insert_(new_node);
+        node_t *new_node = sbt_create_node_(args...);
+        sbt_insert_<false>(new_node);
+        return iterator(new_node);
+    }
+    template<class ...args_t> iterator emplace_hint(iterator hint, args_t &&...args)
+    {
+        node_t *new_node = sbt_create_node_(args...);
+        sbt_insert_hint_(hint.node, new_node);
         return iterator(new_node);
     }
 
@@ -510,8 +512,7 @@ public:
     void erase(iterator where)
     {
         sbt_erase_<false>(where.node);
-        static_cast<value_node_t *>(where.node)->~value_node_t();
-        get_value_allocator().deallocate(static_cast<value_node_t *>(where.node), 1);
+        sbt_destroy_node_(where.node);
     }
     size_type erase(key_type const &key)
     {
@@ -698,8 +699,7 @@ public:
         for(node_t *root = get_root_(); !is_nil_(root); root = get_root_())
         {
             sbt_erase_<true>(root);
-            static_cast<value_node_t *>(root)->~value_node_t();
-            get_value_allocator().deallocate(static_cast<value_node_t *>(root), 1);
+            sbt_destroy_node_(root);
         }
     }
     size_type size() const
@@ -878,12 +878,12 @@ protected:
         }
     }
 
-    node_t *bst_init_node_(node_t *parent, node_t *node)
+    void bst_init_node_(node_t *parent, node_t *node)
     {
         set_parent_(node, parent);
         set_left_(node, nil_());
         set_right_(node, nil_());
-        return node;
+        set_size_(node, 1);
     }
 
     template<bool is_next, typename in_node_t> static in_node_t *bst_move_(in_node_t *node)
@@ -1270,14 +1270,20 @@ protected:
         return node;
     }
 
-    void sbt_insert_(node_t *key)
+    template<class ...args_t> node_t *sbt_create_node_(args_t &&...args)
     {
-        set_size_(key, 1);
+        value_node_t *new_node = get_value_allocator().allocate(1);
+        return ::new(new_node) value_node_t(args...);
+    }
+
+    template<bool is_leftish> void sbt_insert_(node_t *key)
+    {
         if(is_nil_(get_root_()))
         {
-            set_root_(bst_init_node_(nil_(), key));
-            set_most_left_(get_root_());
-            set_most_right_(get_root_());
+            bst_init_node_(nil_(), key);
+            set_root_(key);
+            set_most_left_(key);
+            set_most_right_(key);
             return;
         }
         node_t *node = get_root_(), *where = nil_();
@@ -1286,7 +1292,15 @@ protected:
         {
             set_size_(node, get_size_(node) + 1);
             where = node;
-            if(is_left = get_comparator()(get_key_(key), get_key_(node)))
+            if(is_leftish)
+            {
+                is_left = !get_comparator()(get_key_(node), get_key_(key));
+            }
+            else
+            {
+                is_left = get_comparator()(get_key_(key), get_key_(node));
+            }
+            if(is_left)
             {
                 node = get_left_(node);
             }
@@ -1295,9 +1309,91 @@ protected:
                 node = get_right_(node);
             }
         }
+        sbt_insert_at_<false>(is_left, where, key);
+    }
+
+    void sbt_insert_hint_(node_t *where, node_t *key)
+    {
+        bool is_leftish = false;
+        node_t *other;
+        if(is_nil_(get_root_()))
+        {
+            bst_init_node_(nil_(), key);
+            set_root_(key);
+            set_most_left_(key);
+            set_most_right_(key);
+            return;
+        }
+        else if(where == get_most_left_())
+        {
+            if(!get_comparator()(get_key_(where), get_key_(key)))
+            {
+                sbt_insert_at_<true>(true, where, key);
+                return;
+            }
+            is_leftish = true;
+        }
+        else if(where == nil_())
+        {
+            if(!get_comparator()(get_key_(key), get_key_(get_most_right_())))
+            {
+                sbt_insert_at_<true>(false, get_most_right_(), key);
+                return;
+            }
+        }
+        else if(!get_comparator()(get_key_(where), get_key_(key)) && !get_comparator()(get_key_(key), get_key_(other = bst_move_<false>(where))))
+        {
+            if(is_nil_(get_right_(other)))
+            {
+                sbt_insert_at_<true>(false, other, key);
+            }
+            else
+            {
+                sbt_insert_at_<true>(true, where, key);
+            }
+            return;
+        }
+        else if(!get_comparator()(get_key_(key), get_key_(where)) && ((other = bst_move_<true>(where)) == nil_() || !get_comparator()(get_key_(other), get_key_(key))))
+        {
+            if(is_nil_(get_right_(where)))
+            {
+                sbt_insert_at_<true>(false, where, key);
+            }
+            else
+            {
+                sbt_insert_at_<true>(true, other, key);
+            }
+            return;
+        }
+        else
+        {
+            is_leftish = true;
+        }
+        if(is_leftish)
+        {
+            sbt_insert_<true>(key);
+        }
+        else
+        {
+            sbt_insert_<false>(key);
+        }
+    }
+
+    template<bool is_hint> void sbt_insert_at_(bool is_left, node_t *where, node_t *node)
+    {
+        if(is_hint)
+        {
+            node_t *parent = where;
+            do
+            {
+                set_size_(parent, get_size_(parent) + 1);
+            }
+            while(!is_nil_(parent = get_parent_(parent)));
+        }
+        bst_init_node_(where, node);
         if(is_left)
         {
-            set_left_(where, node = bst_init_node_(where, key));
+            set_left_(where, node);
             if(where == get_most_left_())
             {
                 set_most_left_(node);
@@ -1305,7 +1401,7 @@ protected:
         }
         else
         {
-            set_right_(where, node = bst_init_node_(where, key));
+            set_right_(where, node);
             if(where == get_most_right_())
             {
                 set_most_right_(node);
@@ -1329,6 +1425,12 @@ protected:
             node = where;
             where = get_parent_(where);
         }
+    }
+
+    void sbt_destroy_node_(node_t *node)
+    {
+        static_cast<value_node_t *>(node)->~value_node_t();
+        get_value_allocator().deallocate(static_cast<value_node_t *>(node), 1);
     }
 
     template<bool is_clear> void sbt_erase_(node_t *node)
@@ -1360,7 +1462,7 @@ protected:
         {
             if(get_size_(get_left_(node)) > get_size_(get_right_(node)))
             {
-                node = sbt_erase_on_<is_clear, true>(node);
+                node = sbt_erase_at_<is_clear, true>(node);
                 if(!is_clear)
                 {
                     sbt_erase_maintain_(node, true);
@@ -1368,7 +1470,7 @@ protected:
             }
             else
             {
-                node = sbt_erase_on_<is_clear, false>(node);
+                node = sbt_erase_at_<is_clear, false>(node);
                 if(!is_clear)
                 {
                     sbt_erase_maintain_(node, false);
@@ -1411,7 +1513,7 @@ protected:
         }
     }
 
-    template<bool is_clear, bool is_left> node_t *sbt_erase_on_(node_t *node)
+    template<bool is_clear, bool is_left> node_t *sbt_erase_at_(node_t *node)
     {
         node_t *erase_node = node;
         node_t *fix_node;

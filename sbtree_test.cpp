@@ -89,10 +89,37 @@ struct print_tree_value
     }
 };
 
+
+template<class key_t, class value_t, class comparator_t = std::less<value_t>, class allocator_t = std::allocator<value_t>>
+class sbtree_mmap_test : public sbtree_multimap<key_t, value_t, comparator_t, allocator_t>
+{
+protected:
+    typedef sbtree_multimap<key_t, value_t, comparator_t, allocator_t> b_t;
+
+    bool check(typename b_t::node_t *node)
+    {
+        if(!b_t::is_nil_(node))
+        {
+            if(b_t::get_size_(node) != b_t::get_size_(b_t::get_left_(node)) + b_t::get_size_(b_t::get_right_(node)) + 1)
+            {
+                return false;
+            }
+            return check(b_t::get_right_(node)) && check(b_t::get_left_(node));
+        }
+        return true;
+    }
+public:
+    bool check()
+    {
+        return check(b_t::get_root_());
+    }
+};
+
 int main()
 {
+
     std::multimap<int, int> rb;
-    sbtree_multimap<int, int> sb;
+    sbtree_mmap_test<int, int> sb;
 
     []()
     {
@@ -103,7 +130,7 @@ int main()
             system("pause");
             if(sb.size() < 48)
             {
-                sb.emplace(rand());
+                sb.emplace_hint(std::next(sb.begin(), rand() % std::max<int>(1, sb.size() + 1)), rand());
             }
             else if(sb.size() >= 64)
             {
@@ -112,9 +139,13 @@ int main()
             else
             {
                 int r = rand() % 100;
-                if(r < 50)
+                if(r < 25)
                 {
                     sb.emplace(rand());
+                }
+                else if(r < 50)
+                {
+                    sb.emplace_hint(std::next(sb.begin(), rand() % std::max<int>(1, sb.size() + 1)), rand());
                 }
                 else if(r < 55)
                 {
@@ -143,7 +174,28 @@ int main()
 
     [&]()
     {
-        sbtree_multimap<int, int> sb1;
+        for(int i = 0; i < 10000; ++i)
+        {
+            int key = rand();
+            int val = rand();
+            int where = rand() % std::max<int>(1, sb.size() + 1);
+            sb.emplace_hint(std::next(sb.begin(), where), key, val);
+            rb.emplace_hint(std::next(rb.begin(), where), key, val);
+            assert(sb.check());
+            auto sit = sb.begin();
+            auto rit = rb.begin();
+            for(int j = 0; j < int(sb.size()); ++j, ++sit, ++rit)
+            {
+                assert(sit->second == rit->second);
+            }
+        }
+        sb.clear();
+        rb.clear();
+    }();
+
+    [&]()
+    {
+        sbtree_mmap_test<int, int> sb1;
         assert(sb.size() == sb1.size());
         for(int i = 0; i < 100; ++i)
         {
@@ -153,7 +205,7 @@ int main()
         }
         sb.rank(sb.begin() + 2);
         sb1 = sb;
-        sbtree_multimap<int, int> sb2 = sb;
+        sbtree_mmap_test<int, int> sb2 = sb;
         assert(sb.size() == sb1.size());
         assert(sb.size() == sb2.size());
         assert(sb1.rbegin()->second == (--sb1.end())->second);
