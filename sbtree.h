@@ -1,9 +1,10 @@
 ﻿#pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <algorithm>
 #include <memory>
-
+#include <stdexcept>
 
 template<class config_t>
 class size_balanced_tree
@@ -39,10 +40,13 @@ protected:
         }
         value_type value;
     };
-    typedef typename allocator_type::template rebind<value_node_t>::other value_allocator_t;
-    struct root_node_t : public node_t, public value_allocator_t, public key_compare
+    struct root_node_t : public node_t, public key_compare, public allocator_type
     {
+        root_node_t(key_compare const &comp, allocator_type const &alloc) : key_compare(comp), allocator_type(alloc)
+        {
+        }
     };
+    typedef typename allocator_type::template rebind<value_node_t>::other value_allocator_t;
 
 public:
     class iterator
@@ -385,27 +389,107 @@ public:
     };
 
 public:
-    size_balanced_tree()
+    //empty
+    size_balanced_tree() : size_balanced_tree(key_compare(), allocator_type())
+    {
+    }
+    //empty
+    explicit size_balanced_tree(key_compare const &comp, allocator_type const &alloc = allocator_type()) : head_(comp, alloc)
     {
         set_size_(nil_(), 0);
         set_root_(nil_());
         set_most_left_(nil_());
         set_most_right_(nil_());
     }
-    size_balanced_tree(size_balanced_tree &&other) : size_balanced_tree()
+    //empty
+    explicit size_balanced_tree(allocator_type const &alloc) : size_balanced_tree(key_compare(), alloc)
+    {
+    }
+    //range
+    template <class InputIterator> size_balanced_tree(InputIterator begin, InputIterator end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(key_compare(), allocator_type())
+    {
+        insert(begin, end);
+    }
+    //range
+    template <class InputIterator> size_balanced_tree(InputIterator begin, InputIterator end, allocator_type const &alloc = allocator_type()) : size_balanced_tree(begin, end, key_compare(), alloc)
+    {
+    }
+    //copy
+    size_balanced_tree(size_balanced_tree const &other) : size_balanced_tree(other.begin(), other.end(), other.get_comparator_(), other.get_allocator())
+    {
+    }
+    //copy
+    size_balanced_tree(size_balanced_tree const &other, allocator_type const &alloc) : size_balanced_tree(other.begin(), other.end(), other.get_comparator_(), alloc)
+    {
+    }
+    //move
+    size_balanced_tree(size_balanced_tree &&other) : size_balanced_tree(other.get_comparator_(), other.get_allocator())
     {
         *this = std::move(other);
     }
-    size_balanced_tree(size_balanced_tree const &other) : size_balanced_tree()
+    //move
+    size_balanced_tree(size_balanced_tree &&other, allocator_type const &alloc) : size_balanced_tree(other.get_comparator_(), alloc)
     {
-        insert(other.begin(), other.end());
+        *this = std::move(other);
     }
+    //initializer list
+    size_balanced_tree(std::initializer_list<value_type> il, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(il.begin(), il.end(), comp, alloc)
+    {
+    }
+    //initializer list
+    size_balanced_tree(std::initializer_list<value_type> il, allocator_type const &alloc) : size_balanced_tree(il.begin(), il.end(), key_compare(), alloc)
+    {
+    }
+    //destructor
     ~size_balanced_tree()
     {
         clear();
     }
+    //copy
+    size_balanced_tree &operator = (size_balanced_tree const &other)
+    {
+        if(this == &other)
+        {
+            return *this;
+        }
+        if(get_allocator_() == other.get_allocator_())
+        {
+            size_balanced_tree tree_memory = std::move(*this);
+            clear();
+            get_comparator_() = other.get_comparator_();
+            get_allocator_() = other.get_allocator_();
+            const_iterator it = other.begin();
+            while(!tree_memory.empty())
+            {
+                if(it == other.end())
+                {
+                    tree_memory.clear();
+                    return *this;
+                }
+                node_t *node = tree_memory.get_root_();
+                tree_memory.sbt_erase_<true>(node);
+                static_cast<value_node_t *>(node)->~value_node_t();
+                ::new(node) value_node_t(*it++);
+                sbt_insert_hint_(nil_(), node);
+            }
+            insert(it, other.end());
+        }
+        else
+        {
+            clear();
+            get_comparator_() = other.get_comparator_();
+            get_allocator_() = other.get_allocator_();
+            insert(other.begin(), other.end());
+        }
+        return *this;
+    }
+    //move
     size_balanced_tree &operator = (size_balanced_tree &&other)
     {
+        if(this == &other)
+        {
+            return *this;
+        }
         if(other.empty())
         {
             clear();
@@ -419,32 +503,36 @@ public:
             other.set_most_left_(other.nil_());
             other.set_most_right_(other.nil_());
         }
+        get_comparator_() = std::move(other.get_comparator_());
+        get_allocator_() = std::move(other.get_allocator_());
         return *this;
     }
-    size_balanced_tree &operator = (size_balanced_tree const &other)
+    //initializer list
+    size_balanced_tree &operator = (std::initializer_list<value_type> il)
     {
-        size_balanced_tree temp_set = std::move(*this);
-        const_iterator it = other.begin();
-        while(!temp_set.empty())
+        size_balanced_tree tree_memory = std::move(*this);
+        clear();
+        auto it = il.begin();
+        while(!tree_memory.empty())
         {
-            if(it == other.end())
+            if(it == il.end())
             {
-                temp_set.clear();
+                tree_memory.clear();
                 return *this;
             }
-            node_t *node = temp_set.get_root_();
-            temp_set.sbt_erase_<true>(node);
+            node_t *node = tree_memory.get_root_();
+            tree_memory.sbt_erase_<true>(node);
             static_cast<value_node_t *>(node)->~value_node_t();
             ::new(node) value_node_t(*it++);
             sbt_insert_hint_(nil_(), node);
         }
-        insert(it, other.end());
+        insert(it, il.end());
         return *this;
     }
 
     allocator_type get_allocator() const
     {
-        return allocator_type(head_);
+        return head_;
     }
 
     void swap(size_balanced_tree &other)
@@ -455,70 +543,77 @@ public:
     typedef std::pair<iterator, iterator> pair_ii_t;
     typedef std::pair<const_iterator, const_iterator> pair_cici_t;
 
-    //允许重复key
+    //single element
     iterator insert(value_type const &value)
     {
-        node_t *new_node = sbt_create_node_(value);
-        sbt_insert_<false>(new_node);
-        return iterator(new_node);
+        check_max_size_();
+        return iterator(sbt_insert_<false>(sbt_create_node_(value)));
     }
-    iterator insert(iterator hint, value_type const &value)
+    //single element
+    template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, iterator>::type insert(in_value_t &&value)
     {
-        node_t *new_node = sbt_create_node_(value);
-        sbt_insert_hint_(hint.node, new_node);
-        return iterator(new_node);
+        check_max_size_();
+        return iterator(sbt_insert_<false>(sbt_create_node_(value)));
     }
-    iterator insert(value_type &&value)
+    //with hint
+    iterator insert(const_iterator hint, value_type const &value)
     {
-        node_t *new_node = sbt_create_node_(value);
-        sbt_insert_<false>(new_node);
-        return iterator(new_node);
+        check_max_size_();
+        return iterator(sbt_insert_hint_(const_cast<node_t *>(hint.node), sbt_create_node_(value)));
     }
+    //with hint
+    template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, iterator>::type insert(const_iterator hint, in_value_t &&value)
+    {
+        check_max_size_();
+        return iterator(sbt_insert_hint_<false>(const_cast<node_t *>(hint.node), sbt_create_node_(value)));
+    }
+    //range
     template<class iterator_t> void insert(iterator_t begin, iterator_t end)
     {
         for(; begin != end; ++begin)
         {
-            insert(size_balanced_tree::end(), *begin);
+            emplace_hint(size_balanced_tree::end(), *begin);
         }
     }
-    void insert(std::initializer_list<value_type> ilist)
+    //initializer list
+    void insert(std::initializer_list<value_type> il)
     {
-        insert(ilist.begin(), ilist.end());
+        insert(il.begin(), il.end());
     }
+
     template<class ...args_t> iterator emplace(args_t &&...args)
     {
-        node_t *new_node = sbt_create_node_(args...);
-        sbt_insert_<false>(new_node);
-        return iterator(new_node);
+        check_max_size_();
+        return iterator(sbt_insert_<false>(sbt_create_node_(args...)));
     }
-    template<class ...args_t> iterator emplace_hint(iterator hint, args_t &&...args)
+    template<class ...args_t> iterator emplace_hint(const_iterator hint, args_t &&...args)
     {
-        node_t *new_node = sbt_create_node_(args...);
-        sbt_insert_hint_(hint.node, new_node);
-        return iterator(new_node);
+        check_max_size_();
+        return iterator(sbt_insert_hint_(const_cast<node_t *>(hint.node), sbt_create_node_(args...)));
     }
 
     iterator find(key_type const &key)
     {
         node_t *where = bst_lower_bound_(key);
-        return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_()) : iterator(where);
+        return (is_nil_(where) || get_comparator_()(key, get_key_(where))) ? iterator(nil_()) : iterator(where);
     }
     const_iterator find(key_type const &key) const
     {
         node_t *where = bst_lower_bound_(key);
-        return (is_nil_(where) || get_comparator()(key, get_key_(where))) ? iterator(nil_()) : iterator(where);
+        return (is_nil_(where) || get_comparator_()(key, get_key_(where))) ? iterator(nil_()) : iterator(where);
     }
 
-    void erase(iterator where)
+    void erase(const_iterator where)
     {
-        sbt_erase_<false>(where.node);
-        sbt_destroy_node_(where.node);
+        node_t *node = const_cast<node_t *>(where.node);
+        sbt_erase_<false>(node);
+        sbt_destroy_node_(node);
     }
     size_type erase(key_type const &key)
     {
         size_type erase_count = 0;
         node_t *where = bst_lower_bound_(key);
-        while(!is_nil_(where) && !get_comparator()(key, get_key_(where)))
+        while(!is_nil_(where) && !get_comparator_()(key, get_key_(where)))
         {
             node_t *next = bst_move_<true>(where);
             erase(iterator(where));
@@ -526,6 +621,22 @@ public:
             ++erase_count;
         }
         return erase_count;
+    }
+    iterator erase(const_iterator begin, const_iterator end)
+    {
+        if(begin == size_balanced_tree::begin() && end == size_balanced_tree::end())
+        {
+            clear();
+            return size_balanced_tree::begin();
+        }
+        else
+        {
+            while(begin != end)
+            {
+                erase(begin++);
+            }
+            return iterator(const_cast<node_t *>(begin.node));
+        }
     }
 
     size_type count(key_type const &key) const
@@ -708,7 +819,7 @@ public:
     }
     size_type max_size() const
     {
-        return std::numeric_limits<size_type>::max();
+        return value_allocator_t(get_allocator_()).max_size();
     }
 
     //下标访问[0, size)
@@ -738,12 +849,20 @@ protected:
 
 protected:
 
-    key_compare const &get_comparator() const
+    key_compare &get_comparator_()
+    {
+        return head_;
+    }
+    key_compare const &get_comparator_() const
     {
         return head_;
     }
 
-    value_allocator_t &get_value_allocator()
+    allocator_type &get_allocator_()
+    {
+        return head_;
+    }
+    allocator_type const &get_allocator_() const
     {
         return head_;
     }
@@ -929,7 +1048,7 @@ protected:
         node_t *node = get_root_(), *where = nil_();
         while(!is_nil_(node))
         {
-            if(get_comparator()(get_key_(node), key))
+            if(get_comparator_()(get_key_(node), key))
             {
                 node = get_right_(node);
             }
@@ -947,7 +1066,7 @@ protected:
         node_t const *node = get_root_(), *where = nil_();
         while(!is_nil_(node))
         {
-            if(get_comparator()(get_key_(node), key))
+            if(get_comparator_()(get_key_(node), key))
             {
                 node = get_right_(node);
             }
@@ -965,7 +1084,7 @@ protected:
         node_t *node = get_root_(), *where = nil_();
         while(!is_nil_(node))
         {
-            if(get_comparator()(key, get_key_(node)))
+            if(get_comparator_()(key, get_key_(node)))
             {
                 where = node;
                 node = get_left_(node);
@@ -983,7 +1102,7 @@ protected:
         node_t const *node = get_root_(), *where = nil_();
         while(!is_nil_(node))
         {
-            if(get_comparator()(key, get_key_(node)))
+            if(get_comparator_()(key, get_key_(node)))
             {
                 where = node;
                 node = get_left_(node);
@@ -1003,13 +1122,13 @@ protected:
         node_t *upper = nil_();
         while(!is_nil_(node))
         {
-            if(get_comparator()(get_key_(node), key))
+            if(get_comparator_()(get_key_(node), key))
             {
                 node = get_right_(node);
             }
             else
             {
-                if(is_nil_(upper) && get_comparator()(key, get_key_(node)))
+                if(is_nil_(upper) && get_comparator_()(key, get_key_(node)))
                 {
                     upper = node;
                 }
@@ -1020,7 +1139,7 @@ protected:
         node = is_nil_(upper) ? get_root_() : get_left_(upper);
         while(!is_nil_(node))
         {
-            if(get_comparator()(key, get_key_(node)))
+            if(get_comparator_()(key, get_key_(node)))
             {
                 upper = node;
                 node = get_left_(node);
@@ -1041,13 +1160,13 @@ protected:
         node_t const *upper = nil_();
         while(!is_nil_(node))
         {
-            if(get_comparator()(get_key_(node), key))
+            if(get_comparator_()(get_key_(node), key))
             {
                 node = get_right_(node);
             }
             else
             {
-                if(is_nil_(upper) && get_comparator()(key, get_key_(node)))
+                if(is_nil_(upper) && get_comparator_()(key, get_key_(node)))
                 {
                     upper = node;
                 }
@@ -1058,7 +1177,7 @@ protected:
         node = is_nil_(upper) ? get_root_() : get_left_(upper);
         while(!is_nil_(node))
         {
-            if(get_comparator()(key, get_key_(node)))
+            if(get_comparator_()(key, get_key_(node)))
             {
                 upper = node;
                 node = get_left_(node);
@@ -1270,13 +1389,20 @@ protected:
         return node;
     }
 
-    template<class ...args_t> node_t *sbt_create_node_(args_t &&...args)
+    void check_max_size_()
     {
-        value_node_t *new_node = get_value_allocator().allocate(1);
-        return ::new(new_node) value_node_t(args...);
+        if(size() >= max_size() - 1)
+        {
+            throw std::length_error("sbtree too long");
+        }
     }
 
-    template<bool is_leftish> void sbt_insert_(node_t *key)
+    template<class ...args_t> node_t *sbt_create_node_(args_t &&...args)
+    {
+        return ::new(value_allocator_t(get_allocator_()).allocate(1)) value_node_t(args...);
+    }
+
+    template<bool is_leftish> node_t *sbt_insert_(node_t *key)
     {
         if(is_nil_(get_root_()))
         {
@@ -1284,7 +1410,7 @@ protected:
             set_root_(key);
             set_most_left_(key);
             set_most_right_(key);
-            return;
+            return key;
         }
         node_t *node = get_root_(), *where = nil_();
         bool is_left = true;
@@ -1294,11 +1420,11 @@ protected:
             where = node;
             if(is_leftish)
             {
-                is_left = !get_comparator()(get_key_(node), get_key_(key));
+                is_left = !get_comparator_()(get_key_(node), get_key_(key));
             }
             else
             {
-                is_left = get_comparator()(get_key_(key), get_key_(node));
+                is_left = get_comparator_()(get_key_(key), get_key_(node));
             }
             if(is_left)
             {
@@ -1310,9 +1436,10 @@ protected:
             }
         }
         sbt_insert_at_<false>(is_left, where, key);
+        return key;
     }
 
-    void sbt_insert_hint_(node_t *where, node_t *key)
+    node_t *sbt_insert_hint_(node_t *where, node_t *key)
     {
         bool is_leftish = false;
         node_t *other;
@@ -1322,26 +1449,26 @@ protected:
             set_root_(key);
             set_most_left_(key);
             set_most_right_(key);
-            return;
+            return key;
         }
         else if(where == get_most_left_())
         {
-            if(!get_comparator()(get_key_(where), get_key_(key)))
+            if(!get_comparator_()(get_key_(where), get_key_(key)))
             {
                 sbt_insert_at_<true>(true, where, key);
-                return;
+                return key;
             }
             is_leftish = true;
         }
         else if(where == nil_())
         {
-            if(!get_comparator()(get_key_(key), get_key_(get_most_right_())))
+            if(!get_comparator_()(get_key_(key), get_key_(get_most_right_())))
             {
                 sbt_insert_at_<true>(false, get_most_right_(), key);
-                return;
+                return key;
             }
         }
-        else if(!get_comparator()(get_key_(where), get_key_(key)) && !get_comparator()(get_key_(key), get_key_(other = bst_move_<false>(where))))
+        else if(!get_comparator_()(get_key_(where), get_key_(key)) && !get_comparator_()(get_key_(key), get_key_(other = bst_move_<false>(where))))
         {
             if(is_nil_(get_right_(other)))
             {
@@ -1351,9 +1478,9 @@ protected:
             {
                 sbt_insert_at_<true>(true, where, key);
             }
-            return;
+            return key;
         }
-        else if(!get_comparator()(get_key_(key), get_key_(where)) && ((other = bst_move_<true>(where)) == nil_() || !get_comparator()(get_key_(other), get_key_(key))))
+        else if(!get_comparator_()(get_key_(key), get_key_(where)) && ((other = bst_move_<true>(where)) == nil_() || !get_comparator_()(get_key_(other), get_key_(key))))
         {
             if(is_nil_(get_right_(where)))
             {
@@ -1363,7 +1490,7 @@ protected:
             {
                 sbt_insert_at_<true>(true, other, key);
             }
-            return;
+            return key;
         }
         else
         {
@@ -1377,6 +1504,7 @@ protected:
         {
             sbt_insert_<false>(key);
         }
+        return key;
     }
 
     template<bool is_hint> void sbt_insert_at_(bool is_left, node_t *where, node_t *node)
@@ -1430,7 +1558,7 @@ protected:
     void sbt_destroy_node_(node_t *node)
     {
         static_cast<value_node_t *>(node)->~value_node_t();
-        get_value_allocator().deallocate(static_cast<value_node_t *>(node), 1);
+        value_allocator_t(get_allocator_()).deallocate(static_cast<value_node_t *>(node), 1);
     }
 
     template<bool is_clear> void sbt_erase_(node_t *node)

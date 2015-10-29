@@ -117,14 +117,13 @@ public:
 
 int main()
 {
-
     std::multimap<int, int> rb;
-    sbtree_mmap_test<int, int> sb;
+    sbtree_multimap<int, int> sb;
 
     []()
     {
         sbtree_mset_test<int> sb;
-        while(false)
+        while(true)
         {
             sb.print_tree<print_tree_value>();
             system("pause");
@@ -161,8 +160,27 @@ int main()
 
     [&]()
     {
-        sbtree_multimap<std::string, std::string> sss;
+        sbtree_multiset<int> aaa({1, 2, 3}, std::less<int>(), std::allocator<int>());
+        sbtree_multimap<int, int> sb({{1, 2},{1, 2}});
+        sbtree_multimap<int, int> sb2(sb, sbtree_multimap<int, int>::allocator_type());
+        sb.insert({{3, 4},{5, 6}});
+        sb.insert(sb.begin(), {7, 8});
+        sb.erase(sb.begin() + 1, sb.end());
+        sb2 = sb;
+        sbtree_multimap<int, std::string> ttt({{1, "2"}}, std::less<int>());
+        sbtree_multimap<std::string, std::string> sss =
+        {
+            {"0", ""},
+            {"1", "11"},
+            {"2", "222"},
+        };
         sss.emplace("0", "0");
+        sss =
+        {
+            {"0", "0"},
+            {"1", "11"},
+        };
+        sss.erase("1");
         sss.emplace(std::make_pair("1", "1"));
         sss.insert(std::make_pair("2", "2"));
         sss.emplace("0", "00");
@@ -174,7 +192,7 @@ int main()
 
     [&]()
     {
-        sbtree_mmap_test<int, int> sb1;
+        sbtree_multimap<int, int> sb1;
         assert(sb.size() == sb1.size());
         for(int i = 0; i < 100; ++i)
         {
@@ -184,7 +202,7 @@ int main()
         }
         sb.rank(sb.begin() + 2);
         sb1 = sb;
-        sbtree_mmap_test<int, int> sb2 = sb;
+        sbtree_multimap<int, int> sb2 = sb;
         assert(sb.size() == sb1.size());
         assert(sb.size() == sb2.size());
         assert(sb1.rbegin()->second == (--sb1.end())->second);
@@ -306,6 +324,7 @@ int main()
 
     [&]()
     {
+        sbtree_mmap_test<int, int> sb;
         for(int i = 0; i < 10000; ++i)
         {
             int key = rand();
