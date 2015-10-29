@@ -211,6 +211,9 @@ int main()
         assert(rit.base() == sb1.begin());
         assert(rit == sb1.rend());
         assert(sb2.rbegin() + 10 == sb2.rend() - 190);
+        assert(sb.at(100)->second == sb.at(50)[50].second);
+        assert(sb.at(74) < sb.at(75));
+        assert(sb.at(75) >= sb.at(75));
         sb.clear();
         sb.emplace(0, 1);
         sb.emplace(0, 0);

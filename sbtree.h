@@ -55,8 +55,8 @@ public:
         typedef std::random_access_iterator_tag iterator_category;
         typedef typename size_balanced_tree::value_type value_type;
         typedef typename size_balanced_tree::difference_type difference_type;
-        typedef typename size_balanced_tree::pointer pointer;
         typedef typename size_balanced_tree::reference reference;
+        typedef typename size_balanced_tree::pointer pointer;
     public:
         explicit iterator(node_t *in_node) : node(in_node)
         {
@@ -108,13 +108,33 @@ public:
             --*this;
             return save;
         }
-        value_type &operator *() const
+        reference operator *() const
         {
             return static_cast<value_node_t *>(node)->value;
         }
-        value_type *operator->() const
+        pointer operator->() const
         {
             return &static_cast<value_node_t *>(node)->value;
+        }
+        reference operator[](difference_type index) const
+        {
+            return *(*this + index);
+        }
+        bool operator > (iterator const &other) const
+        {
+            return *this - other > 0;
+        }
+        bool operator < (iterator const &other) const
+        {
+            return *this - other < 0;
+        }
+        bool operator >= (iterator const &other) const
+        {
+            return *this - other >= 0;
+        }
+        bool operator <= (iterator const &other) const
+        {
+            return *this - other <= 0;
         }
         bool operator == (iterator const &other) const
         {
@@ -134,8 +154,10 @@ public:
         typedef std::random_access_iterator_tag iterator_category;
         typedef typename size_balanced_tree::value_type value_type;
         typedef typename size_balanced_tree::difference_type difference_type;
-        typedef typename size_balanced_tree::pointer pointer;
         typedef typename size_balanced_tree::reference reference;
+        typedef typename size_balanced_tree::const_reference const_reference;
+        typedef typename size_balanced_tree::pointer pointer;
+        typedef typename size_balanced_tree::const_pointer const_pointer;
     public:
         explicit const_iterator(node_t const *in_node) : node(in_node)
         {
@@ -190,13 +212,33 @@ public:
             --*this;
             return save;
         }
-        value_type const &operator *() const
+        const_reference operator *() const
         {
             return static_cast<value_node_t const *>(node)->value;
         }
-        value_type const *operator->() const
+        const_pointer operator->() const
         {
             return &static_cast<value_node_t const *>(node)->value;
+        }
+        const_reference operator[](difference_type index) const
+        {
+            return *(*this + index);
+        }
+        bool operator > (const_iterator const &other) const
+        {
+            return *this - other > 0;
+        }
+        bool operator < (const_iterator const &other) const
+        {
+            return *this - other < 0;
+        }
+        bool operator >= (const_iterator const &other) const
+        {
+            return *this - other >= 0;
+        }
+        bool operator <= (const_iterator const &other) const
+        {
+            return *this - other <= 0;
         }
         bool operator == (const_iterator const &other) const
         {
@@ -216,8 +258,8 @@ public:
         typedef std::random_access_iterator_tag iterator_category;
         typedef typename size_balanced_tree::value_type value_type;
         typedef typename size_balanced_tree::difference_type difference_type;
-        typedef typename size_balanced_tree::pointer pointer;
         typedef typename size_balanced_tree::reference reference;
+        typedef typename size_balanced_tree::pointer pointer;
     public:
         explicit reverse_iterator(node_t *in_node) : node(in_node)
         {
@@ -273,13 +315,33 @@ public:
             --*this;
             return save;
         }
-        value_type &operator *() const
+        reference operator *() const
         {
             return static_cast<value_node_t *>(node)->value;
         }
-        value_type *operator->() const
+        pointer operator->() const
         {
             return &static_cast<value_node_t *>(node)->value;
+        }
+        reference operator[](difference_type index) const
+        {
+            return *(*this + index);
+        }
+        bool operator > (reverse_iterator const &other) const
+        {
+            return *this - other > 0;
+        }
+        bool operator < (reverse_iterator const &other) const
+        {
+            return *this - other < 0;
+        }
+        bool operator >= (reverse_iterator const &other) const
+        {
+            return *this - other >= 0;
+        }
+        bool operator <= (reverse_iterator const &other) const
+        {
+            return *this - other <= 0;
         }
         bool operator == (reverse_iterator const &other) const
         {
@@ -303,8 +365,10 @@ public:
         typedef std::random_access_iterator_tag iterator_category;
         typedef typename size_balanced_tree::value_type value_type;
         typedef typename size_balanced_tree::difference_type difference_type;
-        typedef typename size_balanced_tree::pointer pointer;
         typedef typename size_balanced_tree::reference reference;
+        typedef typename size_balanced_tree::const_reference const_reference;
+        typedef typename size_balanced_tree::pointer pointer;
+        typedef typename size_balanced_tree::const_pointer const_pointer;
     public:
         explicit const_reverse_iterator(node_t const *in_node) : node(in_node)
         {
@@ -363,13 +427,33 @@ public:
             --*this;
             return save;
         }
-        value_type const &operator *() const
+        const_reference operator *() const
         {
             return static_cast<value_node_t const *>(node)->value;
         }
-        value_type const *operator->() const
+        const_pointer operator->() const
         {
             return &static_cast<value_node_t const *>(node)->value;
+        }
+        const_reference operator[](difference_type index) const
+        {
+            return *(*this + index);
+        }
+        bool operator > (const_reverse_iterator const &other) const
+        {
+            return *this - other > 0;
+        }
+        bool operator < (const_reverse_iterator const &other) const
+        {
+            return *this - other < 0;
+        }
+        bool operator >= (const_reverse_iterator const &other) const
+        {
+            return *this - other >= 0;
+        }
+        bool operator <= (const_reverse_iterator const &other) const
+        {
+            return *this - other <= 0;
         }
         bool operator == (const_reverse_iterator const &other) const
         {
@@ -783,20 +867,20 @@ public:
         return const_reverse_iterator(nil_());
     }
 
-    value_type &front()
+    reference front()
     {
         return static_cast<value_node_t *>(get_most_left_())->value;
     }
-    value_type &back()
+    reference back()
     {
         return static_cast<value_node_t *>(get_most_right_())->value;
     }
 
-    value_type const &front() const
+    const_reference front() const
     {
         return static_cast<value_node_t const *>(get_most_left_())->value;
     }
-    value_type const &back() const
+    const_reference back() const
     {
         return static_cast<value_node_t const *>(get_most_right_())->value;
     }
