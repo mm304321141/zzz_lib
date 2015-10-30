@@ -490,7 +490,7 @@ public:
     {
     }
     //range
-    template <class InputIterator> size_balanced_tree(InputIterator begin, InputIterator end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(key_compare(), allocator_type())
+    template <class InputIterator> size_balanced_tree(InputIterator begin, InputIterator end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(comp, alloc)
     {
         insert(begin, end);
     }

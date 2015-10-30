@@ -123,7 +123,7 @@ int main()
     []()
     {
         sbtree_mset_test<int> sb;
-        while(false)
+        while(true)
         {
             sb.print_tree<print_tree_value>();
             system("pause");
@@ -160,7 +160,19 @@ int main()
 
     [&]()
     {
-        sbtree_multiset<int> aaa({1, 2, 3}, std::less<int>(), std::allocator<int>());
+        struct comp
+        {
+            size_t count = 0;
+            bool operator()(int l, int r)
+            {
+                ++count;
+                return l > r;
+            }
+        } c;
+        c.count = 100;
+        sbtree_multiset<int, comp> aaa({1, 2, 3}, c);
+        sbtree_multiset<int, comp> aaa2 = aaa;
+        aaa.swap(aaa2);
         sbtree_multimap<int, int> sb({{1, 2},{1, 2}});
         sbtree_multimap<int, int> const sb2(sb, sbtree_multimap<int, int>::allocator_type());
         sb.insert({{3, 4},{5, 6}});
