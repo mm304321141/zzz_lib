@@ -123,7 +123,7 @@ int main()
     []()
     {
         sbtree_mset_test<int> sb;
-        while(true)
+        while(false)
         {
             sb.print_tree<print_tree_value>();
             system("pause");
@@ -162,11 +162,21 @@ int main()
     {
         sbtree_multiset<int> aaa({1, 2, 3}, std::less<int>(), std::allocator<int>());
         sbtree_multimap<int, int> sb({{1, 2},{1, 2}});
-        sbtree_multimap<int, int> sb2(sb, sbtree_multimap<int, int>::allocator_type());
+        sbtree_multimap<int, int> const sb2(sb, sbtree_multimap<int, int>::allocator_type());
         sb.insert({{3, 4},{5, 6}});
         sb.insert(sb.begin(), {7, 8});
         sb.erase(sb.begin() + 1, sb.end());
-        sb2 = sb;
+        sb2.find(0);
+        sb2.slice();
+        sb2.front();
+        sb2.back();
+        sb2.equal_range(2);
+        sb2.lower_bound(2);
+        sb2.upper_bound(2);
+        sb2.range(2, 2);
+        sb2.rank(2);
+        sb2.count(2);
+        sb2.count(2, 2);
         sbtree_multimap<int, std::string> ttt({{1, "2"}}, std::less<int>());
         sbtree_multimap<std::string, std::string> sss =
         {

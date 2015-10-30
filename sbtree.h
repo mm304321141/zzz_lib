@@ -656,7 +656,7 @@ public:
     {
         for(; begin != end; ++begin)
         {
-            emplace_hint(size_balanced_tree::end(), *begin);
+            emplace_hint(cend(), *begin);
         }
     }
     //initializer list
@@ -683,8 +683,8 @@ public:
     }
     const_iterator find(key_type const &key) const
     {
-        node_t *where = bst_lower_bound_(key);
-        return (is_nil_(where) || get_comparator_()(key, get_key_(where))) ? iterator(nil_()) : iterator(where);
+        node_t const *where = bst_lower_bound_(key);
+        return (is_nil_(where) || get_comparator_()(key, get_key_(where))) ? const_iterator(nil_()) : const_iterator(where);
     }
 
     void erase(const_iterator where)
@@ -708,7 +708,7 @@ public:
     }
     iterator erase(const_iterator begin, const_iterator end)
     {
-        if(begin == size_balanced_tree::begin() && end == size_balanced_tree::end())
+        if(begin == cbegin() && end == cend())
         {
             clear();
             return size_balanced_tree::begin();
@@ -731,16 +731,28 @@ public:
     //计数[min, max)
     size_type count(key_type const &min, key_type const &max) const
     {
+        if(get_comparator_()(max, min))
+        {
+            return 0;
+        }
         return sbt_rank_(bst_upper_bound_(max)) - sbt_rank_(bst_lower_bound_(min));
     }
 
     //获取[min, max)
     pair_ii_t range(key_type const &min, key_type const &max)
     {
+        if(get_comparator_()(max, min))
+        {
+            return pair_ii_t(end(), end());
+        }
         return pair_ii_t(iterator(bst_lower_bound_(min)), iterator(bst_upper_bound_(max)));
     }
     pair_cici_t range(key_type const &min, key_type const &max) const
     {
+        if(get_comparator_()(max, min))
+        {
+            return pair_cici_t(cend(), cend());
+        }
         return pair_cici_t(const_iterator(bst_lower_bound_(min)), const_iterator(bst_upper_bound_(max)));
     }
 
@@ -764,14 +776,14 @@ public:
         {
             end = s_size;
         }
-        return pair_ii_t(size_balanced_tree::begin() + begin, size_balanced_tree::end() - (s_size - end));
+        return pair_ii_t(at(begin), at(end));
     }
     pair_cici_t slice(difference_type begin = 0, difference_type end = std::numeric_limits<difference_type>::max()) const
     {
         difference_type s_size = size();
         if(begin < 0)
         {
-            begin = std::max(s_size + begin, 0);
+            begin = std::max<difference_type>(s_size + begin, 0);
         }
         if(end < 0)
         {
@@ -779,13 +791,13 @@ public:
         }
         if(begin > end || begin >= s_size)
         {
-            return pair_cici_t(size_balanced_tree::cend(), size_balanced_tree::cend());
+            return pair_cici_t(cend(), cend());
         }
         if(end > s_size)
         {
             end = s_size;
         }
-        return pair_cici_t(size_balanced_tree::cbegin() + begin, size_balanced_tree::cend() - (s_size - end));
+        return pair_cici_t(at(begin), at(end));
     }
 
     iterator lower_bound(key_type const &key)
