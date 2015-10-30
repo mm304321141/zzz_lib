@@ -490,12 +490,12 @@ public:
     {
     }
     //range
-    template <class InputIterator> size_balanced_tree(InputIterator begin, InputIterator end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(comp, alloc)
+    template <class iterator_t> size_balanced_tree(iterator_t begin, iterator_t end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(comp, alloc)
     {
         insert(begin, end);
     }
     //range
-    template <class InputIterator> size_balanced_tree(InputIterator begin, InputIterator end, allocator_type const &alloc = allocator_type()) : size_balanced_tree(begin, end, key_compare(), alloc)
+    template <class iterator_t> size_balanced_tree(iterator_t begin, iterator_t end, allocator_type const &alloc = allocator_type()) : size_balanced_tree(begin, end, key_compare(), alloc)
     {
     }
     //copy
@@ -706,20 +706,20 @@ public:
         }
         return erase_count;
     }
-    iterator erase(const_iterator begin, const_iterator end)
+    iterator erase(const_iterator erase_begin, const_iterator erase_end)
     {
-        if(begin == cbegin() && end == cend())
+        if(erase_begin == cbegin() && erase_end == cend())
         {
             clear();
-            return size_balanced_tree::begin();
+            return begin();
         }
         else
         {
-            while(begin != end)
+            while(erase_begin != erase_end)
             {
-                erase(begin++);
+                erase(erase_begin++);
             }
-            return iterator(const_cast<node_t *>(begin.node));
+            return iterator(const_cast<node_t *>(erase_begin.node));
         }
     }
 
@@ -757,47 +757,47 @@ public:
     }
 
     //获取下标begin到end之间(参数小于0反向下标)
-    pair_ii_t slice(difference_type begin = 0, difference_type end = std::numeric_limits<difference_type>::max())
+    pair_ii_t slice(difference_type slice_begin = 0, difference_type slice_end = std::numeric_limits<difference_type>::max())
     {
         difference_type s_size = size();
-        if(begin < 0)
+        if(slice_begin < 0)
         {
-            begin = std::max<difference_type>(s_size + begin, 0);
+            slice_begin = std::max<difference_type>(s_size + slice_begin, 0);
         }
-        if(end < 0)
+        if(slice_end < 0)
         {
-            end = s_size + end;
+            slice_end = s_size + slice_end;
         }
-        if(begin > end || begin >= s_size)
+        if(slice_begin > slice_end || slice_begin >= s_size)
         {
-            return pair_ii_t(size_balanced_tree::end(), size_balanced_tree::end());
+            return pair_ii_t(end(), end());
         }
-        if(end > s_size)
+        if(slice_end > s_size)
         {
-            end = s_size;
+            slice_end = s_size;
         }
-        return pair_ii_t(at(begin), at(end));
+        return pair_ii_t(at(slice_begin), at(slice_end));
     }
-    pair_cici_t slice(difference_type begin = 0, difference_type end = std::numeric_limits<difference_type>::max()) const
+    pair_cici_t slice(difference_type slice_begin = 0, difference_type slice_end = std::numeric_limits<difference_type>::max()) const
     {
         difference_type s_size = size();
-        if(begin < 0)
+        if(slice_begin < 0)
         {
-            begin = std::max<difference_type>(s_size + begin, 0);
+            slice_begin = std::max<difference_type>(s_size + slice_begin, 0);
         }
-        if(end < 0)
+        if(slice_end < 0)
         {
-            end = s_size + end;
+            slice_end = s_size + slice_end;
         }
-        if(begin > end || begin >= s_size)
+        if(slice_begin > slice_end || slice_begin >= s_size)
         {
             return pair_cici_t(cend(), cend());
         }
-        if(end > s_size)
+        if(slice_end > s_size)
         {
-            end = s_size;
+            slice_end = s_size;
         }
-        return pair_cici_t(at(begin), at(end));
+        return pair_cici_t(at(slice_begin), at(slice_end));
     }
 
     iterator lower_bound(key_type const &key)
