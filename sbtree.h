@@ -483,23 +483,6 @@ public:
     };
 
 protected:
-    template<class iterator> void assign_(size_balanced_tree &memory, iterator assign_begin, iterator assign_end)
-    {
-        while(!memory.empty())
-        {
-            if(assign_begin == assign_end)
-            {
-                return;
-            }
-            value_node_t *node = static_cast<value_node_t *>(memory.get_root_());
-            memory.sbt_erase_<true>(node);
-            get_node_allocator_().destroy(node);
-            get_node_allocator_().construct(node, *assign_begin++);
-            sbt_insert_hint_(nil_(), node);
-        }
-        insert(assign_begin, assign_end);
-    }
-
     //full
     template<class in_root_allocator_t, class in_node_allocator_t> size_balanced_tree(key_compare const &comp, in_root_allocator_t &&root_alloc, in_node_allocator_t &&node_alloc) : head_(std::forward<in_root_allocator_t>(root_alloc))
     {
@@ -537,12 +520,12 @@ public:
     //copy
     size_balanced_tree(size_balanced_tree const &other) : size_balanced_tree(other.get_comparator_(), other.get_root_allocator_(), other.get_node_allocator_())
     {
-        insert(other.cbegin(), other.cend());
+        sbt_copy_<std::false_type>(nullptr, other.get_root_());
     }
     //copy
     size_balanced_tree(size_balanced_tree const &other, allocator_type const &alloc) : size_balanced_tree(other.get_comparator_(), alloc, alloc)
     {
-        insert(other.cbegin(), other.cend());
+        sbt_copy_<std::false_type>(nullptr, other.get_root_());
     }
     //move
     size_balanced_tree(size_balanced_tree &&other) : size_balanced_tree(key_compare(), other.get_root_allocator_(), node_allocator_t())
@@ -553,10 +536,7 @@ public:
     //move
     size_balanced_tree(size_balanced_tree &&other, allocator_type const &alloc) : size_balanced_tree(key_compare(), alloc, alloc)
     {
-        for(iterator it = other.begin(); it != other.end(); ++it)
-        {
-            emplace_hint(cend(), std::move(*it));
-        }
+        sbt_copy_<std::true_type>(nullptr, other.get_root_());
     }
     //initializer list
     size_balanced_tree(std::initializer_list<value_type> il, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(il.begin(), il.end(), comp, alloc)
@@ -582,18 +562,18 @@ public:
         }
         if(get_node_allocator_() == other.get_node_allocator_())
         {
-            size_balanced_tree tree_memory = std::move(*this);
-            clear();
+            size_balanced_tree tree_memory(get_comparator_(), get_root_allocator_(), get_node_allocator_());
+            std::swap(head_.root, tree_memory.head_.root);
             get_comparator_() = other.get_comparator_();
             get_node_allocator_() = other.get_node_allocator_();
-            assign_(tree_memory, other.cbegin(), other.cend());
+            sbt_copy_<std::false_type>(&tree_memory, other.get_root_());
         }
         else
         {
             clear();
             get_comparator_() = other.get_comparator_();
             get_node_allocator_() = other.get_node_allocator_();
-            insert(other.cbegin(), other.cend());
+            sbt_copy_<std::false_type>(nullptr, other.get_root_());
         }
         return *this;
     }
@@ -610,9 +590,22 @@ public:
     //initializer list
     size_balanced_tree &operator = (std::initializer_list<value_type> il)
     {
-        size_balanced_tree tree_memory = std::move(*this);
-        clear();
-        assign_(tree_memory, il.begin(), il.end());
+        size_balanced_tree tree_memory(get_comparator_(), get_root_allocator_(), get_node_allocator_());
+        std::swap(head_.root, tree_memory.head_.root);
+        typename std::initializer_list<value_type>::iterator it = il.begin();
+        while(!tree_memory.empty())
+        {
+            if(it == il.end())
+            {
+                return *this;
+            }
+            value_node_t *node = static_cast<value_node_t *>(tree_memory.get_root_());
+            tree_memory.sbt_erase_<true>(node);
+            get_node_allocator_().destroy(node);
+            get_node_allocator_().construct(node, *it++);
+            sbt_insert_hint_(nil_(), node);
+        }
+        insert(it, il.end());
         return *this;
     }
 
@@ -897,11 +890,8 @@ public:
     }
     void clear()
     {
-        for(node_t *root = get_root_(); !is_nil_(root); root = get_root_())
-        {
-            sbt_erase_<true>(root);
-            sbt_destroy_node_(root);
-        }
+        sbt_clear_(get_root_());
+        set_root_(nil_());
     }
     size_type size() const
     {
@@ -1728,5 +1718,96 @@ protected:
             node = where;
             where = get_parent_(where);
         }
+    }
+
+    void sbt_clear_(node_t *node)
+    {
+        if(!is_nil_(node))
+        {
+            sbt_clear_uncheck_(node);
+            sbt_destroy_node_(node);
+        }
+    }
+
+    void sbt_clear_uncheck_(node_t *node)
+    {
+        if(!is_nil_(get_left_(node)))
+        {
+            sbt_clear_uncheck_(get_left_(node));
+            sbt_destroy_node_(get_left_(node));
+        }
+        if(!is_nil_(get_right_(node)))
+        {
+            sbt_clear_uncheck_(get_right_(node));
+            sbt_destroy_node_(get_right_(node));
+        }
+    }
+
+    node_t *sbt_copy_node_(size_balanced_tree *memory, node_t *other, std::true_type)
+    {
+        if(memory != nullptr && !memory->empty())
+        {
+            value_node_t *node = static_cast<value_node_t *>(memory->get_root_());
+            memory->sbt_erase_<true>(node);
+            get_node_allocator_().destroy(node);
+            get_node_allocator_().construct(node, std::move(static_cast<value_node_t *>(other)->value));
+            return node;
+        }
+        else
+        {
+            return sbt_create_node_(std::move(static_cast<value_node_t *>(other)->value));
+        }
+    }
+
+    node_t *sbt_copy_node_(size_balanced_tree *memory, node_t *other, std::false_type)
+    {
+        if(memory != nullptr && !memory->empty())
+        {
+            value_node_t *node = static_cast<value_node_t *>(memory->get_root_());
+            memory->sbt_erase_<true>(node);
+            get_node_allocator_().destroy(node);
+            get_node_allocator_().construct(node, static_cast<value_node_t *>(other)->value);
+            return node;
+        }
+        else
+        {
+            return sbt_create_node_(static_cast<value_node_t *>(other)->value);
+        }
+    }
+
+    template<class is_move> void sbt_copy_(size_balanced_tree *memory, node_t *other)
+    {
+        if(!is_nil_(other))
+        {
+            set_root_(sbt_copy_uncheck_<is_move>(memory, nil_(), other));
+            set_most_left_(bst_most_<true>(get_root_()));
+            set_most_right_(bst_most_<false>(get_root_()));
+        }
+    }
+
+    template<class is_move> node_t *sbt_copy_uncheck_(size_balanced_tree *memory, node_t *node, node_t *other)
+    {
+        node_t *new_node = sbt_copy_node_(memory, other, is_move());
+        set_parent_(new_node, node);
+        set_left_(new_node, nil_());
+        set_right_(new_node, nil_());
+        set_size_(new_node, get_size_(other));
+        try
+        {
+            if(!is_nil_(get_left_(other)))
+            {
+                set_left_(new_node, sbt_copy_uncheck_<is_move>(memory, new_node, get_left_(other)));
+            }
+            if(!is_nil_(get_right_(other)))
+            {
+                set_right_(new_node, sbt_copy_uncheck_<is_move>(memory, new_node, get_right_(other)));
+            }
+        }
+        catch(...)
+        {
+            sbt_clear_(new_node);
+            throw;
+        }
+        return new_node;
     }
 };

@@ -132,6 +132,7 @@ struct test_comp
     }
 };
 size_t identity_seed = 0;
+size_t alloc_limit = 999999999;
 template<typename T>
 class test_allocator
 {
@@ -144,18 +145,23 @@ public:
     typedef std::size_t size_type;
     typedef std::ptrdiff_t difference_type;
 
-    test_allocator() : set(new std::set<T *>())
+    test_allocator() : set(new std::set<T *>()), max(100)
     {
-        identity = ++identity_seed;
+        root = fork = ++identity_seed;
     }
-    test_allocator(test_allocator const &other) : set(other.set)
+    test_allocator(test_allocator const &other) : set(other.set), max(other.max)
     {
-        identity = other.identity;
+        root = other.root;
+        fork = other.fork;
     }
-    template<class U> test_allocator(test_allocator<U> const &other) : set(new std::set<T *>())
+    template<class U> test_allocator(test_allocator<U> const &other) : set(new std::set<T *>()), max(other.max)
     {
-        identity = ++identity_seed;
+        root = other.root;
+        fork = ++identity_seed;
     }
+
+    template<class U>
+    friend class test_allocator;
 
     template<class U>
     struct rebind
@@ -164,11 +170,16 @@ public:
     };
     pointer allocate(size_type n)
     {
+        if(alloc_limit == 0 || set->size() >= max_size() - 1)
+        {
+            throw std::bad_alloc();
+        }
+        --alloc_limit;
         return *set->insert(reinterpret_cast<pointer>(new uint8_t[sizeof(T) * n])).first;
     }
     void deallocate(pointer ptr, size_type n)
     {
-        set->erase(ptr);
+        assert(set->erase(ptr) == 1);
         delete[] reinterpret_cast<uint8_t *>(ptr);
     }
     template<class U, class ...args_t> void construct(U *ptr, args_t &&...args)
@@ -185,7 +196,11 @@ public:
     }
     size_type max_size() const
     {
-        return size_t(-1) / sizeof(T);
+        return max;
+    }
+    size_type& max_size()
+    {
+        return max;
     }
     bool operator == (test_allocator const &other)
     {
@@ -193,7 +208,9 @@ public:
     }
 private:
     std::shared_ptr<std::set<T *>> set;
-    size_t identity;
+    size_t max;
+    size_t root;
+    size_t fork;
 };
 
 int main()
@@ -248,7 +265,7 @@ int main()
         c.is_less = false;
         sbtree_multiset<int, test_comp, test_allocator<int>> aaa2({4, 5, 6}, c);
         sbtree_multiset<int, test_comp, test_allocator<int>> aaa3(std::move(aaa), a);
-        sbtree_multiset<int, test_comp, test_allocator<int>> aaa4(std::move(aaa));
+        sbtree_multiset<int, test_comp, test_allocator<int>> aaa4(aaa2);
         aaa.swap(aaa2);
         aaa3 = aaa;
         aaa3.emplace(7);
@@ -269,7 +286,17 @@ int main()
         sb2.rank(2);
         sb2.count(2);
         sb2.count(2, 2);
-        sbtree_multimap<int, std::string> ttt({{1, "2"}}, std::less<int>());
+        sbtree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({{1, "2"},{1, "2"},{1, "2"}}, c);
+        sbtree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({{1, "2"}}, a);
+        alloc_limit = 2;
+        try
+        {
+            tttt = ttt;
+        }
+        catch(...)
+        {
+        }
+        alloc_limit = 999999999;
         sbtree_multimap<std::string, std::string> sss =
         {
             {"0", ""},
@@ -445,6 +472,7 @@ int main()
                 assert(sit->second == rit->second);
             }
         }
+        sbtree_mmap_test<int, int> sb2 = sb;
         sb.clear();
         rb.clear();
     }();
