@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
   <Type Name="size_balanced_tree&lt;*&gt;">
-    <DisplayString>{{ size={head_.parent-&gt;size} }}</DisplayString>
+    <DisplayString>{{ size={head_.root-&gt;parent-&gt;size} }}</DisplayString>
     <Expand>
-      <Item Name="[comparator]" ExcludeView="simple">(*(key_compare *)&amp;head_)</Item>
-      <Item Name="[allocator]" ExcludeView="simple">(*(allocator_type *)&amp;head_)</Item>
+      <Item Name="[comparator]" ExcludeView="simple">(*(key_compare *)head_.root)</Item>
+      <Item Name="[allocator]" ExcludeView="simple">(*(root_allocator_t *)&amp;head_)</Item>
+      <Item Name="[allocator]" ExcludeView="simple">(*(node_allocator_t *)head_.root)</Item>
       <TreeItems>
-        <Size>head_.parent-&gt;size</Size>
-        <HeadPointer>head_.parent</HeadPointer>
+        <Size>head_.root-&gt;parent-&gt;size</Size>
+        <HeadPointer>head_.root-&gt;parent</HeadPointer>
         <LeftPointer>left</LeftPointer>
         <RightPointer>right</RightPointer>
         <ValueNode Condition="size != 0">((value_node_t *)this)-&gt;value</ValueNode>
@@ -37,6 +38,15 @@
       <Item Condition="size == 0" Name="[most left]">left</Item>
       <Item Condition="size == 0" Name="[most right]">right</Item>
       <Item Condition="size == 0" Name="[tree size]">parent-&gt;size</Item>
+    </Expand>
+  </Type>
+  <Type Name="size_balanced_tree&lt;*&gt;::head_t">
+    <DisplayString>{{ size={root-&gt;parent-&gt;size} }}</DisplayString>
+    <Expand>
+      <Item Name="[tree root]">root-&gt;parent</Item>
+      <Item Name="[most left]">root-&gt;left</Item>
+      <Item Name="[most right]">root-&gt;right</Item>
+      <Item Name="[tree size]">root-&gt;parent-&gt;size</Item>
     </Expand>
   </Type>
 </AutoVisualizer>

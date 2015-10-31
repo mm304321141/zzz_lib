@@ -8,6 +8,7 @@
 #include <iostream>
 #include <random>
 #include <map>
+#include <set>
 #include <cstring>
 
 
@@ -115,6 +116,86 @@ public:
     }
 };
 
+struct test_comp
+{
+    bool is_less = 0;
+    bool operator()(int l, int r)
+    {
+        if(is_less)
+        {
+            return l < r;
+        }
+        else
+        {
+            return l > r;
+        }
+    }
+};
+size_t identity_seed = 0;
+template<typename T>
+class test_allocator
+{
+public:
+    typedef T value_type;
+    typedef T *pointer;
+    typedef T const *const_pointer;
+    typedef T &reference;
+    typedef T const &const_reference;
+    typedef std::size_t size_type;
+    typedef std::ptrdiff_t difference_type;
+
+    test_allocator() : set(new std::set<T *>())
+    {
+        identity = ++identity_seed;
+    }
+    test_allocator(test_allocator const &other) : set(other.set)
+    {
+        identity = other.identity;
+    }
+    template<class U> test_allocator(test_allocator<U> const &other) : set(new std::set<T *>())
+    {
+        identity = ++identity_seed;
+    }
+
+    template<class U>
+    struct rebind
+    {
+        typedef test_allocator<U> other;
+    };
+    pointer allocate(size_type n)
+    {
+        return *set->insert(reinterpret_cast<pointer>(new uint8_t[sizeof(T) * n])).first;
+    }
+    void deallocate(pointer ptr, size_type n)
+    {
+        set->erase(ptr);
+        delete[] reinterpret_cast<uint8_t *>(ptr);
+    }
+    template<class U, class ...args_t> void construct(U *ptr, args_t &&...args)
+    {
+        ::new(ptr) U(std::forward<args_t>(args)...);
+    }
+    void destroy(pointer ptr)
+    {
+        ptr->~T();
+    }
+    pointer address(reference x)
+    {
+        return &x;
+    }
+    size_type max_size() const
+    {
+        return size_t(-1) / sizeof(T);
+    }
+    bool operator == (test_allocator const &other)
+    {
+        return set == other.set;
+    }
+private:
+    std::shared_ptr<std::set<T *>> set;
+    size_t identity;
+};
+
 int main()
 {
     std::multimap<int, int> rb;
@@ -160,19 +241,18 @@ int main()
 
     [&]()
     {
-        struct comp
-        {
-            size_t count = 0;
-            bool operator()(int l, int r)
-            {
-                ++count;
-                return l > r;
-            }
-        } c;
-        c.count = 100;
-        sbtree_multiset<int, comp> aaa({1, 2, 3}, c);
-        sbtree_multiset<int, comp> aaa2 = aaa;
+        test_allocator<int> a;
+        test_comp c;
+        c.is_less = true;
+        sbtree_multiset<int, test_comp, test_allocator<int>> aaa({1, 2, 3}, c, a);
+        c.is_less = false;
+        sbtree_multiset<int, test_comp, test_allocator<int>> aaa2({4, 5, 6}, c);
+        sbtree_multiset<int, test_comp, test_allocator<int>> aaa3(std::move(aaa), a);
+        sbtree_multiset<int, test_comp, test_allocator<int>> aaa4(std::move(aaa));
         aaa.swap(aaa2);
+        aaa3 = aaa;
+        aaa3.emplace(7);
+        aaa = aaa3;
         sbtree_multimap<int, int> sb({{1, 2},{1, 2}});
         sbtree_multimap<int, int> const sb2(sb, sbtree_multimap<int, int>::allocator_type());
         sb.insert({{3, 4},{5, 6}});
