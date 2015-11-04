@@ -8,7 +8,6 @@
 #include <iostream>
 #include <random>
 #include <map>
-#include <set>
 #include <cstring>
 
 
@@ -116,103 +115,6 @@ public:
     }
 };
 
-struct test_comp
-{
-    bool is_less = 0;
-    bool operator()(int l, int r)
-    {
-        if(is_less)
-        {
-            return l < r;
-        }
-        else
-        {
-            return l > r;
-        }
-    }
-};
-size_t identity_seed = 0;
-size_t alloc_limit = 999999999;
-template<typename T>
-class test_allocator
-{
-public:
-    typedef T value_type;
-    typedef T *pointer;
-    typedef T const *const_pointer;
-    typedef T &reference;
-    typedef T const &const_reference;
-    typedef std::size_t size_type;
-    typedef std::ptrdiff_t difference_type;
-
-    test_allocator() : set(new std::set<T *>()), max(100)
-    {
-        root = fork = ++identity_seed;
-    }
-    test_allocator(test_allocator const &other) : set(other.set), max(other.max)
-    {
-        root = other.root;
-        fork = other.fork;
-    }
-    template<class U> test_allocator(test_allocator<U> const &other) : set(new std::set<T *>()), max(other.max)
-    {
-        root = other.root;
-        fork = ++identity_seed;
-    }
-
-    template<class U>
-    friend class test_allocator;
-
-    template<class U>
-    struct rebind
-    {
-        typedef test_allocator<U> other;
-    };
-    pointer allocate(size_type n)
-    {
-        if(alloc_limit == 0 || set->size() >= max_size() - 1)
-        {
-            throw std::bad_alloc();
-        }
-        --alloc_limit;
-        return *set->insert(reinterpret_cast<pointer>(new uint8_t[sizeof(T) * n])).first;
-    }
-    void deallocate(pointer ptr, size_type n)
-    {
-        assert(set->erase(ptr) == 1);
-        delete[] reinterpret_cast<uint8_t *>(ptr);
-    }
-    template<class U, class ...args_t> void construct(U *ptr, args_t &&...args)
-    {
-        ::new(ptr) U(std::forward<args_t>(args)...);
-    }
-    void destroy(pointer ptr)
-    {
-        ptr->~T();
-    }
-    pointer address(reference x)
-    {
-        return &x;
-    }
-    size_type max_size() const
-    {
-        return max;
-    }
-    size_type& max_size()
-    {
-        return max;
-    }
-    bool operator == (test_allocator const &other)
-    {
-        return set == other.set;
-    }
-private:
-    std::shared_ptr<std::set<T *>> set;
-    size_t max;
-    size_t root;
-    size_t fork;
-};
-
 int main()
 {
     std::multimap<int, int> rb;
@@ -258,45 +160,14 @@ int main()
 
     [&]()
     {
-        test_allocator<int> a;
-        test_comp c;
-        c.is_less = true;
-        sbtree_multiset<int, test_comp, test_allocator<int>> aaa({1, 2, 3}, c, a);
-        c.is_less = false;
-        sbtree_multiset<int, test_comp, test_allocator<int>> aaa2({4, 5, 6}, c);
-        sbtree_multiset<int, test_comp, test_allocator<int>> aaa3(std::move(aaa), a);
-        sbtree_multiset<int, test_comp, test_allocator<int>> aaa4(aaa2);
-        aaa.swap(aaa2);
-        aaa3 = aaa;
-        aaa3.emplace(7);
-        aaa = aaa3;
+        sbtree_multiset<int> aaa({1, 2, 3}, std::less<int>(), std::allocator<int>());
         sbtree_multimap<int, int> sb({{1, 2},{1, 2}});
-        sbtree_multimap<int, int> const sb2(sb, sbtree_multimap<int, int>::allocator_type());
+        sbtree_multimap<int, int> sb2(sb, sbtree_multimap<int, int>::allocator_type());
         sb.insert({{3, 4},{5, 6}});
         sb.insert(sb.begin(), {7, 8});
         sb.erase(sb.begin() + 1, sb.end());
-        sb2.find(0);
-        sb2.slice();
-        sb2.front();
-        sb2.back();
-        sb2.equal_range(2);
-        sb2.lower_bound(2);
-        sb2.upper_bound(2);
-        sb2.range(2, 2);
-        sb2.rank(2);
-        sb2.count(2);
-        sb2.count(2, 2);
-        sbtree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({{1, "2"},{1, "2"},{1, "2"}}, c);
-        sbtree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({{1, "2"}}, a);
-        alloc_limit = 2;
-        try
-        {
-            tttt = ttt;
-        }
-        catch(...)
-        {
-        }
-        alloc_limit = 999999999;
+        sb2 = sb;
+        sbtree_multimap<int, std::string> ttt({{1, "2"}}, std::less<int>());
         sbtree_multimap<std::string, std::string> sss =
         {
             {"0", ""},
@@ -472,7 +343,6 @@ int main()
                 assert(sit->second == rit->second);
             }
         }
-        sbtree_mmap_test<int, int> sb2 = sb;
         sb.clear();
         rb.clear();
     }();

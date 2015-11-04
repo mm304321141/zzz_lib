@@ -46,7 +46,7 @@ public:
     //内存片段
     struct sparse_range
     {
-        uint32_t end;
+        uint32_t index;
         uint16_t length;
         uint16_t offset;
         handle_t handle;
@@ -114,7 +114,6 @@ public:
     //红黑树数据节点,内存片段集合(数据是有序的)
     struct sparse_range_set : public sparse_range_set_base
     {
-        uint32_t max_index;
         uint32_t end;
         sparse_range begin[1];
     };
@@ -145,7 +144,11 @@ public:
     {
         bool operator()(sparse_range const &left, uint32_t const &right) const
         {
-            return left.end < right;
+            return left.index < right;
+        }
+        bool operator()(uint32_t const &left, sparse_range const &right) const
+        {
+            return left < right.index;
         }
     };
     enum
@@ -186,6 +189,7 @@ public:
     {
         static_assert(memory_size >= sizeof(memory_block), "low memory_size");
         static_assert(memory_size >= sizeof(sparse_range_set), "low memory_size");
+        static_assert(range_length >= 3, "low memory_size");
         static_assert(sizeof(value_t) * atomic_length >= sizeof(memory_blcok_free), "low atomic_length");
         block_handle_ = handle_t(invalid_handle);
         free_.handle = handle_t(invalid_handle);
@@ -284,7 +288,7 @@ public:
         {
             return value_t();
         }
-        return deref_<memory_block>(range->handle)->data[range->offset].data[index + range->length - range->end];
+        return deref_<memory_block>(range->handle)->data[range->offset].data[index - range->index];
     }
     //添加元素
     void set(uint32_t index, value_t const &value)
@@ -293,7 +297,7 @@ public:
         sparse_range *range = find_index_(index, &find);
         if(range != NULL)
         {
-            deref_<memory_block>(range->handle)->data[range->offset].data[index + range->length - range->end] = value;
+            deref_<memory_block>(range->handle)->data[range->offset].data[index - range->index] = value;
         }
         else if(value != value_t())
         {
@@ -315,8 +319,8 @@ public:
             sparse_range *range = find_index_(index, NULL);
             if(range != NULL)
             {
-                copy_length = std::min<uint32_t>(length, range->end - index);
-                value_t *ptr = deref_<memory_block>(range->handle)->data[range->offset].data + index + range->length - range->end;
+                copy_length = std::min<uint32_t>(length, range->index + range->length - index);
+                value_t *ptr = deref_<memory_block>(range->handle)->data[range->offset].data + (index - range->index);
                 std::copy(ptr, ptr + copy_length, out_arr);
             }
             else
@@ -427,39 +431,10 @@ public:
     }
 
 private:
-    //从片段集合树中找到片段集合
-    handle_t find_handle_(uint32_t index) const
-    {
-        handle_t find = rb_lower_bound_(index);
-        if(find != rb_nil_() && rb_get_key_(find) == index)
-        {
-            find = rb_move_<true>(find);
-        }
-        return find;
-    }
-    //从片段集合中找到片段
-    bool find_range_(uint32_t index, sparse_range_set *range_set, sparse_range *&range) const
-    {
-        sparse_range *const end = range_set->begin + range_set->end;
-        range = std::lower_bound(range_set->begin, end, index, sparse_range_op());
-        if(range == end)
-        {
-            return false;
-        }
-        if(range->end == index)
-        {
-            ++range;
-            if(range == end)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
     //从片段集合树中找到片段
     sparse_range *find_index_(uint32_t index, handle_t *out_handle) const
     {
-        handle_t find = find_handle_(index);
+        handle_t find = rb_special_bound_(index);
         if(out_handle != NULL)
         {
             *out_handle = find;
@@ -468,13 +443,15 @@ private:
         {
             return NULL;
         }
-        sparse_range_set *ranget_set = deref_<sparse_range_set>(find);
-        if(ranget_set->max_index > index + ranget_set->length || index >= ranget_set->max_index)
+        sparse_range_set *range_set = deref_<sparse_range_set>(find);
+        sparse_range *range = &range_set->begin[range_set->end - 1];
+        if(index >= range->index + range->length)
         {
             return NULL;
         }
-        sparse_range *range;
-        if(!find_range_(index, ranget_set, range) || range->end > index + range->length || index >= range->end)
+        sparse_range *const end = range_set->begin + range_set->end;
+        range = special_bound_(range_set->begin, end, index);
+        if(range == end || index >= range->index + range->length)
         {
             return NULL;
         }
@@ -622,8 +599,8 @@ private:
             sparse_range *range = find_index_(index, &find);
             if(range != NULL)
             {
-                copy_length = std::min<uint32_t>(length, range->end - index);
-                value_t *ptr = deref_<memory_block>(range->handle)->data[range->offset].data + index + range->length - range->end;
+                copy_length = std::min<uint32_t>(length, range->index + range->length - index);
+                value_t *ptr = deref_<memory_block>(range->handle)->data[range->offset].data + (index - range->index);
                 std::copy(in_arr, in_arr + copy_length, ptr);
             }
             else
@@ -650,14 +627,14 @@ private:
             sparse_range *range = find_index_(index, &find);
             if(range != NULL)
             {
-                erase_length = std::min<uint32_t>(length, range->end - index);
-                if(erase_length == range->length && index + range->length == range->end)
+                erase_length = std::min<uint32_t>(length, range->index + range->length - index);
+                if(erase_length == range->length && index == range->index)
                 {
                     remove_range_(find, range);
                 }
                 else
                 {
-                    value_t *ptr = deref_<memory_block>(range->handle)->data[range->offset].data + index + range->length - range->end;
+                    value_t *ptr = deref_<memory_block>(range->handle)->data[range->offset].data + (index - range->index);
                     std::fill(ptr, ptr + erase_length, value_t());
                 }
             }
@@ -673,13 +650,29 @@ private:
             index += erase_length;
         }
     }
-    //初始化片段集合
-    void init_range_set_(sparse_range_set *range_set)
+    template<class iterator_t> static iterator_t special_bound_(iterator_t bound_begin, iterator_t bound_end, uint32_t index)
     {
-        range_set->max_index = 0;
-        range_set->length = 0;
-        range_set->end = 0;
+        uint32_t count = std::distance(bound_begin, bound_end);
+        iterator_t where = bound_end;
+        while(0 < count)
+        {
+            uint32_t half_count = count / 2;
+            iterator_t mid = std::next(bound_begin, half_count);
+
+            if(!sparse_range_op()(index, *mid))
+            {
+                where = mid;
+                bound_begin = ++mid;
+                count -= half_count + 1;
+            }
+            else
+            {
+                count = half_count;
+            }
+        }
+        return where;
     }
+    
     //创建一个新的片段
     void create_new_range_(handle_t where, uint32_t index, value_t const *arr, uint32_t length)
     {
@@ -690,19 +683,12 @@ private:
         }
         sparse_range range_insert =
         {
-            index - index % atomic_length + atomic_length, atomic_length
+            index - index % atomic_length, atomic_length
         };
         alloc_(1, range_insert.handle, range_insert.offset);
         memory_block_data *data = deref_<memory_block>(range_insert.handle)->data + range_insert.offset;
-        init_range_data_(data->data + (index + atomic_length - range_insert.end), data->data, data->data + atomic_length, arr, length);
-        if(rb_is_nil_(rb_get_root_()))
-        {
-            insert_tail_range_(&range_insert);
-        }
-        else
-        {
-            insert_range_(where, &range_insert);
-        }
+        init_range_data_(data->data + (index - range_insert.index), data->data, data->data + atomic_length, arr, length);
+        insert_range_(where, &range_insert);
     }
     //初始化片段数据
     void init_range_data_(value_t *ptr, value_t *begin, value_t *end, value_t const *arr, uint32_t length)
@@ -757,9 +743,9 @@ private:
             }
         }
         dealloc_(range->handle, range->offset, range->length / atomic_length);
+        adjust.index -= change * atomic_length;
         adjust.length += change * atomic_length;
         *range = adjust;
-        update_range_set_(deref_<sparse_range_set>(handle), handle);
     }
     //调整片段尾部大小
     void adjust_range_tail_(handle_t handle, sparse_range *range, int32_t change)
@@ -795,10 +781,8 @@ private:
             }
         }
         dealloc_(range->handle, range->offset, range->length / atomic_length);
-        adjust.end += change * atomic_length;
         adjust.length += change * atomic_length;
         *range = adjust;
-        update_range_set_(deref_<sparse_range_set>(handle), handle);
     }
     //尝试合并数据到相邻的片段
     bool merge_range_(uint32_t index, value_t const *arr, uint32_t length)
@@ -849,112 +833,232 @@ private:
         }
         return false;
     }
-    //插入一块片段,到片段集合树末尾
-    void insert_tail_range_(sparse_range *range)
+    //拆分片段集合,2/3
+    void split_range_set_(handle_t where_left, handle_t where_right)
     {
+        sparse_range_set *range_set_left = deref_<sparse_range_set>(where_left);
+        sparse_range_set *range_set_right = deref_<sparse_range_set>(where_right);
         handle_t handle = index_tree_.alloc();
         sparse_range_set *range_set = deref_<sparse_range_set>(handle);
-        init_range_set_(range_set);
-        range_set->max_index = range->end;
-        range_set->length = range->length;
-        range_set->end = 1;
-        *range_set->begin = *range;
+        enum
+        {
+            move_size = range_length / 3
+        };
+        std::memmove(range_set->begin, range_set_left->begin + range_set_left->end - move_size, move_size * sizeof(sparse_range));
+        range_set_left->end -= move_size;
+        std::memmove(range_set->begin + move_size, range_set_right->begin, move_size * sizeof(sparse_range));
+        range_set->end = move_size * 2;
+        range_set_right->end -= move_size;
+        std::memmove(range_set_right->begin, range_set_right->begin + move_size, range_set_right->end * sizeof(sparse_range));
+        rb_insert_(handle);
+    }
+    //拆分片段集合,1/2
+    void split_range_set_(handle_t where)
+    {
+        sparse_range_set *range_set_left = deref_<sparse_range_set>(where);
+        handle_t handle = index_tree_.alloc();
+        sparse_range_set *range_set = deref_<sparse_range_set>(handle);
+        enum
+        {
+            move_size = range_length / 2
+        };
+        std::memmove(range_set->begin, range_set_left->begin + range_set_left->end - move_size, move_size * sizeof(sparse_range));
+        range_set_left->end -= move_size;
+        range_set->end = move_size;
         rb_insert_(handle);
     }
     //插入一块片段
-    void insert_range_(handle_t find, sparse_range *range)
+    void insert_range_(handle_t where, sparse_range *range)
     {
-        if(find == rb_nil_())
+        if(rb_is_nil_(rb_get_root_()))
         {
-            insert_range_(rb_get_most_right_(), range);
+            handle_t handle = index_tree_.alloc();
+            sparse_range_set *range_set = deref_<sparse_range_set>(handle);
+            range_set->end = 1;
+            *range_set->begin = *range;
+            rb_insert_(handle);
+            return;
         }
-        else
+        if(where == rb_nil_())
         {
-            sparse_range out_range;
-            sparse_range_set *range_set = deref_<sparse_range_set>(find);
-            if(force_insert_range_(range_set, range, &out_range))
+            where = rb_get_most_left_();
+        }
+        sparse_range_set *range_set = deref_<sparse_range_set>(where);
+        if(range_set->end == range_length)
+        {
+            sparse_range_set *range_set_left = nullptr;
+            sparse_range_set *range_set_right = nullptr;
+            handle_t left = rb_move_<false>(where);
+            if(left != rb_nil_())
             {
-                update_range_set_(range_set, find);
-                if(find == rb_get_most_right_())
+                range_set_left = deref_<sparse_range_set>(left);
+                if(range_set_left->end != range_length)
                 {
-                    insert_tail_range_(&out_range);
+                    if(range_set->begin->index < range->index)
+                    {
+                        range_set_left->begin[range_set_left->end++] = *range_set->begin;
+                        set_remove_range_(range_set, range_set->begin);
+                        set_insert_range_(range_set, range);
+                    }
+                    else
+                    {
+                        range_set_left->begin[range_set_left->end++] = *range;
+                    }
+                    return;
                 }
-                else
+            }
+            handle_t right = rb_move_<true>(where);
+            if(right != rb_nil_())
+            {
+                range_set_right = deref_<sparse_range_set>(right);
+                if(range_set_right->end != range_length)
                 {
-                    find = rb_move_<true>(find);
-                    insert_range_(find, &out_range);
+                    sparse_range *back_range = range_set->begin + range_set->end - 1;
+                    if(range->index < back_range->index)
+                    {
+                        set_insert_range_(range_set_right, back_range);
+                        --range_set->end;
+                        set_insert_range_(range_set, range);
+                    }
+                    else
+                    {
+                        set_insert_range_(range_set_right, range);
+                    }
+                    return;
                 }
+            }
+            if(range_set_right != nullptr)
+            {
+                split_range_set_(where, right);
+            }
+            else if(range_set_left != nullptr)
+            {
+                split_range_set_(left, where);
             }
             else
             {
-                update_range_set_(range_set, find);
+                split_range_set_(where);
+            }
+            if((where = rb_special_bound_(range->index)) == rb_nil_())
+            {
+                where = rb_get_most_left_();
+            }
+            range_set = deref_<sparse_range_set>(where);
+        }
+        set_insert_range_(range_set, range);
+    }
+    //强制插入片段
+    void set_insert_range_(sparse_range_set *range_set, sparse_range *range)
+    {
+        sparse_range *const end = range_set->begin + range_set->end;
+        sparse_range *where = std::lower_bound(range_set->begin, end, range->index, sparse_range_op());
+        if(where != end)
+        {
+            std::memmove(where + 1, where, (end - where) * sizeof(sparse_range));
+        }
+        *where = *range;
+        ++range_set->end;
+    }
+    //合并片段集合
+    void merge_range_set_(handle_t left, handle_t right)
+    {
+        sparse_range_set *range_set_left = deref_<sparse_range_set>(left);
+        sparse_range_set *range_set_right = deref_<sparse_range_set>(right);
+        std::memmove(range_set_left->begin + range_set_left->end, range_set_right->begin, range_set_right->end * sizeof(sparse_range));
+        range_set_left->end += range_set_right->end;
+        rb_erase_(right);
+        index_tree_.dealloc(right);
+    }
+    //移除一个片段
+    void remove_range_(handle_t where, sparse_range *range)
+    {
+        dealloc_(range->handle, range->offset, range->length / atomic_length);
+        sparse_range_set *range_set = deref_<sparse_range_set>(where);
+        if(range_set->end == 1)
+        {
+            rb_erase_(where);
+            index_tree_.dealloc(where);
+            return;
+        }
+        set_remove_range_(range_set, range);
+        enum
+        {
+            move_size = range_length / 3
+        };
+        if(range_set->end < range_length / 2)
+        {
+            handle_t left = rb_move_<false>(where);
+            sparse_range_set *range_set_left = nullptr;
+            if(left != rb_nil_())
+            {
+                range_set_left = deref_<sparse_range_set>(left);
+                if(range_set_left->end >range_length / 2)
+                {
+                    sparse_range *back_range = range_set_left->begin + range_set_left->end - 1;
+                    set_insert_range_(range_set, back_range);
+                    --range_set_left->end;
+                    return;
+                }
+            }
+            handle_t right = rb_move_<true>(where);
+            sparse_range_set *range_set_right = nullptr;
+            if(right != rb_nil_())
+            {
+                range_set_right = deref_<sparse_range_set>(right);
+                if(range_set_right->end > range_length / 2)
+                {
+                    range_set->begin[range_set->end++] = *range_set_right->begin;
+                    set_remove_range_(range_set_right, range_set_right->begin);
+                    return;
+                }
+            }
+            uint32_t total_length;
+            if(range_set_left != nullptr && range_set_right != nullptr && (total_length = range_set_left->end + range_set->end + range_set_right->end) <= range_length * 9 / 5)
+            {
+                uint32_t each_length = (total_length + 1) / 2;
+                if(range_set_left->end < each_length)
+                {
+                    uint32_t copy_length = std::min(each_length - range_set_left->end, range_set->end);
+                    std::memmove(range_set_left->begin + range_set_left->end, range_set->begin, copy_length * sizeof(sparse_range));
+                    range_set_left->end += copy_length;
+                    if(range_set->end > copy_length)
+                    {
+                        range_set->end -= copy_length;
+                        std::memmove(range_set->begin, range_set->begin + copy_length, range_set->end * sizeof(sparse_range));
+                        std::memmove(range_set->begin + range_set->end, range_set_right->begin, range_set_right->end * sizeof(sparse_range));
+                        range_set->end += range_set_right->end;
+                        rb_erase_(right);
+                        index_tree_.dealloc(right);
+                    }
+                    else
+                    {
+                        rb_erase_(where);
+                        index_tree_.dealloc(where);
+                    }
+                }
+                else
+                {
+                    merge_range_set_(where, right);
+                }
+            }
+            else if(range_set_left != nullptr && range_set_left->end + range_set->end < range_length)
+            {
+                merge_range_set_(left, where);
+            }
+            else if(range_set_right != nullptr && range_set->end + range_set_right->end < range_length)
+            {
+                merge_range_set_(where, right);
             }
         }
     }
-    //移除一个片段
-    void remove_range_(handle_t handle, sparse_range *range)
+    void set_remove_range_(sparse_range_set *range_set, sparse_range *range)
     {
-        dealloc_(range->handle, range->offset, range->length / atomic_length);
-        sparse_range_set *range_set = deref_<sparse_range_set>(handle);
-        if(range_set->end == 1)
-        {
-            rb_erase_(handle);
-            index_tree_.dealloc(handle);
-            return;
-        }
-        uint32_t offset = range - range_set->begin;
+        uint32_t offset = uint32_t(range - range_set->begin);
         if(offset != range_set->end - 1)
         {
             std::memmove(range, range + 1, (range_set->end - offset - 1) * sizeof(sparse_range));
         }
         --range_set->end;
-        update_range_set_(range_set, handle);
-    }
-    //强制插入片段(如果满,则返回挤出的片段)
-    bool force_insert_range_(sparse_range_set *range_set, sparse_range *range, sparse_range *out_range)
-    {
-        sparse_range *const end = range_set->begin + range_set->end;
-        sparse_range *where = std::lower_bound(range_set->begin, end, range->end, sparse_range_op());
-        if(range_set->end == range_length)
-        {
-            if(where == end)
-            {
-                *out_range = *range;
-            }
-            else
-            {
-                *out_range = *(end - 1);
-                uint32_t offset = end - where;
-                if(offset > 1)
-                {
-                    std::memmove(where + 1, where, (offset - 1) * sizeof(sparse_range));
-                }
-                *where = *range;
-            }
-            return true;
-        }
-        else
-        {
-            if(where != end)
-            {
-                std::memmove(where + 1, where, (end - where) * sizeof(sparse_range));
-            }
-            *where = *range;
-            ++range_set->end;
-            return false;
-        }
-    }
-    //更新片段集合的区间
-    void update_range_set_(sparse_range_set *range_set, handle_t handle)
-    {
-        sparse_range *back = range_set->begin + (range_set->end - 1);
-        if(back->end != range_set->max_index)
-        {
-            rb_erase_(handle);
-            range_set->max_index = back->end;
-            rb_insert_(handle);
-        }
-        range_set->length = back->end - (range_set->begin->end - range_set->begin->length);
     }
     //从句柄得到对象
     template<typename T> T *deref_(handle_t handle) const
@@ -1001,7 +1105,7 @@ private:
     }
     uint32_t const &rb_get_key_(handle_t node) const
     {
-        return deref_<sparse_range_set>(node)->max_index;
+        return deref_<sparse_range_set>(node)->begin->index;
     }
     bool rb_is_nil_(handle_t node) const
     {
@@ -1119,36 +1223,19 @@ private:
         }
         return node;
     }
-    handle_t rb_lower_bound_(uint32_t const &key) const
+    handle_t rb_special_bound_(uint32_t const &key) const
     {
         handle_t node = rb_get_root_(), where = rb_nil_();
         while(!rb_is_nil_(node))
         {
-            if(rb_predicate_(rb_get_key_(node), key))
+            if(!rb_predicate_(key, rb_get_key_(node)))
             {
+                where = node;
                 node = rb_get_right_(node);
             }
             else
             {
-                where = node;
                 node = rb_get_left_(node);
-            }
-        }
-        return where;
-    }
-    handle_t rb_upper_bound_(uint32_t const &key) const
-    {
-        handle_t node = rb_get_root_(), *where = rb_nil_();
-        while(!rb_is_nil_(node))
-        {
-            if(rb_predicate_(key, rb_get_key_(node)))
-            {
-                where = node;
-                node = rb_get_left_(node);
-            }
-            else
-            {
-                node = rb_get_right_(node);
             }
         }
         return where;
