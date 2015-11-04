@@ -43,16 +43,14 @@ protected:
     typedef typename allocator_type::template rebind<value_node_t>::other node_allocator_t;
     struct root_node_t : public node_t, public key_compare, public node_allocator_t
     {
-        template<class any_key_compare, class any_allocator_t>
-        root_node_t(any_key_compare &&comp, any_allocator_t &&alloc) : key_compare(std::forward<any_key_compare>(comp)), node_allocator_t(std::forward<any_allocator_t>(alloc))
+        template<class any_key_compare, class any_allocator_t> root_node_t(any_key_compare &&comp, any_allocator_t &&alloc) : key_compare(std::forward<any_key_compare>(comp)), node_allocator_t(std::forward<any_allocator_t>(alloc))
         {
         }
     };
     typedef typename allocator_type::template rebind<root_node_t>::other root_allocator_t;
     struct head_t : public root_allocator_t
     {
-        template<class any_allocator_t>
-        head_t(any_allocator_t &&alloc) : root_allocator_t(std::forward<any_allocator_t>(alloc))
+        template<class any_allocator_t> head_t(any_allocator_t &&alloc) : root_allocator_t(std::forward<any_allocator_t>(alloc))
         {
         }
         root_node_t *root;
