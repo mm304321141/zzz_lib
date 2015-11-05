@@ -6,7 +6,7 @@
 template<class key_t, class comparator_t, class allocator_t>
 struct sbtree_multiset_config_t
 {
-    static key_t const &get_key(key_t const &value)
+    template<class in_type> static key_t const &get_key(in_type &value)
     {
         return value;
     }

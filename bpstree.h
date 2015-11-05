@@ -5,26 +5,6 @@
 #include <memory>
 #include <type_traits>
 
-template<class key_t, class comparator_t, class allocator_t>
-struct bstree_multiset_config_t
-{
-    static key_t const &get_key(key_t const &value)
-    {
-        return value;
-    }
-    typedef key_t key_type;
-    typedef key_t const mapped_type;
-    typedef key_t const value_type;
-    typedef key_t storage_type;
-    typedef comparator_t key_compare;
-    typedef allocator_t allocator_type;
-    typedef std::false_type unique_t;
-    enum
-    {
-        memory_block_size = 256
-    };
-};
-
 
 template<class config_t>
 class b_plus_size_tree
@@ -119,6 +99,22 @@ public:
         value_node_t *left;
         value_node_t *right;
     };
+    struct key_stack_t
+    {
+        uint8_t buffer[sizeof(key_type)];
+        operator key_type &()
+        {
+            return *reinterpret_cast<key_type *>(buffer);
+        }
+        operator key_type &&()
+        {
+            return std::move(*reinterpret_cast<key_type *>(buffer));
+        }
+        key_type *operator &()
+        {
+            return reinterpret_cast<key_type *>(buffer);
+        }
+    };
     typedef std::pair<value_node_t *, size_type> pair_pos_t;
 public:
     class iterator
@@ -194,7 +190,9 @@ protected:
                 }
                 while(child->level != 0);
             }
-            if(get_key_(static_cast<value_node_t *>(child)->item[child->used - 1]) != tree_node->item[i])
+            key_type const &key1 = get_key_(static_cast<value_node_t *>(child)->item[child->used - 1]);
+            key_type const &key2 = tree_node->item[i];
+            if(get_comparator_()(key1, key2) || get_comparator_()(key2, key2))
             {
                 return false;
             }
@@ -266,33 +264,53 @@ protected:
         }
     }
 
-    template<class in_item_t> typename std::enable_if<std::is_same<in_item_t, key_type>::value, key_type const &>::type get_key_(in_item_t const &item) const
+    template<class in_item_t> typename std::enable_if<std::is_convertible<in_item_t, key_type>::value, key_type const &>::type get_key_(in_item_t &item) const
     {
         return item;
     }
-    template<class in_item_t> typename std::enable_if<std::is_same<in_item_t, storage_type>::value && !std::is_same<key_type, storage_type>::value, key_type const &>::type get_key_(in_item_t const &item) const
+    template<class in_item_t> typename std::enable_if<!std::is_same<key_type, storage_type>::value && std::is_convertible<in_item_t, storage_type>::value, key_type const &>::type get_key_(in_item_t &item) const
     {
         return config_t::get_key(item);
     }
 
     template<typename node_type> size_type lower_bound_(node_type const *node, key_type const &key) const
     {
-        node_type::item_type const *begin = node->item, *const end = node->item + node->used;
-        while(begin != end && get_comparator_()(get_key_(*begin), key))
+        if(std::is_scalar<key_type>::value)
         {
-            ++begin;
+            node_type::item_type const *begin = node->item, *const end = node->item + node->used;
+            while(begin != end && get_comparator_()(get_key_(*begin), key))
+            {
+                ++begin;
+            }
+            return begin - node->item;
         }
-        return begin - node->item;
+        else
+        {
+            return std::lower_bound(node->item, node->item + node->used, key, [&](node_type::item_type const &left, key_type const &right)->bool
+            {
+                return get_comparator_()(get_key_(left), right);
+            }) - node->item;
+        }
     }
 
     template<typename node_type> size_type upper_bound_(node_type const *node, key_type const &key) const
     {
-        node_type::item_type const *begin = node->item, *const end = node->item + node->used;
-        while(begin != end && !get_comparator_()(key, get_key_(*begin)))
+        if(std::is_scalar<key_type>::value)
         {
-            ++begin;
+            node_type::item_type const *begin = node->item, *const end = node->item + node->used;
+            while(begin != end && !get_comparator_()(key, get_key_(*begin)))
+            {
+                ++begin;
+            }
+            return begin - node->item;
         }
-        return begin - node->item;
+        else
+        {
+            return std::upper_bound(node->item, node->item + node->used, key, [&](key_type const &left, node_type::item_type const &right)->bool
+            {
+                return get_comparator_()(left, get_key_(right));
+            }) - node->item;
+        }
     }
 
     pair_pos_t lower_bound_(key_type const &key) const
@@ -392,17 +410,18 @@ protected:
     template<class in_value_t> pair_posi_t insert_nohint_(in_value_t &&value)
     {
         node_t *new_child = nullptr;
-        key_type const *key_ptr;
+        key_stack_t key_out;
         if(root_.parent == nullptr)
         {
             root_.parent = root_.left = root_.right = alloc_value_node_(&root_);
         }
-        pair_posi_t result = insert_descend(root_.parent, std::forward<in_value_t>(value), key_ptr, new_child);
+        pair_posi_t result = insert_descend(root_.parent, std::forward<in_value_t>(value), &key_out, new_child);
         if(new_child != nullptr)
         {
             tree_node_t *new_root = alloc_tree_node_();
             new_root->level = root_.parent->level + 1;
-            construct_one_(new_root->item, *key_ptr);
+            construct_one_(new_root->item, std::move(key_out));
+            destroy_one_(&key_out);
             new_root->children[0] = root_.parent;
             new_root->children[1] = new_child;
             new_root->used = 1;
@@ -411,7 +430,7 @@ protected:
         return result;
     }
 
-    void split_tree_node_(tree_node_t *tree_node, key_type const *&key_ptr, node_t *&new_node, size_type where)
+    void split_tree_node_(tree_node_t *tree_node, key_type *key_ptr, node_t *&new_node, size_type where)
     {
         size_type mid = (tree_node->used >> 1);
         if(where <= mid && mid > tree_node->used - (mid + 1))
@@ -422,18 +441,13 @@ protected:
         new_tree_node->level = tree_node->level;
         new_tree_node->used = half_size_t(tree_node->used - (mid + 1));
         move_construct_and_destroy_(tree_node->item + mid + 1, tree_node->item + tree_node->used, new_tree_node->item);
-        destroy_one_(tree_node->item + mid);
         std::copy(tree_node->children + mid + 1, tree_node->children + tree_node->used + 1, new_tree_node->children);
         tree_node->used = half_size_t(mid);
-        node_t *child = tree_node->children[mid];
-        while(child->level != 0)
-        {
-            child = static_cast<tree_node_t *>(child)->children[child->used];
-        }
-        key_ptr = &get_key_(static_cast<value_node_t *>(child)->item[child->used - 1]);
+        construct_one_(key_ptr, tree_node->item[mid]);
+        destroy_one_(tree_node->item + mid);
         new_node = new_tree_node;
     }
-    void split_value_node_(value_node_t *value_node, key_type const *&key_ptr, node_t *&new_node)
+    void split_value_node_(value_node_t *value_node, key_type *key_ptr, node_t *&new_node)
     {
         size_type mid = (value_node->used >> 1);
         value_node_t *new_value_node = alloc_value_node_(nullptr);
@@ -451,18 +465,18 @@ protected:
         value_node->used = half_size_t(mid);
         value_node->next = new_value_node;
         new_value_node->prev = value_node;
-        key_ptr = &get_key_(value_node->item[value_node->used - 1]);
+        construct_one_(key_ptr, get_key_(value_node->item[value_node->used - 1]));
         new_node = new_value_node;
     }
-    template<class in_value_t> pair_posi_t insert_descend(node_t *node, in_value_t &&value, key_type const *&split_key, node_t *&split_node)
+    template<class in_value_t> pair_posi_t insert_descend(node_t *node, in_value_t &&value, key_type *split_key, node_t *&split_node)
     {
         if(node->level > 0)
         {
             tree_node_t *tree_node = static_cast<tree_node_t *>(node);
             node_t *new_child = nullptr;
-            key_type const *key_ptr;
+            key_stack_t key_out;
             size_type where = upper_bound_(tree_node, get_key_(value));
-            pair_posi_t result = insert_descend(tree_node->children[where], std::forward<in_value_t>(value), key_ptr, new_child);
+            pair_posi_t result = insert_descend(tree_node->children[where], std::forward<in_value_t>(value), &key_out, new_child);
             if(new_child != nullptr)
             {
                 if(tree_node->is_full())
@@ -475,7 +489,8 @@ protected:
                         tree_node->children[tree_node->used + 1] = split_tree_node->children[0];
                         tree_node->used++;
                         split_tree_node->children[0] = new_child;
-                        split_key = key_ptr;
+                        *split_key = std::move(key_out);
+                        destroy_one_(&key_out);
                         return result;
                     }
                     else if(where >= size_type(tree_node->used + 1))
@@ -484,7 +499,8 @@ protected:
                         tree_node = static_cast<tree_node_t *>(split_node);
                     }
                 }
-                move_next_and_insert_one_(tree_node->item + where, tree_node->item + tree_node->used, *key_ptr);
+                move_next_and_insert_one_(tree_node->item + where, tree_node->item + tree_node->used, std::move(key_out));
+                destroy_one_(&key_out);
                 std::move_backward(tree_node->children + where, tree_node->children + tree_node->used + 1, tree_node->children + tree_node->used + 2);
 
                 tree_node->children[where + 1] = new_child;
@@ -522,17 +538,13 @@ protected:
                     where -= value_node->used;
                     value_node = static_cast<value_node_t *>(split_node);
                 }
-                else
-                {
-                    ++split_key;
-                }
             }
             move_next_and_insert_one_(value_node->item + where, value_node->item + value_node->used, std::forward<in_value_t>(value));
             value_node->used++;
 
             if(split_node != nullptr && value_node != split_node && where == value_node->used - 1)
             {
-                split_key = &get_key_(value_node->item[where]);
+                *split_key = get_key_(value_node->item[where]);
             }
             return std::make_pair(std::make_pair(value_node, where), true);
         }
