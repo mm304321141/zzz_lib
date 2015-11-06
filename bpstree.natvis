@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="b_plus_size_tree&lt;*&gt;">
+    <DisplayString>{{ size={root_.size} }}</DisplayString>
+    <Expand>
+      <Item Name="[comparator]" ExcludeView="simple">(key_compare &amp;)root_</Item>
+      <Item Name="[allocator]" ExcludeView="simple">(node_allocator_t &amp;)root_</Item>
+    </Expand>
+  </Type>
+  <Type Name="b_plus_size_tree&lt;*&gt;::key_stack_t">
+    <DisplayString Condition="true">{*(key_type *)buffer}</DisplayString>
+  </Type>
+</AutoVisualizer>

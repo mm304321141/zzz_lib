@@ -7,6 +7,7 @@
 #include <iostream>
 #include <random>
 #include <map>
+#include <set>
 #include <cstring>
 #include <string>
 
@@ -58,22 +59,174 @@ struct bstree_set_config_t
     };
 };
 
-int main()
+
+size_t identity_seed = 0;
+size_t alloc_limit = 999999999;
+template<typename T>
+class test_allocator
 {
-    auto t = std::chrono::high_resolution_clock::now;
-    std::mt19937 mt;
-    auto mtr = std::uniform_int_distribution<int>(std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
+public:
+    typedef T value_type;
+    typedef T *pointer;
+    typedef T const *const_pointer;
+    typedef T &reference;
+    typedef T const &const_reference;
+    typedef std::size_t size_type;
+    typedef std::ptrdiff_t difference_type;
 
-    b_plus_size_tree<bstree_set_config_t<std::string>> tree;
-
-    for(int i = 0; ; ++i)
+    test_allocator() : set(new std::set<T *>()), max(999999999)
     {
-        tree.insert(std::to_string(mtr(mt)));
-        if(!tree.debug_check())
+        root = fork = ++identity_seed;
+    }
+    test_allocator(test_allocator const &other) : set(other.set), max(other.max)
+    {
+        root = other.root;
+        fork = other.fork;
+    }
+    template<class U> test_allocator(test_allocator<U> const &other) : set(new std::set<T *>()), max(other.max)
+    {
+        root = other.root;
+        fork = ++identity_seed;
+    }
+
+    template<class U>
+    friend class test_allocator;
+
+    template<class U>
+    struct rebind
+    {
+        typedef test_allocator<U> other;
+    };
+    pointer allocate(size_type n)
+    {
+        if(alloc_limit == 0 || set->size() >= max_size() - 1)
+        {
+            throw std::bad_alloc();
+        }
+        --alloc_limit;
+        return *set->insert(reinterpret_cast<pointer>(new uint8_t[sizeof(T) * n])).first;
+    }
+    void deallocate(pointer ptr, size_type n)
+    {
+        assert(set->erase(ptr) == 1);
+        delete[] reinterpret_cast<uint8_t *>(ptr);
+    }
+    template<class U, class ...args_t> void construct(U *ptr, args_t &&...args)
+    {
+        ::new(ptr) U(std::forward<args_t>(args)...);
+    }
+    void destroy(pointer ptr)
+    {
+        ptr->~T();
+    }
+    pointer address(reference x)
+    {
+        return &x;
+    }
+    size_type max_size() const
+    {
+        return max;
+    }
+    size_type& max_size()
+    {
+        return max;
+    }
+    bool operator == (test_allocator const &other)
+    {
+        return set == other.set;
+    }
+private:
+    std::shared_ptr<std::set<T *>> set;
+    size_t max;
+    size_t root;
+    size_t fork;
+};
+
+class checker
+{
+    int i;
+    void c(bool b) const
+    {
+        if(!b)
         {
             _asm int 3;
         }
     }
+public:
+    checker() : i(-1)
+    {
+    }
+    ~checker()
+    {
+        i = -1;
+    }
+    checker(int v) : i(v)
+    {
+        c(i >= 0);
+    }
+    checker(checker const &o) : i(o.i)
+    {
+        c(i >= 0);
+    }
+    checker(checker &&o) : i(o.i)
+    {
+        o.i = -1;
+        c(i >= 0);
+    }
+    checker &operator = (checker const &o)
+    {
+        i = o.i;
+        c(i >= 0);
+        return *this;
+    }
+    checker &operator = (checker &&o)
+    {
+        i = o.i;
+        o.i = -1;
+        c(i >= 0);
+        return *this;
+    }
+    bool operator < (checker const &o) const
+    {
+        c(i >= 0);
+        c(o.i >= 0);
+        return i < o.i;
+    }
+};
+
+int main()
+{
+    auto t = std::chrono::high_resolution_clock::now;
+    std::mt19937 mt(0);
+    auto mtr = std::uniform_int_distribution<int>(1000000, 9999999);
+
+    b_plus_size_tree<bstree_set_config_t<checker, std::less<checker>, test_allocator<checker>>> tree;
+
+    mt.seed(0);
+    for(int i = 0; i < 99999; ++i)
+    {
+        tree.insert(checker(mtr(mt)));
+        //if(!tree.debug_check())
+        //{
+        //    printf("%d\n", i);
+        //    _asm int 3;
+        //}
+    }
+    mt.seed(0);
+    for(int i = 0; i < 99999; ++i)
+    {
+        if(i == 773)
+        {
+            _asm int 3;
+        }
+        tree.erase(checker(mtr(mt)));
+        if(!tree.debug_check())
+        {
+            printf("%d\n", i);
+            _asm int 3;
+        }
+    }
+    system("pause");
 
 
     //std::vector<int> v;

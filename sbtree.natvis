@@ -4,7 +4,7 @@
     <DisplayString>{{ size={head_.root-&gt;parent-&gt;size} }}</DisplayString>
     <Expand>
       <Item Name="[comparator]" ExcludeView="simple">(*(key_compare *)head_.root)</Item>
-      <Item Name="[allocator]" ExcludeView="simple">(*(root_allocator_t *)&amp;head_)</Item>
+      <Item Name="[allocator]" ExcludeView="simple">(root_allocator_t &amp;)head_</Item>
       <Item Name="[allocator]" ExcludeView="simple">(*(node_allocator_t *)head_.root)</Item>
       <TreeItems>
         <Size>head_.root-&gt;parent-&gt;size</Size>
