@@ -149,7 +149,7 @@ class checker
     {
         if(!b)
         {
-            _asm int 3;
+            *static_cast<int *>(0) = 0;
         }
     }
 public:
@@ -198,14 +198,16 @@ int main()
 {
     auto t = std::chrono::high_resolution_clock::now;
     std::mt19937 mt(0);
-    auto mtr = std::uniform_int_distribution<int>(1000000, 9999999);
+    auto mtr = std::uniform_int_distribution<int>(-99999, 99999);
 
-    b_plus_size_tree<bstree_set_config_t<checker, std::less<checker>, test_allocator<checker>>> tree;
+    //b_plus_size_tree<bstree_set_config_t<checker, std::less<checker>, test_allocator<checker>>> tree;
+    b_plus_size_tree<bstree_set_config_t<int>> tree;
 
     mt.seed(0);
     for(int i = 0; i < 99999; ++i)
     {
-        tree.insert(checker(mtr(mt)));
+        tree.insert(mtr(mt));
+        tree.insert(i);
         //if(!tree.debug_check())
         //{
         //    printf("%d\n", i);
@@ -215,11 +217,16 @@ int main()
     mt.seed(0);
     for(int i = 0; i < 99999; ++i)
     {
-        if(i == 773)
+        tree.erase(tree.find(99999 - i));
+        if(!tree.debug_check())
         {
+            printf("%d\n", i);
             _asm int 3;
         }
-        tree.erase(checker(mtr(mt)));
+    }
+    for(int i = 0; i < 99999; ++i)
+    {
+        tree.erase(mtr(mt));
         if(!tree.debug_check())
         {
             printf("%d\n", i);
