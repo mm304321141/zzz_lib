@@ -55,7 +55,26 @@ struct bstree_set_config_t
     typedef std::true_type unique_t;
     enum
     {
-        memory_block_size = 256
+        memory_block_size = 64
+    };
+};
+template<class key_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<key_t>>
+struct bstree_multiset_config_t
+{
+    template<class in_type> static key_t const &get_key(in_type &value)
+    {
+        return value;
+    }
+    typedef key_t key_type;
+    typedef key_t const mapped_type;
+    typedef key_t const value_type;
+    typedef key_t storage_type;
+    typedef comparator_t key_compare;
+    typedef allocator_t allocator_type;
+    typedef std::false_type unique_t;
+    enum
+    {
+        memory_block_size = 64
     };
 };
 
@@ -196,44 +215,110 @@ public:
 
 int main()
 {
+
+
     auto t = std::chrono::high_resolution_clock::now;
     std::mt19937 mt(0);
-    auto mtr = std::uniform_int_distribution<int>(-99999, 99999);
+    auto mtr = std::uniform_int_distribution<int>(-9999, 9999);
 
     //b_plus_size_tree<bstree_set_config_t<checker, std::less<checker>, test_allocator<checker>>> tree;
-    b_plus_size_tree<bstree_set_config_t<int>> tree;
+    b_plus_size_tree<bstree_multiset_config_t<int>> tree;
 
-    mt.seed(0);
-    for(int i = 0; i < 99999; ++i)
+    //mt.seed(0);
+    //for(int i = 0; i < 9999999; ++i)
+    //{
+    //    tree.insert(mtr(mt));
+    //    tree.insert(i);
+    //}
+    //mt.seed(0);
+    //for(int i = 0; i < 9999999; ++i)
+    //{
+    //    tree.erase1(tree.find(9999999 - i));
+    //}
+    //for(int i = 0; i < 9999999; ++i)
+    //{
+    //    tree.erase(mtr(mt));
+    //}
+    //system("pause");
+
+    auto testsb = [&mtr, &mt, &c = tree]()
     {
-        tree.insert(mtr(mt));
-        tree.insert(i);
-        //if(!tree.debug_check())
-        //{
-        //    printf("%d\n", i);
-        //    _asm int 3;
-        //}
-    }
-    mt.seed(0);
-    for(int i = 0; i < 99999; ++i)
-    {
-        tree.erase(tree.find(99999 - i));
-        if(!tree.debug_check())
+        mt.seed(0);
+        for(int i = 0; i <= 99999999; ++i)
         {
-            printf("%d\n", i);
-            _asm int 3;
+            c.insert(i);
         }
-    }
-    for(int i = 0; i < 99999; ++i)
-    {
-        tree.erase(mtr(mt));
-        if(!tree.debug_check())
+        mt.seed(0);
+        for(int i = 0; i <= 99999999; ++i)
         {
-            printf("%d\n", i);
-            _asm int 3;
+            c.erase2(c.find(99999999 - i));
         }
-    }
+    };
+    auto testrb = [&mtr, &mt, &c = tree]()
+    {
+        mt.seed(0);
+        for(int i = 0; i <= 99999999; ++i)
+        {
+            c.insert(i);
+        }
+        mt.seed(0);
+        for(int i = 0; i <= 99999999; ++i)
+        {
+            c.erase1(c.find(99999999 - i));
+        }
+    };
+    auto ss1 = t();
+    testsb();
+    auto se1 = t();
+    auto rs1 = t();
+    testrb();
+    auto re1 = t();
+    auto ss2 = t();
+    testsb();
+    auto se2 = t();
+    auto rs2 = t();
+    testrb();
+    auto re2 = t();
+    auto ss3 = t();
+    testsb();
+    auto se3 = t();
+    auto rs3 = t();
+    testrb();
+    auto re3 = t();
+
+    std::cout
+        << "sb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se1 - ss1).count() << std::endl
+        << "rb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re1 - rs1).count() << std::endl
+        << "sb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se2 - ss2).count() << std::endl
+        << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl
+        << "sb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se3 - ss3).count() << std::endl
+        << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl
+        ;
+
     system("pause");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     //std::vector<int> v;

@@ -23,37 +23,43 @@ public:
     typedef value_type *pointer;
     typedef value_type const *const_pointer;
 
-    typedef std::conditional<sizeof(size_t) == 4, uint16_t, uint32_t>::type half_size_t;
-
     struct node_t
     {
         node_t *parent;
         size_t size;
-        half_size_t level;
-        half_size_t used;
+        size_t level;
     };
     struct inner_node_t : public node_t
     {
         typedef key_type item_type;
         enum
         {
-            max = ((config_t::memory_block_size - sizeof(node_t) - sizeof(nullptr)) / (sizeof(key_type) + sizeof(nullptr))),
+            max = ((config_t::memory_block_size - sizeof(node_t) - sizeof(size_t) - sizeof(nullptr)) / (sizeof(key_type) + sizeof(nullptr))),
             min = max / 2,
         };
+        size_t used;
         node_t *children[max + 1];
         key_type item[max];
 
+        size_t &bound()
+        {
+            return used;
+        }
+        size_t bound() const
+        {
+            return used;
+        }
         bool is_full() const
         {
-            return node_t::used == max;
+            return used == max;
         }
         bool is_few() const
         {
-            return node_t::used <= min;
+            return used <= min;
         }
-        inline bool is_underflow() const
+        bool is_underflow() const
         {
-            return node_t::used < min;
+            return used < min;
         }
     };
     struct leaf_node_t : public node_t
@@ -61,24 +67,32 @@ public:
         typedef storage_type item_type;
         enum
         {
-            max = (config_t::memory_block_size - sizeof(node_t) - sizeof(nullptr) * 2) / sizeof(value_type),
+            max = (config_t::memory_block_size - sizeof(node_t) - sizeof(nullptr) * 2) / sizeof(storage_type),
             min = max / 2,
         };
         leaf_node_t *prev;
         leaf_node_t *next;
         storage_type item[max];
 
+        size_t &bound()
+        {
+            return node_t::size;
+        }
+        size_t bound() const
+        {
+            return node_t::size;
+        }
         bool is_full() const
         {
-            return node_t::used == max;
+            return node_t::size == max;
         }
         bool is_few() const
         {
-            return node_t::used <= min;
+            return node_t::size <= min;
         }
-        inline bool is_underflow() const
+        bool is_underflow() const
         {
-            return node_t::used < min;
+            return node_t::size < min;
         }
     };
     struct memory_node_t
@@ -90,10 +104,9 @@ public:
     {
         template<class any_key_compare, class any_allocator_t> root_node_t(any_key_compare &&comp, any_allocator_t &&alloc) : key_compare(std::forward<any_key_compare>(comp)), node_allocator_t(std::forward<any_allocator_t>(alloc))
         {
-            parent = nullptr;
+            parent = this;
             size = 0;
             level = 0;
-            used = 0;
             left = right = nullptr;
         }
         leaf_node_t *left;
@@ -337,13 +350,13 @@ public:;
     iterator find(key_type const &key)
     {
         pair_pos_t pos = lower_bound_(key);
-        return (pos.first == nullptr || pos.second >= pos.first->used || get_comparator_()(key, get_key_(pos.first->item[pos.second]))) ? iterator(&root_, 0) : iterator(pos.first, pos.second);
+        return (pos.first == nullptr || pos.second >= pos.first->bound() || get_comparator_()(key, get_key_(pos.first->item[pos.second]))) ? iterator(&root_, 0) : iterator(pos.first, pos.second);
     }
 
     iterator find(key_type const &key) const
     {
         pair_pos_t pos = lower_bound_(key);
-        return (pos.first == nullptr || pos.second >= pos.first->used || get_comparator_()(key, get_key_(pos.first->item[pos.second]))) ? iterator(&root_, 0) : iterator(pos.first, pos.second);
+        return (pos.first == nullptr || pos.second >= pos.first->bound() || get_comparator_()(key, get_key_(pos.first->item[pos.second]))) ? iterator(&root_, 0) : iterator(pos.first, pos.second);
     }
 
     size_type erase(key_type const &key)
@@ -360,9 +373,9 @@ public:;
         return count;
     }
 
-    void erase(const_iterator it)
+    void erase1(const_iterator it)
     {
-        if(root_.parent == nullptr)
+        if(root_.parent == &root_)
         {
             return;
         }
@@ -373,9 +386,22 @@ public:;
         }
     }
 
+    void erase2(const_iterator it)
+    {
+        if(root_.parent == &root_)
+        {
+            return;
+        }
+        result_t result = erase_pos_(static_cast<leaf_node_t *>(it.node), it.where);
+        if(!result.has(btree_not_found))
+        {
+            --root_.size;
+        }
+    }
+
     bool debug_check()
     {
-        if(root_.parent != nullptr)
+        if(root_.parent != &root_)
         {
             return debug_check_(root_.parent);
         }
@@ -398,14 +424,14 @@ protected:
 
     bool debug_check_(node_t *node)
     {
-        if(node->used == 0)
-        {
-            return false;
-        }
         if(node->level == 0)
         {
             leaf_node_t *leaf_node = static_cast<leaf_node_t *>(node);
-            for(half_size_t i = 0; i < node->used - 1; ++i)
+            if(leaf_node->bound() == 0)
+            {
+                return false;
+            }
+            for(size_type i = 0; i < leaf_node->bound() - 1; ++i)
             {
                 if(get_comparator_()(get_key_(leaf_node->item[i + 1]), get_key_(leaf_node->item[i])))
                 {
@@ -416,9 +442,13 @@ protected:
         else
         {
             inner_node_t *inner_node = static_cast<inner_node_t *>(node);
-            for(half_size_t i = 0; i < node->used; ++i)
+            if(inner_node->bound() == 0)
             {
-                for(half_size_t i = 0; i < node->used - 1; ++i)
+                return false;
+            }
+            for(size_type i = 0; i < inner_node->bound(); ++i)
+            {
+                for(size_type i = 0; i < inner_node->bound() - 1; ++i)
                 {
                     if(get_comparator_()(inner_node->item[i + 1], inner_node->item[i]))
                     {
@@ -426,20 +456,24 @@ protected:
                     }
                 }
             }
-            for(half_size_t i = 0; i < node->used + 1; ++i)
+            size_type sum = 0;
+            for(size_type i = 0; i < inner_node->bound() + 1; ++i)
             {
                 node_t *child = inner_node->children[i];
-                if(!debug_check_(child))
+                sum += child->size;
+                if(child->parent != node || !debug_check_(child))
                 {
                     return false;
                 }
-                if(i < node->used)
+                if(i < inner_node->bound())
                 {
                     while(child->level > 0)
                     {
-                        child = static_cast<inner_node_t *>(child)->children[child->used];
+                        inner_node_t *child_inner = static_cast<inner_node_t *>(child);
+                        child = child_inner->children[child_inner->bound()];
                     }
-                    key_type const &key1 = get_key_(static_cast<leaf_node_t *>(child)->item[child->used - 1]);
+                    leaf_node_t *child_leaf = static_cast<leaf_node_t *>(child);
+                    key_type const &key1 = get_key_(child_leaf->item[child_leaf->bound() - 1]);
                     key_type const &key2 = inner_node->item[i];
                     if(get_comparator_()(key1, key2) || get_comparator_()(key2, key2))
                     {
@@ -447,24 +481,28 @@ protected:
                     }
                 }
             }
+            if(sum != node->size)
+            {
+                return false;
+            }
         }
         return true;
     }
 
-    inner_node_t *alloc_inner_node_()
+    inner_node_t *alloc_inner_node_(node_t *parent)
     {
         node_allocator_t &allocator(root_);
         inner_node_t *node = reinterpret_cast<inner_node_t *>(allocator.allocate(1));
-        node->parent = nullptr;
+        node->parent = parent;
         node->size = 0;
         node->level = 1;
-        node->used = 0;
+        node->bound() = 0;
         return node;
     }
 
     void dealloc_inner_node_(inner_node_t *node)
     {
-        for(half_size_t i = 0; i < node->used; ++i)
+        for(size_t i = 0; i < node->bound(); ++i)
         {
             node->item[i].~key_type();
         }
@@ -479,7 +517,7 @@ protected:
         node->parent = parent;
         node->size = 0;
         node->level = 0;
-        node->used = 0;
+        node->bound() = 0;
         node->prev = nullptr;
         node->next = nullptr;
         return node;
@@ -487,7 +525,7 @@ protected:
 
     void dealloc_leaf_node_(leaf_node_t *node)
     {
-        for(size_t i = 0; i < node->used; ++i)
+        for(size_type i = 0; i < node->bound(); ++i)
         {
             node->item[i].~value_type();
         }
@@ -506,7 +544,7 @@ protected:
             inner_node_t *leaf_node = static_cast<inner_node_t *>(node);
             if(is_recursive)
             {
-                for(size_t i = 0; i < node->used; ++i)
+                for(size_type i = 0; i < leaf_node->bound(); ++i)
                 {
                     free_node_<is_recursive>(leaf_node->children[i]);
                 }
@@ -528,7 +566,7 @@ protected:
     {
         if(std::is_scalar<key_type>::value)
         {
-            node_type::item_type const *begin = node->item, *const end = node->item + node->used;
+            node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
             while(begin != end && get_comparator_()(get_key_(*begin), key))
             {
                 ++begin;
@@ -537,7 +575,7 @@ protected:
         }
         else
         {
-            return std::lower_bound(node->item, node->item + node->used, key, [&](node_type::item_type const &left, key_type const &right)->bool
+            return std::lower_bound(node->item, node->item + node->bound(), key, [&](node_type::item_type const &left, key_type const &right)->bool
             {
                 return get_comparator_()(get_key_(left), right);
             }) - node->item;
@@ -548,7 +586,7 @@ protected:
     {
         if(std::is_scalar<key_type>::value)
         {
-            node_type::item_type const *begin = node->item, *const end = node->item + node->used;
+            node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
             while(begin != end && !get_comparator_()(key, get_key_(*begin)))
             {
                 ++begin;
@@ -557,7 +595,7 @@ protected:
         }
         else
         {
-            return std::upper_bound(node->item, node->item + node->used, key, [&](key_type const &left, node_type::item_type const &right)->bool
+            return std::upper_bound(node->item, node->item + node->bound(), key, [&](key_type const &left, node_type::item_type const &right)->bool
             {
                 return get_comparator_()(left, get_key_(right));
             }) - node->item;
@@ -586,7 +624,7 @@ protected:
     pair_pos_t upper_bound_(key_type const &key) const
     {
         node_t *node = root_.parent;
-        if(node == nullptr)
+        if(node == &root_)
         {
             return std::make_pair(&root_, 0);
         }
@@ -765,59 +803,77 @@ protected:
         }
     }
 
+    static size_type update_parent_(node_t **update_begin, node_t **update_end, node_t *parent)
+    {
+        size_type count = 0;
+        while(update_begin != update_end)
+        {
+            node_t *node = *update_begin++;
+            count += node->size;
+            node->parent = parent;
+        }
+        return count;
+    }
+
     template<class in_value_t> pair_posi_t insert_nohint_(in_value_t &&value)
     {
-        if(root_.parent == nullptr)
+        if(root_.parent == &root_)
         {
-            root_.parent = root_.left = root_.right = alloc_leaf_node_(&root_);
-            construct_one_(root_.left->item, std::forward<in_value_t>(value));
-            root_.size = root_.left->used = 1;
-            return std::make_pair(std::make_pair(root_.left, 0), true);
+            leaf_node_t *node = root_.left = root_.right = alloc_leaf_node_(&root_);
+            construct_one_(node->item, std::forward<in_value_t>(value));
+            node->bound() = 1;
+            root_.parent = node;
+            root_.size = 1;
+            return std::make_pair(std::make_pair(node, 0), true);
         }
         node_t *new_child = nullptr;
         key_stack_t key_out;
         pair_posi_t result = insert_descend_<false>(root_.parent, std::forward<in_value_t>(value), &key_out, new_child);
+        if(result.second)
+        {
+            ++root_.size;
+        }
         if(new_child != nullptr)
         {
-            inner_node_t *new_root = alloc_inner_node_();
+            inner_node_t *new_root = alloc_inner_node_(&root_);
             new_root->level = root_.parent->level + 1;
             construct_one_(new_root->item, std::move(key_out.key()));
             destroy_one_(&key_out);
             new_root->children[0] = root_.parent;
             new_root->children[1] = new_child;
-            new_root->used = 1;
+            new_root->bound() = 1;
+            new_root->size = update_parent_(new_root->children, new_root->children + 2, new_root);
             root_.parent = new_root;
-        }
-        if(result.second)
-        {
-            ++root_.size;
         }
         return result;
     }
 
     void split_inner_node_(inner_node_t *inner_node, key_type *key_ptr, node_t *&new_node, size_type where)
     {
-        size_type mid = (inner_node->used >> 1);
-        if(where <= mid && mid > inner_node->used - (mid + 1))
+        size_type mid = (inner_node->bound() >> 1);
+        if(where <= mid && mid > inner_node->bound() - (mid + 1))
         {
             --mid;
         }
-        inner_node_t *new_inner_node = alloc_inner_node_();
+        inner_node_t *new_inner_node = alloc_inner_node_(nullptr);
         new_inner_node->level = inner_node->level;
-        new_inner_node->used = half_size_t(inner_node->used - (mid + 1));
-        move_construct_and_destroy_(inner_node->item + mid + 1, inner_node->item + inner_node->used, new_inner_node->item);
-        std::copy(inner_node->children + mid + 1, inner_node->children + inner_node->used + 1, new_inner_node->children);
-        inner_node->used = half_size_t(mid);
+        new_inner_node->bound() = inner_node->bound() - (mid + 1);
+        move_construct_and_destroy_(inner_node->item + mid + 1, inner_node->item + inner_node->bound(), new_inner_node->item);
+        std::copy(inner_node->children + mid + 1, inner_node->children + inner_node->bound() + 1, new_inner_node->children);
+        inner_node->bound() = mid;
         construct_one_(key_ptr, inner_node->item[mid]);
         destroy_one_(inner_node->item + mid);
+        size_type count = update_parent_(new_inner_node->children, new_inner_node->children + new_inner_node->bound() + 1, new_inner_node);
+        new_inner_node->size = count;
+        inner_node->size -= count;
         new_node = new_inner_node;
     }
 
     void split_leaf_node_(leaf_node_t *leaf_node, key_type *key_ptr, node_t *&new_node)
     {
-        size_type mid = (leaf_node->used >> 1);
+        size_type mid = (leaf_node->bound() >> 1);
         leaf_node_t *new_leaf_node = alloc_leaf_node_(nullptr);
-        new_leaf_node->used = half_size_t(leaf_node->used - mid);
+        new_leaf_node->bound() = leaf_node->bound() - mid;
         new_leaf_node->next = leaf_node->next;
         if(new_leaf_node->next == nullptr)
         {
@@ -827,11 +883,11 @@ protected:
         {
             new_leaf_node->next->prev = new_leaf_node;
         }
-        move_construct_and_destroy_(leaf_node->item + mid, leaf_node->item + leaf_node->used, new_leaf_node->item);
-        leaf_node->used = half_size_t(mid);
+        move_construct_and_destroy_(leaf_node->item + mid, leaf_node->item + leaf_node->bound(), new_leaf_node->item);
+        leaf_node->bound() = mid;
         leaf_node->next = new_leaf_node;
         new_leaf_node->prev = leaf_node;
-        construct_one_(key_ptr, get_key_(leaf_node->item[leaf_node->used - 1]));
+        construct_one_(key_ptr, get_key_(leaf_node->item[leaf_node->bound() - 1]));
         new_node = new_leaf_node;
     }
 
@@ -844,34 +900,44 @@ protected:
             key_stack_t key_out;
             size_type where = is_leftish ? lower_bound_(inner_node, get_key_(value)) : upper_bound_(inner_node, get_key_(value));
             pair_posi_t result = insert_descend_<is_leftish>(inner_node->children[where], std::forward<in_value_t>(value), &key_out, new_child);
+            if(result.second)
+            {
+                ++inner_node->size;
+            }
             if(new_child != nullptr)
             {
                 if(inner_node->is_full())
                 {
                     split_inner_node_(inner_node, split_key, split_node, where);
-                    if(where == inner_node->used + 1 && inner_node->used < split_node->used)
+                    inner_node_t *split_tree_node = static_cast<inner_node_t *>(split_node);
+                    if(where == inner_node->bound() + 1 && inner_node->bound() < split_tree_node->bound())
                     {
-                        inner_node_t *split_tree_node = static_cast<inner_node_t *>(split_node);
-                        construct_one_(inner_node->item + inner_node->used, *split_key);
-                        inner_node->children[inner_node->used + 1] = split_tree_node->children[0];
-                        inner_node->used++;
+                        construct_one_(inner_node->item + inner_node->bound(), std::move(*split_key));
+                        inner_node->children[inner_node->bound() + 1] = split_tree_node->children[0];
+                        ++inner_node->bound();
+                        inner_node->size = inner_node->size + split_tree_node->children[0]->size - new_child->size;
+                        split_tree_node->size = split_tree_node->size - split_tree_node->children[0]->size + new_child->size;
+                        split_tree_node->children[0]->parent = inner_node;
+                        new_child->parent = split_tree_node;
                         split_tree_node->children[0] = new_child;
                         *split_key = std::move(key_out.key());
                         destroy_one_(&key_out);
                         return result;
                     }
-                    else if(where >= size_type(inner_node->used + 1))
+                    else if(where >= size_type(inner_node->bound() + 1))
                     {
-                        where -= inner_node->used + 1;
-                        inner_node = static_cast<inner_node_t *>(split_node);
+                        where -= inner_node->bound() + 1;
+                        inner_node->size -= new_child->size;
+                        split_tree_node->size += new_child->size;
+                        inner_node = split_tree_node;
                     }
                 }
-                move_next_and_insert_one_(inner_node->item + where, inner_node->item + inner_node->used, std::move(key_out.key()));
+                move_next_and_insert_one_(inner_node->item + where, inner_node->item + inner_node->bound(), std::move(key_out.key()));
                 destroy_one_(&key_out);
-                std::move_backward(inner_node->children + where, inner_node->children + inner_node->used + 1, inner_node->children + inner_node->used + 2);
-
+                std::move_backward(inner_node->children + where, inner_node->children + inner_node->bound() + 1, inner_node->children + inner_node->bound() + 2);
                 inner_node->children[where + 1] = new_child;
-                inner_node->used++;
+                inner_node->bound()++;
+                new_child->parent = inner_node;
             }
             return result;
         }
@@ -896,9 +962,9 @@ protected:
                     if(where == 0)
                     {
                         leaf_node_t *prev_leaf_node = leaf_node->prev;
-                        if(!get_comparator_()(get_key_(prev_leaf_node->item[prev_leaf_node->used - 1]), get_key_(value)))
+                        if(!get_comparator_()(get_key_(prev_leaf_node->item[prev_leaf_node->bound() - 1]), get_key_(value)))
                         {
-                            return std::make_pair(std::make_pair(prev_leaf_node, prev_leaf_node->used - 1), false);
+                            return std::make_pair(std::make_pair(prev_leaf_node, prev_leaf_node->bound() - 1), false);
                         }
                     }
                     else
@@ -913,16 +979,15 @@ protected:
             if(leaf_node->is_full())
             {
                 split_leaf_node_(leaf_node, split_key, split_node);
-                if(where >= leaf_node->used)
+                if(where >= leaf_node->bound())
                 {
-                    where -= leaf_node->used;
+                    where -= leaf_node->bound();
                     leaf_node = static_cast<leaf_node_t *>(split_node);
                 }
             }
-            move_next_and_insert_one_(leaf_node->item + where, leaf_node->item + leaf_node->used, std::forward<in_value_t>(value));
-            leaf_node->used++;
-
-            if(split_node != nullptr && leaf_node != split_node && where == leaf_node->used - 1)
+            move_next_and_insert_one_(leaf_node->item + where, leaf_node->item + leaf_node->bound(), std::forward<in_value_t>(value));
+            ++leaf_node->bound();
+            if(split_node != nullptr && leaf_node != split_node && where == leaf_node->bound() - 1)
             {
                 *split_key = get_key_(leaf_node->item[where]);
             }
@@ -932,7 +997,7 @@ protected:
 
     bool erase_one(key_type const &key)
     {
-        if(root_.parent == nullptr)
+        if(root_.parent == &root_)
         {
             return false;
         }
@@ -948,8 +1013,8 @@ protected:
     result_t merge_leaves(leaf_node_t *left, leaf_node_t *right, inner_node_t *parent)
     {
         (void)parent;
-        move_construct_and_destroy_(right->item, right->item + right->used, left->item + left->used);
-        left->used += right->used;
+        move_construct_and_destroy_(right->item, right->item + right->bound(), left->item + left->bound());
+        left->bound() += right->bound();
         left->next = right->next;
         if(left->next != nullptr)
         {
@@ -959,110 +1024,120 @@ protected:
         {
             root_.right = left;
         }
-        right->used = 0;
+        right->bound() = 0;
+        right->parent = nullptr;
         return result_t(btree_fixmerge);
     }
 
     static result_t shift_left_leaf(leaf_node_t *left, leaf_node_t *right, inner_node_t *parent, size_type parent_where)
     {
-        size_type shiftnum = (right->used - left->used) >> 1;
-        move_construct_(right->item, right->item + shiftnum, left->item + left->used);
-        left->used += half_size_t(shiftnum);
-        move_(right->item + shiftnum, right->item + right->used, right->item);
-        destroy_(right->item + right->used - shiftnum, right->item + right->used);
-        right->used -= half_size_t(shiftnum);
-        if(parent_where < parent->used)
+        size_type shiftnum = (right->bound() - left->bound()) >> 1;
+        move_construct_(right->item, right->item + shiftnum, left->item + left->bound());
+        left->bound() += shiftnum;
+        move_(right->item + shiftnum, right->item + right->bound(), right->item);
+        destroy_(right->item + right->bound() - shiftnum, right->item + right->bound());
+        right->bound() -= shiftnum;
+        if(parent_where < parent->bound())
         {
-            parent->item[parent_where] = left->item[left->used - 1];
+            parent->item[parent_where] = left->item[left->bound() - 1];
             return result_t(btree_ok);
         }
         else
         {
-            return result_t(btree_update_lastkey, left->item[left->used - 1]);
+            return result_t(btree_update_lastkey, left->item[left->bound() - 1]);
         }
     }
 
     static void shift_right_leaf(leaf_node_t *left, leaf_node_t *right, inner_node_t *parent, size_type parent_where)
     {
-        size_type shiftnum = (left->used - right->used) >> 1;
-        move_next_to_and_construct_(right->item, right->item + right->used, right->item + shiftnum);
-        right->used += half_size_t(shiftnum);
-        move_and_destroy_(left->item + left->used - shiftnum, left->item + left->used, right->item);
-        left->used -= half_size_t(shiftnum);
-        parent->item[parent_where] = left->item[left->used - 1];
+        size_type shiftnum = (left->bound() - right->bound()) >> 1;
+        move_next_to_and_construct_(right->item, right->item + right->bound(), right->item + shiftnum);
+        right->bound() += shiftnum;
+        move_and_destroy_(left->item + left->bound() - shiftnum, left->item + left->bound(), right->item);
+        left->bound() -= shiftnum;
+        parent->item[parent_where] = left->item[left->bound() - 1];
     }
 
-    static result_t merge_inner(inner_node_t *left, inner_node_t *right, inner_node_t *parent, size_type parent_where)
+    static result_t merge_inners(inner_node_t *left, inner_node_t *right, inner_node_t *parent, size_type parent_where)
     {
-        construct_one_(left->item + left->used, parent->item[parent_where]);
-        ++left->used;
-        move_construct_and_destroy_(right->item, right->item + right->used, left->item + left->used);
-        std::copy(right->children, right->children + right->used + 1, left->children + left->used);
-        left->used += right->used;
-        right->used = 0;
+        construct_one_(left->item + left->bound(), parent->item[parent_where]);
+        ++left->bound();
+        move_construct_and_destroy_(right->item, right->item + right->bound(), left->item + left->bound());
+        std::copy(right->children, right->children + right->bound() + 1, left->children + left->bound());
+        left->size += update_parent_(left->children + left->bound(), left->children + left->bound() + right->bound() + 1, left);
+        left->bound() += right->bound();
+        right->bound() = 0;
+        right->size = 0;
+        right->parent = nullptr;
         return result_t(btree_fixmerge);
     }
 
     static void shift_left_inner(inner_node_t *left, inner_node_t *right, inner_node_t *parent, size_type parent_where)
     {
-        size_type shiftnum = (right->used - left->used) >> 1;
-        construct_one_(left->item + left->used, parent->item[parent_where]);
-        ++left->used;
-        move_construct_(right->item, right->item + shiftnum - 1, left->item + left->used);
-        std::copy(right->children, right->children + shiftnum, left->children + left->used);
-        left->used += half_size_t(shiftnum - 1);
+        size_type shiftnum = (right->bound() - left->bound()) >> 1;
+        construct_one_(left->item + left->bound(), parent->item[parent_where]);
+        ++left->bound();
+        move_construct_(right->item, right->item + shiftnum - 1, left->item + left->bound());
+        std::copy(right->children, right->children + shiftnum, left->children + left->bound());
+        size_t count = update_parent_(left->children + left->bound(), left->children + left->bound() + shiftnum, left);
+        left->bound() += shiftnum - 1;
+        left->size += count;
         parent->item[parent_where] = right->item[shiftnum - 1];
-        move_(right->item + shiftnum, right->item + right->used, right->item);
-        destroy_(right->item + right->used - shiftnum, right->item + right->used);
-        std::copy(right->children + shiftnum, right->children + right->used + 1, right->children);
-        right->used -= half_size_t(shiftnum);
+        move_(right->item + shiftnum, right->item + right->bound(), right->item);
+        destroy_(right->item + right->bound() - shiftnum, right->item + right->bound());
+        std::copy(right->children + shiftnum, right->children + right->bound() + 1, right->children);
+        right->bound() -= shiftnum;
+        right->size -= count;
     }
 
     static void shift_right_inner(inner_node_t *left, inner_node_t *right, inner_node_t *parent, size_type parent_where)
     {
-        size_type shiftnum = (left->used - right->used) >> 1;
-        move_next_to_and_construct_(right->item, right->item + right->used, right->item + shiftnum);
-        std::copy_backward(right->children, right->children + right->used + 1, right->children + right->used + 1 + shiftnum);
-        right->used += half_size_t(shiftnum);
+        size_type shiftnum = (left->bound() - right->bound()) >> 1;
+        move_next_to_and_construct_(right->item, right->item + right->bound(), right->item + shiftnum);
+        std::copy_backward(right->children, right->children + right->bound() + 1, right->children + right->bound() + 1 + shiftnum);
+        right->bound() += shiftnum;
         right->item[shiftnum - 1] = parent->item[parent_where];
-        move_and_destroy_(left->item + left->used - shiftnum + 1, left->item + left->used, right->item);
-        std::copy(left->children + left->used - shiftnum + 1, left->children + left->used + 1, right->children);
-        parent->item[parent_where] = left->item[left->used - shiftnum];
-        left->used -= half_size_t(shiftnum);
+        move_and_destroy_(left->item + left->bound() - shiftnum + 1, left->item + left->bound(), right->item);
+        std::copy(left->children + left->bound() - shiftnum + 1, left->children + left->bound() + 1, right->children);
+        size_t count = update_parent_(right->children, right->children + shiftnum, right);
+        parent->item[parent_where] = left->item[left->bound() - shiftnum];
+        left->bound() -= shiftnum;
+        left->size -= count;
+        right->size += count;
     }
 
     result_t erase_one_descend(key_type const &key, node_t *node, node_t *left, node_t *right, inner_node_t *left_parent, inner_node_t *right_parent, inner_node_t *parent, size_type parent_where)
     {
         if(node->level == 0)
         {
-            leaf_node_t* leaf_node = static_cast<leaf_node_t*>(node);
-            leaf_node_t* leaf_left = static_cast<leaf_node_t*>(left);
-            leaf_node_t* leaf_right = static_cast<leaf_node_t*>(right);
+            leaf_node_t *leaf_node = static_cast<leaf_node_t*>(node);
+            leaf_node_t *leaf_left = static_cast<leaf_node_t*>(left);
+            leaf_node_t *leaf_right = static_cast<leaf_node_t*>(right);
             size_type where = lower_bound_(leaf_node, key);
-            if(where >= leaf_node->used || get_comparator_()(get_key_(leaf_node->item[where]), key))
+            if(where >= leaf_node->bound() || get_comparator_()(get_key_(leaf_node->item[where]), key))
             {
                 return result_t(btree_not_found);
             }
-            move_prev_and_destroy_one_(leaf_node->item + where + 1, leaf_node->item + leaf_node->used);
-            leaf_node->used--;
+            move_prev_and_destroy_one_(leaf_node->item + where + 1, leaf_node->item + leaf_node->bound());
+            leaf_node->bound()--;
             result_t result(btree_ok);
-            if(where == leaf_node->used)
+            if(where == leaf_node->bound())
             {
-                if(parent != nullptr && parent_where < parent->used)
+                if(parent != nullptr && parent_where < parent->bound())
                 {
-                    parent->item[parent_where] = get_key_(leaf_node->item[leaf_node->used - 1]);
+                    parent->item[parent_where] = get_key_(leaf_node->item[leaf_node->bound() - 1]);
                 }
-                else if(leaf_node->used >= 1)
+                else if(leaf_node->bound() >= 1)
                 {
-                    result |= result_t(btree_update_lastkey, get_key_(leaf_node->item[leaf_node->used - 1]));
+                    result |= result_t(btree_update_lastkey, get_key_(leaf_node->item[leaf_node->bound() - 1]));
                 }
             }
-            if(leaf_node->is_underflow() && !(leaf_node == root_.parent && leaf_node->used >= 1))
+            if(leaf_node->is_underflow() && !(leaf_node == root_.parent && leaf_node->bound() >= 1))
             {
                 if(leaf_left == nullptr && leaf_right == nullptr)
                 {
                     free_node_<false>(root_.parent);
-                    root_.parent = nullptr;
+                    root_.parent = &root_;
                     root_.left = root_.right = nullptr;
                     return result_t(btree_ok);
                 }
@@ -1101,7 +1176,7 @@ protected:
                 }
                 else if(left_parent == right_parent)
                 {
-                    if(leaf_left->used <= leaf_right->used)
+                    if(leaf_left->bound() <= leaf_right->bound())
                     {
                         result |= shift_left_leaf(leaf_node, leaf_right, right_parent, parent_where);
                     }
@@ -1134,7 +1209,7 @@ protected:
             size_type where = lower_bound_(inner_node, key);
             if(where == 0)
             {
-                self_left = (left == nullptr) ? nullptr : (static_cast<inner_node_t *>(left))->children[left->used - 1];
+                self_left = left == nullptr ? nullptr : inner_left->children[inner_left->bound() - 1];
                 self_left_parent = left_parent;
             }
             else
@@ -1142,9 +1217,9 @@ protected:
                 self_left = inner_node->children[where - 1];
                 self_left_parent = inner_node;
             }
-            if(where == inner_node->used)
+            if(where == inner_node->bound())
             {
-                self_right = (right == nullptr) ? nullptr : (static_cast<inner_node_t*>(right))->children[0];
+                self_right = right == nullptr ? nullptr : inner_right->children[0];
                 self_right_parent = right_parent;
             }
             else
@@ -1157,10 +1232,11 @@ protected:
             {
                 return result;
             }
+            --inner_node->size;
             result_t self_result(btree_ok);
             if(result.has(btree_update_lastkey))
             {
-                if(parent != nullptr && parent_where < parent->used)
+                if(parent != nullptr && parent_where < parent->bound())
                 {
                     parent->item[parent_where] = std::move<key_type>(result.last_key);
                 }
@@ -1171,27 +1247,27 @@ protected:
             }
             if(result.has(btree_fixmerge))
             {
-                if(inner_node->children[where]->used != 0)
+                if(inner_node->children[where]->parent != nullptr)
                 {
                     ++where;
                 }
                 free_node_<false>(inner_node->children[where]);
-                move_prev_and_destroy_one_(inner_node->item + where, inner_node->item + inner_node->used);
-                std::copy(inner_node->children + where + 1, inner_node->children + inner_node->used + 1, inner_node->children + where);
-                --inner_node->used;
+                move_prev_and_destroy_one_(inner_node->item + where, inner_node->item + inner_node->bound());
+                std::copy(inner_node->children + where + 1, inner_node->children + inner_node->bound() + 1, inner_node->children + where);
+                --inner_node->bound();
                 if(inner_node->level == 1)
                 {
                     --where;
                     leaf_node_t *child = static_cast<leaf_node_t *>(inner_node->children[where]);
-                    inner_node->item[where] = child->item[child->used - 1];
+                    inner_node->item[where] = child->item[child->bound() - 1];
                 }
             }
-            if(inner_node->is_underflow() && !(inner_node == root_.parent && inner_node->used >= 1))
+            if(inner_node->is_underflow() && !(inner_node == root_.parent && inner_node->bound() >= 1))
             {
                 if(inner_left == nullptr && inner_right == nullptr)
                 {
                     root_.parent = inner_node->children[0];
-                    inner_node->used = 0;
+                    inner_node->bound() = 0;
                     free_node_<false>(inner_node);
                     return result_t(btree_ok);
                 }
@@ -1199,11 +1275,11 @@ protected:
                 {
                     if(left_parent == parent)
                     {
-                        self_result |= merge_inner(inner_left, inner_node, left_parent, parent_where - 1);
+                        self_result |= merge_inners(inner_left, inner_node, left_parent, parent_where - 1);
                     }
                     else
                     {
-                        self_result |= merge_inner(inner_node, inner_right, right_parent, parent_where);
+                        self_result |= merge_inners(inner_node, inner_right, right_parent, parent_where);
                     }
                 }
                 else if((inner_left != nullptr && inner_left->is_few()) && (inner_right != nullptr && !inner_right->is_few()))
@@ -1214,7 +1290,7 @@ protected:
                     }
                     else
                     {
-                        self_result |= merge_inner(inner_left, inner_node, left_parent, parent_where - 1);
+                        self_result |= merge_inners(inner_left, inner_node, left_parent, parent_where - 1);
                     }
                 }
                 else if((inner_left != nullptr && !inner_left->is_few()) && (inner_right != nullptr && inner_right->is_few()))
@@ -1225,12 +1301,12 @@ protected:
                     }
                     else
                     {
-                        self_result |= merge_inner(inner_node, inner_right, right_parent, parent_where);
+                        self_result |= merge_inners(inner_node, inner_right, right_parent, parent_where);
                     }
                 }
                 else if(left_parent == right_parent)
                 {
-                    if(inner_left->used <= inner_right->used)
+                    if(inner_left->bound() <= inner_right->bound())
                     {
                         shift_left_inner(inner_node, inner_right, right_parent, parent_where);
                     }
@@ -1255,38 +1331,326 @@ protected:
         }
     }
 
+    size_type get_parent_(node_t *node, inner_node_t *&parent)
+    {
+        if(node->parent == &root_)
+        {
+            parent = nullptr;
+            return 0;
+        }
+        parent = static_cast<inner_node_t *>(node->parent);
+        return std::find(parent->children, parent->children + parent->bound() + 1, node) - parent->children;
+    }
+
+    template<class in_node_t> in_node_t *get_left_(in_node_t *node)
+    {
+        inner_node_t *parent;
+        size_type where = get_parent_(node, parent);
+        if(parent == nullptr)
+        {
+            return nullptr;
+        }
+        if(where == 0)
+        {
+            in_node_t *left_parent = get_left_(parent);
+            return left_parent == nullptr ? nullptr : static_cast<in_node_t *>(left_parent->children[left_parent->bound() - 1]);
+        }
+        else
+        {
+            return static_cast<in_node_t *>(parent->children[where - 1]);
+        }
+    }
+
+    template<class in_node_t> in_node_t *get_right_(in_node_t *node)
+    {
+        inner_node_t *parent;
+        size_type where = get_parent_(node, parent);
+        if(parent == nullptr)
+        {
+            return nullptr;
+        }
+        if(where == parent->bound())
+        {
+            in_node_t *right_parent = get_right_(parent);
+            return right_parent == nullptr ? nullptr : static_cast<in_node_t *>(right_parent->children[0]);
+        }
+        else
+        {
+            return static_cast<in_node_t *>(parent->children[where + 1]);
+        }
+    }
+    
+    template<class in_node_t> void get_left_right_parent_(in_node_t *node, inner_node_t *parent, size_type where, in_node_t *&left, inner_node_t *&left_parent, in_node_t *&right, inner_node_t *&right_parent)
+    {
+        if(parent == nullptr)
+        {
+            left = right = nullptr;
+            left_parent = right_parent = nullptr;
+            return;
+        }
+        if(where == 0)
+        {
+            left_parent = get_left_(parent);
+            left = left_parent == nullptr ? nullptr : static_cast<in_node_t *>(left_parent->children[left_parent->bound() - 1]);
+        }
+        else
+        {
+            left_parent = parent;
+            left = static_cast<in_node_t *>(parent->children[where - 1]);
+        }
+        if(where == parent->bound())
+        {
+            right_parent = get_right_(parent);
+            right = right_parent == nullptr ? nullptr : static_cast<in_node_t *>(right_parent->children[0]);
+        }
+        else
+        {
+            right_parent = parent;
+            right = static_cast<in_node_t *>(parent->children[where + 1]);
+        }
+    }
+
+    result_t erase_pos_(leaf_node_t *leaf_node, size_type where)
+    {
+        move_prev_and_destroy_one_(leaf_node->item + where + 1, leaf_node->item + leaf_node->bound());
+        leaf_node->bound()--;
+        result_t result(btree_ok);
+        inner_node_t *parent;
+        size_type parent_where = get_parent_(leaf_node, parent);
+        if(where == leaf_node->bound())
+        {
+            if(parent != nullptr && parent_where < parent->bound())
+            {
+                parent->item[parent_where] = get_key_(leaf_node->item[leaf_node->bound() - 1]);
+            }
+            else if(leaf_node->bound() >= 1)
+            {
+                result |= result_t(btree_update_lastkey, get_key_(leaf_node->item[leaf_node->bound() - 1]));
+            }
+        }
+        if(leaf_node->is_underflow() && !(leaf_node == root_.parent && leaf_node->bound() >= 1))
+        {
+            leaf_node_t *leaf_left, *leaf_right;
+            inner_node_t *left_parent, *right_parent;
+            get_left_right_parent_(leaf_node, parent, parent_where, leaf_left, left_parent, leaf_right, right_parent);
+            if(leaf_left == nullptr && leaf_right == nullptr)
+            {
+                free_node_<false>(root_.parent);
+                root_.parent = &root_;
+                root_.left = root_.right = nullptr;
+                return result_t(btree_ok);
+            }
+            else if((leaf_left == nullptr || leaf_left->is_few()) && (leaf_right == nullptr || leaf_right->is_few()))
+            {
+                if(left_parent == parent)
+                {
+                    result |= merge_leaves(leaf_left, leaf_node, left_parent);
+                }
+                else
+                {
+                    result |= merge_leaves(leaf_node, leaf_right, right_parent);
+                }
+            }
+            else if((leaf_left != nullptr && leaf_left->is_few()) && (leaf_right != nullptr && !leaf_right->is_few()))
+            {
+                if(right_parent == parent)
+                {
+                    result |= shift_left_leaf(leaf_node, leaf_right, right_parent, parent_where);
+                }
+                else
+                {
+                    result |= merge_leaves(leaf_left, leaf_node, left_parent);
+                }
+            }
+            else if((leaf_left != nullptr && !leaf_left->is_few()) && (leaf_right != nullptr && leaf_right->is_few()))
+            {
+                if(left_parent == parent)
+                {
+                    shift_right_leaf(leaf_left, leaf_node, left_parent, parent_where - 1);
+                }
+                else
+                {
+                    result |= merge_leaves(leaf_node, leaf_right, right_parent);
+                }
+            }
+            else if(left_parent == right_parent)
+            {
+                if(leaf_left->bound() <= leaf_right->bound())
+                {
+                    result |= shift_left_leaf(leaf_node, leaf_right, right_parent, parent_where);
+                }
+                else
+                {
+                    shift_right_leaf(leaf_left, leaf_node, left_parent, parent_where - 1);
+                }
+            }
+            else
+            {
+                if(left_parent == parent)
+                {
+                    shift_right_leaf(leaf_left, leaf_node, left_parent, parent_where - 1);
+                }
+                else
+                {
+                    result |= shift_left_leaf(leaf_node, leaf_right, right_parent, parent_where);
+                }
+            }
+        }
+        if(parent != nullptr)
+        {
+            return erase_pos_descend(parent, parent_where, std::move(result));
+        }
+        else
+        {
+            return result;
+        }
+    }
+
+    result_t erase_pos_descend(inner_node_t *inner_node, size_type where, result_t &&result)
+    {
+        --inner_node->size;
+        result_t self_result(btree_ok);
+        inner_node_t *parent;
+        size_type parent_where = get_parent_(inner_node, parent);
+        if(result.has(btree_update_lastkey))
+        {
+            if(parent != nullptr && parent_where < parent->bound())
+            {
+                parent->item[parent_where] = std::move<key_type>(result.last_key);
+            }
+            else
+            {
+                self_result |= result_t(btree_update_lastkey, std::move(result.last_key));
+            }
+        }
+        if(result.has(btree_fixmerge))
+        {
+            if(inner_node->children[where]->parent != nullptr)
+            {
+                ++where;
+            }
+            free_node_<false>(inner_node->children[where]);
+            move_prev_and_destroy_one_(inner_node->item + where, inner_node->item + inner_node->bound());
+            std::copy(inner_node->children + where + 1, inner_node->children + inner_node->bound() + 1, inner_node->children + where);
+            --inner_node->bound();
+            if(inner_node->level == 1)
+            {
+                --where;
+                leaf_node_t *child = static_cast<leaf_node_t *>(inner_node->children[where]);
+                inner_node->item[where] = child->item[child->bound() - 1];
+            }
+        }
+        if(inner_node->is_underflow() && !(inner_node == root_.parent && inner_node->bound() >= 1))
+        {
+            inner_node_t *inner_left, *inner_right;
+            inner_node_t *left_parent, *right_parent;
+            get_left_right_parent_(inner_node, parent, parent_where, inner_left, left_parent, inner_right, right_parent);
+            if(inner_left == nullptr && inner_right == nullptr)
+            {
+                root_.parent = inner_node->children[0];
+                root_.parent->parent = &root_;
+                inner_node->bound() = 0;
+                free_node_<false>(inner_node);
+                return result_t(btree_ok);
+            }
+            else if((inner_left == nullptr || inner_left->is_few()) && (inner_right == nullptr || inner_right->is_few()))
+            {
+                if(left_parent == parent)
+                {
+                    self_result |= merge_inners(inner_left, inner_node, left_parent, parent_where - 1);
+                }
+                else
+                {
+                    self_result |= merge_inners(inner_node, inner_right, right_parent, parent_where);
+                }
+            }
+            else if((inner_left != nullptr && inner_left->is_few()) && (inner_right != nullptr && !inner_right->is_few()))
+            {
+                if(right_parent == parent)
+                {
+                    shift_left_inner(inner_node, inner_right, right_parent, parent_where);
+                }
+                else
+                {
+                    self_result |= merge_inners(inner_left, inner_node, left_parent, parent_where - 1);
+                }
+            }
+            else if((inner_left != nullptr && !inner_left->is_few()) && (inner_right != nullptr && inner_right->is_few()))
+            {
+                if(left_parent == parent)
+                {
+                    shift_right_inner(inner_left, inner_node, left_parent, parent_where - 1);
+                }
+                else
+                {
+                    self_result |= merge_inners(inner_node, inner_right, right_parent, parent_where);
+                }
+            }
+            else if(left_parent == right_parent)
+            {
+                if(inner_left->bound() <= inner_right->bound())
+                {
+                    shift_left_inner(inner_node, inner_right, right_parent, parent_where);
+                }
+                else
+                {
+                    shift_right_inner(inner_left, inner_node, left_parent, parent_where - 1);
+                }
+            }
+            else
+            {
+                if(left_parent == parent)
+                {
+                    shift_right_inner(inner_left, inner_node, left_parent, parent_where - 1);
+                }
+                else
+                {
+                    shift_left_inner(inner_node, inner_right, right_parent, parent_where);
+                }
+            }
+        }
+        if(parent != nullptr)
+        {
+            return erase_pos_descend(parent, parent_where, std::move(self_result));
+        }
+        else
+        {
+            return self_result;
+        }
+    }
+
     result_t erase_iter_descend(pair_pos_t const &pos, node_t *node, node_t *left, node_t *right, inner_node_t *left_parent, inner_node_t *right_parent, inner_node_t *parent, size_type parent_where)
     {
         if(node->level == 0)
         {
-            leaf_node_t* leaf_node = static_cast<leaf_node_t*>(node);
-            leaf_node_t* leaf_left = static_cast<leaf_node_t*>(left);
-            leaf_node_t* leaf_right = static_cast<leaf_node_t*>(right);
-            if(leaf_node != pos.first || pos.second >= leaf_node->used)
+            leaf_node_t *leaf_node = static_cast<leaf_node_t*>(node);
+            leaf_node_t *leaf_left = static_cast<leaf_node_t*>(left);
+            leaf_node_t *leaf_right = static_cast<leaf_node_t*>(right);
+            if(leaf_node != pos.first || pos.second >= leaf_node->bound())
             {
                 return result_t(btree_not_found);
             }
             size_type where = pos.second;
-            move_prev_and_destroy_one_(leaf_node->item + where + 1, leaf_node->item + leaf_node->used);
-            leaf_node->used--;
+            move_prev_and_destroy_one_(leaf_node->item + where + 1, leaf_node->item + leaf_node->bound());
+            leaf_node->bound()--;
             result_t result(btree_ok);
-            if(where == leaf_node->used)
+            if(where == leaf_node->bound())
             {
-                if(parent != nullptr && parent_where < parent->used)
+                if(parent != nullptr && parent_where < parent->bound())
                 {
-                    parent->item[parent_where] = get_key_(leaf_node->item[leaf_node->used - 1]);
+                    parent->item[parent_where] = get_key_(leaf_node->item[leaf_node->bound() - 1]);
                 }
-                else if(leaf_node->used >= 1)
+                else if(leaf_node->bound() >= 1)
                 {
-                    result |= result_t(btree_update_lastkey, get_key_(leaf_node->item[leaf_node->used - 1]));
+                    result |= result_t(btree_update_lastkey, get_key_(leaf_node->item[leaf_node->bound() - 1]));
                 }
             }
-            if(leaf_node->is_underflow() && !(leaf_node == root_.parent && leaf_node->used >= 1))
+            if(leaf_node->is_underflow() && !(leaf_node == root_.parent && leaf_node->bound() >= 1))
             {
                 if(leaf_left == nullptr && leaf_right == nullptr)
                 {
                     free_node_<false>(root_.parent);
-                    root_.parent = nullptr;
+                    root_.parent = &root_;
                     root_.left = root_.right = nullptr;
                     return result_t(btree_ok);
                 }
@@ -1325,7 +1689,7 @@ protected:
                 }
                 else if(left_parent == right_parent)
                 {
-                    if(leaf_left->used <= leaf_right->used)
+                    if(leaf_left->bound() <= leaf_right->bound())
                     {
                         result |= shift_left_leaf(leaf_node, leaf_right, right_parent, parent_where);
                     }
@@ -1355,13 +1719,13 @@ protected:
             inner_node_t *inner_right = static_cast<inner_node_t *>(right);
             result_t result(btree_ok);
             size_type where = lower_bound_(inner_node, get_key_(pos.first->item[pos.second]));
-            while(where <= inner_node->used)
+            while(where <= inner_node->bound())
             {
                 node_t *self_left, *self_right;
                 inner_node_t *self_left_parent, *self_right_parent;
                 if(where == 0)
                 {
-                    self_left = (left == nullptr) ? nullptr : (static_cast<inner_node_t *>(left))->children[left->used - 1];
+                    self_left = left == nullptr ? nullptr : inner_left->children[inner_left->bound() - 1];
                     self_left_parent = left_parent;
                 }
                 else
@@ -1369,9 +1733,9 @@ protected:
                     self_left = inner_node->children[where - 1];
                     self_left_parent = inner_node;
                 }
-                if(where == inner_node->used)
+                if(where == inner_node->bound())
                 {
-                    self_right = (right == nullptr) ? nullptr : (static_cast<inner_node_t*>(right))->children[0];
+                    self_right = right == nullptr ? nullptr : (static_cast<inner_node_t*>(right))->children[0];
                     self_right_parent = right_parent;
                 }
                 else
@@ -1384,20 +1748,21 @@ protected:
                 {
                     break;
                 }
-                if(where < inner_node->used && get_comparator_()(inner_node->item[where], get_key_(pos.first->item[pos.second])))
+                if(where < inner_node->bound() && get_comparator_()(inner_node->item[where], get_key_(pos.first->item[pos.second])))
                 {
                     return result_t(btree_not_found);
                 }
                 ++where;
             }
-            if(where > inner_node->used)
+            if(where > inner_node->bound())
             {
                 return result_t(btree_not_found);
             }
+            --inner_node->size;
             result_t self_result(btree_ok);
             if(result.has(btree_update_lastkey))
             {
-                if(parent != nullptr && parent_where < parent->used)
+                if(parent != nullptr && parent_where < parent->bound())
                 {
                     parent->item[parent_where] = std::move<key_type>(result.last_key);
                 }
@@ -1408,27 +1773,28 @@ protected:
             }
             if(result.has(btree_fixmerge))
             {
-                if(inner_node->children[where]->used != 0)
+                if(inner_node->children[where]->parent != nullptr)
                 {
                     ++where;
                 }
                 free_node_<false>(inner_node->children[where]);
-                move_prev_and_destroy_one_(inner_node->item + where, inner_node->item + inner_node->used);
-                std::copy(inner_node->children + where + 1, inner_node->children + inner_node->used + 1, inner_node->children + where);
-                --inner_node->used;
+                move_prev_and_destroy_one_(inner_node->item + where, inner_node->item + inner_node->bound());
+                std::copy(inner_node->children + where + 1, inner_node->children + inner_node->bound() + 1, inner_node->children + where);
+                --inner_node->bound();
                 if(inner_node->level == 1)
                 {
                     --where;
                     leaf_node_t *child = static_cast<leaf_node_t *>(inner_node->children[where]);
-                    inner_node->item[where] = child->item[child->used - 1];
+                    inner_node->item[where] = child->item[child->bound() - 1];
                 }
             }
-            if(inner_node->is_underflow() && !(inner_node == root_.parent && inner_node->used >= 1))
+            if(inner_node->is_underflow() && !(inner_node == root_.parent && inner_node->bound() >= 1))
             {
                 if(inner_left == nullptr && inner_right == nullptr)
                 {
                     root_.parent = inner_node->children[0];
-                    inner_node->used = 0;
+                    root_.parent->parent = &root_;
+                    inner_node->bound() = 0;
                     free_node_<false>(inner_node);
                     return result_t(btree_ok);
                 }
@@ -1436,11 +1802,11 @@ protected:
                 {
                     if(left_parent == parent)
                     {
-                        self_result |= merge_inner(inner_left, inner_node, left_parent, parent_where - 1);
+                        self_result |= merge_inners(inner_left, inner_node, left_parent, parent_where - 1);
                     }
                     else
                     {
-                        self_result |= merge_inner(inner_node, inner_right, right_parent, parent_where);
+                        self_result |= merge_inners(inner_node, inner_right, right_parent, parent_where);
                     }
                 }
                 else if((inner_left != nullptr && inner_left->is_few()) && (inner_right != nullptr && !inner_right->is_few()))
@@ -1451,7 +1817,7 @@ protected:
                     }
                     else
                     {
-                        self_result |= merge_inner(inner_left, inner_node, left_parent, parent_where - 1);
+                        self_result |= merge_inners(inner_left, inner_node, left_parent, parent_where - 1);
                     }
                 }
                 else if((inner_left != nullptr && !inner_left->is_few()) && (inner_right != nullptr && inner_right->is_few()))
@@ -1462,12 +1828,12 @@ protected:
                     }
                     else
                     {
-                        self_result |= merge_inner(inner_node, inner_right, right_parent, parent_where);
+                        self_result |= merge_inners(inner_node, inner_right, right_parent, parent_where);
                     }
                 }
                 else if(left_parent == right_parent)
                 {
-                    if(inner_left->used <= inner_right->used)
+                    if(inner_left->bound() <= inner_right->bound())
                     {
                         shift_left_inner(inner_node, inner_right, right_parent, parent_where);
                     }
