@@ -1,7 +1,8 @@
 ﻿
 #define _SCL_SECURE_NO_WARNINGS
 
-#include "bpstree.h"
+#include "bpstree_map.h"
+#include "bpstree_set.h"
 
 #include <chrono>
 #include <iostream>
@@ -19,65 +20,6 @@ auto assert = [](bool no_error)
         *static_cast<int *>(0) = 0;
     }
 };
-
-template<class key_t, class value_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<std::pair<key_t const, value_t>>>
-struct bstree_map_config_t
-{
-    template<class in_type> static key_t const &get_key(in_type &value)
-    {
-        return value.first;
-    }
-    typedef key_t key_type;
-    typedef value_t mapped_type;
-    typedef std::pair<key_t const, value_t> value_type;
-    typedef std::pair<key_t, value_t> storage_type;
-    typedef comparator_t key_compare;
-    typedef allocator_t allocator_type;
-    typedef std::true_type unique_t;
-    enum
-    {
-        memory_block_size = 256
-    };
-};
-template<class key_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<key_t>>
-struct bstree_set_config_t
-{
-    template<class in_type> static key_t const &get_key(in_type &value)
-    {
-        return value;
-    }
-    typedef key_t key_type;
-    typedef key_t const mapped_type;
-    typedef key_t const value_type;
-    typedef key_t storage_type;
-    typedef comparator_t key_compare;
-    typedef allocator_t allocator_type;
-    typedef std::true_type unique_t;
-    enum
-    {
-        memory_block_size = 64
-    };
-};
-template<class key_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<key_t>>
-struct bstree_multiset_config_t
-{
-    template<class in_type> static key_t const &get_key(in_type &value)
-    {
-        return value;
-    }
-    typedef key_t key_type;
-    typedef key_t const mapped_type;
-    typedef key_t const value_type;
-    typedef key_t storage_type;
-    typedef comparator_t key_compare;
-    typedef allocator_t allocator_type;
-    typedef std::false_type unique_t;
-    enum
-    {
-        memory_block_size = 64
-    };
-};
-
 
 size_t identity_seed = 0;
 size_t alloc_limit = 999999999;
@@ -215,88 +157,52 @@ public:
 
 int main()
 {
-
-
     auto t = std::chrono::high_resolution_clock::now;
     std::mt19937 mt(0);
-    auto mtr = std::uniform_int_distribution<int>(-9999, 9999);
+    auto mtr = std::uniform_int_distribution<int>(-99999, 99999);
 
-    //b_plus_size_tree<bstree_set_config_t<checker, std::less<checker>, test_allocator<checker>>> tree;
-    b_plus_size_tree<bstree_multiset_config_t<int>> tree;
-
-    //mt.seed(0);
-    //for(int i = 0; i < 9999999; ++i)
-    //{
-    //    tree.insert(mtr(mt));
-    //    tree.insert(i);
-    //}
-    //mt.seed(0);
-    //for(int i = 0; i < 9999999; ++i)
-    //{
-    //    tree.erase1(tree.find(9999999 - i));
-    //}
-    //for(int i = 0; i < 9999999; ++i)
-    //{
-    //    tree.erase(mtr(mt));
-    //}
-    //system("pause");
-
-    auto testsb = [&mtr, &mt, &c = tree]()
+    [&]
     {
-        mt.seed(0);
-        for(int i = 0; i <= 99999999; ++i)
-        {
-            c.insert(i);
-        }
-        mt.seed(0);
-        for(int i = 0; i <= 99999999; ++i)
-        {
-            c.erase2(c.find(99999999 - i));
-        }
-    };
-    auto testrb = [&mtr, &mt, &c = tree]()
-    {
-        mt.seed(0);
-        for(int i = 0; i <= 99999999; ++i)
-        {
-            c.insert(i);
-        }
-        mt.seed(0);
-        for(int i = 0; i <= 99999999; ++i)
-        {
-            c.erase1(c.find(99999999 - i));
-        }
-    };
-    auto ss1 = t();
-    testsb();
-    auto se1 = t();
-    auto rs1 = t();
-    testrb();
-    auto re1 = t();
-    auto ss2 = t();
-    testsb();
-    auto se2 = t();
-    auto rs2 = t();
-    testrb();
-    auto re2 = t();
-    auto ss3 = t();
-    testsb();
-    auto se3 = t();
-    auto rs3 = t();
-    testrb();
-    auto re3 = t();
+        bpstree_multimap<std::string, std::string> tree;
 
-    std::cout
-        << "sb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se1 - ss1).count() << std::endl
-        << "rb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re1 - rs1).count() << std::endl
-        << "sb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se2 - ss2).count() << std::endl
-        << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl
-        << "sb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se3 - ss3).count() << std::endl
-        << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl
-        ;
-
+        mt.seed(0);
+        for(int i = 0; i <= 999999; ++i)
+        {
+            tree.insert(std::make_pair(std::to_string(mtr(mt)), "2"));
+            tree.emplace(std::to_string(i), "1");
+        }
+        mt.seed(0);
+        for(int i = 0; i <= 999999; ++i)
+        {
+            tree.erase(tree.find(std::to_string(999999 - i)));
+        }
+        for(int i = 0; i <= 999999; ++i)
+        {
+            tree.erase(std::to_string(mtr(mt)));
+        }
+    }();
     system("pause");
+    [&]
+    {
+        bpstree_set<int> tree;
 
+        mt.seed(0);
+        for(int i = 0; i <= 99999999; ++i)
+        {
+            tree.insert(mtr(mt));
+            tree.emplace(i);
+        }
+        mt.seed(0);
+        for(int i = 0; i <= 99999999; ++i)
+        {
+            tree.erase(tree.find(99999999 - i));
+        }
+        for(int i = 0; i <= 99999999; ++i)
+        {
+            tree.erase(mtr(mt));
+        }
+    }();
+    system("pause");
 
 
 
