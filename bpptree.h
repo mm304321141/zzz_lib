@@ -114,49 +114,49 @@ public:
     };
     struct key_stack_t
     {
-        uint8_t buffer[sizeof(key_type)];
+        typename std::aligned_storage<sizeof(key_type), alignof(key_type)>::type key_pod;
         key_stack_t()
         {
         }
         key_stack_t(key_stack_t &&key)
         {
-            ::new(buffer) key_type(std::move(key.key()));
+            ::new(&key_pod) key_type(std::move(key.key()));
         }
         key_stack_t(key_stack_t const &key)
         {
-            ::new(buffer) key_type(key.key());
+            ::new(&key_pod) key_type(key.key());
         }
         key_stack_t(key_type &&key)
         {
-            ::new(buffer) key_type(std::move(key));
+            ::new(&key_pod) key_type(std::move(key));
         }
         key_stack_t(key_type const &key)
         {
-            ::new(buffer) key_type(key);
+            ::new(&key_pod) key_type(key);
         }
         operator key_type &()
         {
-            return *reinterpret_cast<key_type *>(buffer);
+            return *reinterpret_cast<key_type *>(&key_pod);
         }
         operator key_type const &() const
         {
-            return *reinterpret_cast<key_type const *>(buffer);
+            return *reinterpret_cast<key_type const *>(&key_pod);
         }
-        operator key_type && ()
+        operator key_type &&()
         {
-            return std::move(*reinterpret_cast<key_type *>(buffer));
+            return std::move(*reinterpret_cast<key_type *>(&key_pod));
         }
         key_type &key()
         {
-            return *reinterpret_cast<key_type *>(buffer);
+            return *reinterpret_cast<key_type *>(&key_pod);
         }
         key_type const &key() const
         {
-            return *reinterpret_cast<key_type const *>(buffer);
+            return *reinterpret_cast<key_type const *>(&key_pod);
         }
         key_type *operator &()
         {
-            return reinterpret_cast<key_type *>(buffer);
+            return reinterpret_cast<key_type *>(&key_pod);
         }
         key_stack_t &operator = (key_stack_t &&other)
         {
@@ -1257,7 +1257,7 @@ protected:
         node->parent = parent;
         node->size = 0;
         node->level = 1;
-        node->bound() = 0;
+        node->used = 0;
         return node;
     }
     void dealloc_inner_node_(inner_node_t *node)
@@ -1275,7 +1275,6 @@ protected:
         node->parent = parent;
         node->size = 0;
         node->level = 0;
-        node->bound() = 0;
         node->prev = nullptr;
         node->next = nullptr;
         return node;
