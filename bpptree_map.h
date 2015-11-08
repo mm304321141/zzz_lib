@@ -1,10 +1,10 @@
 #pragma once
 
-#include "bpstree.h"
+#include "bpptree.h"
 
 
 template<class key_t, class value_t, class unique_t, class comparator_t, class allocator_t>
-struct bpstree_map_config_t
+struct bpptree_map_config_t
 {
     typedef key_t key_type;
     typedef value_t mapped_type;
@@ -32,6 +32,6 @@ struct bpstree_map_config_t
     };
 };
 template<class key_t, class value_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<std::pair<key_t const, value_t>>>
-using bpstree_map = b_plus_size_tree<bpstree_map_config_t<key_t, value_t, std::true_type, comparator_t, allocator_t>>;
+using bpptree_map = b_plus_plus_tree<bpptree_map_config_t<key_t, value_t, std::true_type, comparator_t, allocator_t>>;
 template<class key_t, class value_t, class comparator_t = std::less<key_t>, class allocator_t = std::allocator<std::pair<key_t const, value_t>>>
-using bpstree_multimap = b_plus_size_tree<bpstree_map_config_t<key_t, value_t, std::false_type, comparator_t, allocator_t>>;
+using bpptree_multimap = b_plus_plus_tree<bpptree_map_config_t<key_t, value_t, std::false_type, comparator_t, allocator_t>>;

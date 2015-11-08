@@ -713,7 +713,7 @@ public:
             {
                 erase(erase_begin++);
             }
-            return iterator(const_cast<node_t *>(erase_begin.node));
+            return iterator(erase_begin.node);
         }
     }
 

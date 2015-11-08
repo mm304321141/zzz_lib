@@ -1,8 +1,8 @@
 ﻿
 #define _SCL_SECURE_NO_WARNINGS
 
-#include "bpstree_map.h"
-#include "bpstree_set.h"
+#include "bpptree_map.h"
+#include "bpptree_set.h"
 
 #include <chrono>
 #include <iostream>
@@ -12,11 +12,13 @@
 #include <cstring>
 #include <string>
 
+#define assert(exp) assert_proc(exp, #exp, __FILE__, __LINE__)
 
-auto assert = [](bool no_error)
+auto assert_proc = [](bool no_error, char const *query, char const *file, size_t line)
 {
     if(!no_error)
     {
+        printf("%s(%zd):%s\n", file, line, query);
         *static_cast<int *>(0) = 0;
     }
 };
@@ -174,33 +176,36 @@ int main()
 {
 
     std::multimap<int, int> rb;
-    bpstree_multimap<int, int> sb;
+    bpptree_multimap<int, int> sb;
 
     [&]()
     {
         test_allocator<int> a;
         test_comp c;
         c.is_less = true;
-        bpstree_multiset<int, test_comp, test_allocator<int>> aaa({1, 2, 3}, c, a);
+        bpptree_multiset<int, test_comp, test_allocator<int>> aaa({1, 2, 3}, c, a);
         c.is_less = false;
-        bpstree_multiset<int, test_comp, test_allocator<int>> aaa2({4, 5, 6}, c);
-        bpstree_multiset<int, test_comp, test_allocator<int>> aaa3(std::move(aaa), a);
-        bpstree_multiset<int, test_comp, test_allocator<int>> aaa4(aaa2);
+        bpptree_multiset<int, test_comp, test_allocator<int>> aaa2({4, 5, 6}, c);
+        bpptree_multiset<int, test_comp, test_allocator<int>> aaa3(std::move(aaa), a);
+        bpptree_multiset<int, test_comp, test_allocator<int>> aaa4(aaa2);
         aaa.swap(aaa2);
         aaa3 = aaa;
         aaa3.emplace(7);
         aaa = aaa3;
-        bpstree_multimap<int, int> sb({{1, 2},{1, 2}});
-        bpstree_multimap<int, int> const sb2(sb, bpstree_multimap<int, int>::allocator_type());
+        bpptree_multimap<int, int> sb({{1, 2},{1, 2}});
+        bpptree_multimap<int, int> const sb2(sb, bpptree_multimap<int, int>::allocator_type());
         sb.insert({{3, 4},{5, 6}});
         sb.insert(sb.begin(), {7, 8});
+        sb.erase(sb.begin() + 1, sb.end());
         sb2.find(0);
+        sb2.slice();
         sb2.front();
         sb2.back();
         sb2.equal_range(2);
         sb2.lower_bound(2);
         sb2.upper_bound(2);
         sb2.range(2, 2);
+        sb2.rank(2);
         sb2.count(2);
         sb2.count(2, 2);
         for(int i = 0; i < 100000; ++i)
@@ -208,8 +213,8 @@ int main()
             aaa.emplace(i);
         }
         aaa.clear();
-        bpstree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({{1, "2"},{1, "2"},{1, "2"}}, c);
-        bpstree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({{1, "2"}}, a);
+        bpptree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({{1, "2"},{1, "2"},{1, "2"}}, c);
+        bpptree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({{1, "2"}}, a);
         alloc_limit = 2;
         try
         {
@@ -219,7 +224,7 @@ int main()
         {
         }
         alloc_limit = 999999999;
-        bpstree_multimap<std::string, std::string> sss =
+        bpptree_multimap<std::string, std::string> sss =
         {
             {"0", ""},
             {"1", "11"},
@@ -237,12 +242,13 @@ int main()
         sss.emplace("0", "00");
         sss.emplace("2", "22");
         assert(sss.erase("0") == 2);
+        assert((sss.find("2") + 1)->second == "22");
         sss.clear();
     }();
 
     [&]()
     {
-        bpstree_multimap<int, int> sb1;
+        bpptree_multimap<int, int> sb1;
         assert(sb.size() == sb1.size());
         for(int i = 0; i < 100; ++i)
         {
@@ -250,22 +256,33 @@ int main()
             sb.insert(std::make_pair(rand(), i));
             sb1.insert(std::make_pair(rand(), i));
         }
+        sb.rank(sb.begin() + 2);
         sb1 = sb;
-        bpstree_multimap<int, int> sb2 = sb;
+        bpptree_multimap<int, int> sb2 = sb;
         assert(sb.size() == sb1.size());
         assert(sb.size() == sb2.size());
+        assert(sb1.rbegin()->second == (--sb1.end())->second);
+        typedef decltype(sb1.rbegin()) riter_t;
+        riter_t rit(sb1.begin());
+        assert(rit.base() == sb1.begin());
+        assert(rit == sb1.rend());
+        assert(sb2.rbegin() + 10 == sb2.rend() - 190);
+        assert(sb.at(100)->second == sb.at(50)[50].second);
+        assert(sb.at(74) < sb.at(75));
+        assert(sb.at(75) >= sb.at(75));
         sb.clear();
         sb.emplace(0, 1);
         sb.emplace(0, 0);
         sb.emplace(0, 3);
         sb.emplace(0, 4);
         sb.emplace(0, 2);
-        assert(std::next(sb.begin(), 0)->second == 1);
-        assert(std::next(sb.begin(), 1)->second == 0);
-        assert(std::next(sb.begin(), 2)->second == 3);
-        assert(std::next(sb.begin(), 3)->second == 4);
-        assert(std::next(sb.begin(), 4)->second == 2);
+        assert(sb.at(0)->second == 1);
+        assert(sb.at(1)->second == 0);
+        assert(sb.at(2)->second == 3);
+        assert(sb.at(3)->second == 4);
+        assert(sb.at(4)->second == 2);
         assert(sb.erase(0) == 5);
+        sb.insert(sb1.rbegin(), sb1.rend());
         assert(sb.get_allocator() == sb2.get_allocator());
         sb1.clear();
         sb.swap(sb1);
@@ -287,11 +304,25 @@ int main()
         assert(rb.find(0) == rb.begin());
         assert(sb.find(0) == sb.begin());
         assert(rb.find(length / 2 - 1) == ----rb.end());
-        assert(sb.find(length / 2 - 1) == ----sb.end());
+        assert(sb.find(length / 2 - 1) == sb.end() - 2);
         assert(rb.count(1) == 2);
         assert(sb.count(1) == 2);
         assert(sb.count(1, 2) == 4);
         assert(sb.count(1, 3) == 6);
+        assert(sb.range(1, 3) == std::make_pair(sb.find(1), sb.find(4)));
+        assert(sb.range(0, 2) == std::make_pair(sb.begin(), sb.begin() + 6));
+        assert(sb.range(2, 3) == sb.slice(4, 8));
+        assert(sb.range(0, length) == sb.slice());
+        assert(sb.front().second == sb.begin()->second);
+        assert(sb.front().second == (--sb.rend())->second);
+        assert(sb.back().second == (--sb.end())->second);
+        assert(sb.back().second == sb.rbegin()->second);
+        assert(sb.rank(0) == 2);
+        assert(sb.rank(1) == 4);
+        assert(sb.rank(length) == sb.size());
+        assert(sb.rank(length / 2) == sb.size());
+        assert(sb.rank(length / 2 - 1) == sb.size());
+        assert(sb.rank(length / 2 - 2) == sb.size() - 2);
         assert(rb.equal_range(2).first == rb.lower_bound(2));
         assert(sb.equal_range(2).second == sb.upper_bound(2));
         assert(sb.erase(3) == 2);
@@ -311,21 +342,47 @@ int main()
             rb.insert(n);
             sb.insert(n);
         }
-
+        for(int i = 0; i < length; ++i)
+        {
+            decltype(sb) const &csb = sb;
+            typedef decltype(csb.begin()) iter_t;
+            int off = rand() % csb.size();
+            iter_t it = csb.at(off);
+            assert(it - csb.begin() == off);
+            assert(it - off == csb.begin());
+            assert(csb.begin() + off == it);
+            assert(csb.begin() + off == csb.end() - (csb.size() - off));
+            iter_t begin = csb.begin(), end = csb.end();
+            for(int i = 0; i < off; ++i)
+            {
+                --it;
+                ++begin;
+                --end;
+            }
+            assert(csb.end() - end == off);
+            assert(csb.begin() + off == begin);
+            assert(csb.begin() == it);
+            size_t part = csb.size() / 4;
+            size_t a = part + rand() % (part * 2);
+            size_t b = rand() % part;
+            assert(csb.at(a) + b == csb.at(a + b));
+            assert(csb.begin() + a == csb.at(a + b) - b);
+            assert(csb.at(a) - csb.at(b) == a - b);
+        }
         for(int i = 0; i < length * 2 + length / 2; ++i)
         {
-            auto it_rb = rb.begin();
-            auto it_sb = sb.begin();
+            auto it_rb = rb.rbegin();
+            auto it_sb = sb.rbegin();
             std::advance(it_rb, rand() % rb.size());
             std::advance(it_sb, rand() % sb.size());
-            rb.erase(it_rb);
-            sb.erase(it_sb);
+            rb.erase(--(it_rb.base()));
+            sb.erase(--(it_sb.base()));
         }
     }();
 
     [&]()
     {
-        bpstree_multimap<int, int> sb;
+        bpptree_multimap<int, int> sb;
         for(int i = 0; i < 10000; ++i)
         {
             int key = rand();
@@ -340,7 +397,6 @@ int main()
                 assert(sit->second == rit->second);
             }
         }
-        bpstree_multimap<int, int> sb2 = sb;
         sb.clear();
         rb.clear();
     }();

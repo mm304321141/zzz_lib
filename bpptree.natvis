@@ -1,24 +1,24 @@
-<?xml version="1.0" encoding="utf-8"?> 
+<?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <Type Name="b_plus_size_tree&lt;*&gt;">
+  <Type Name="b_plus_plus_tree&lt;*&gt;">
     <DisplayString>{{ size={root_.size} }}</DisplayString>
     <Expand>
       <Item Name="[comparator]" ExcludeView="simple">(key_compare &amp;)root_</Item>
       <Item Name="[allocator]" ExcludeView="simple">(node_allocator_t &amp;)root_</Item>
     </Expand>
   </Type>
-  <Type Name="b_plus_size_tree&lt;*&gt;::iterator">
-    <AlternativeType Name="b_plus_size_tree&lt;*&gt;::const_iterator" />
+  <Type Name="b_plus_plus_tree&lt;*&gt;::iterator">
+    <AlternativeType Name="b_plus_plus_tree&lt;*&gt;::const_iterator" />
     <DisplayString Condition="node-&gt;level == 0">{((leaf_node_t *)node)-&gt;item[where]}</DisplayString>
     <DisplayString Condition="node-&gt;level == size_type(-1)">end</DisplayString>
     <Expand>
       <Item Condition="node-&gt;level == 0" Name="[ptr]">((leaf_node_t *)node)-&gt;item[where]</Item>
     </Expand>
   </Type>
-  <Type Name="b_plus_size_tree&lt;*&gt;::key_stack_t">
+  <Type Name="b_plus_plus_tree&lt;*&gt;::key_stack_t">
     <DisplayString Condition="true">{*(key_type *)buffer}</DisplayString>
   </Type>
-  <Type Name="b_plus_size_tree&lt;*&gt;::node_t">
+  <Type Name="b_plus_plus_tree&lt;*&gt;::node_t">
     <DisplayString Condition="level == size_type(-1)">{{ root:size={size} }}</DisplayString>
     <DisplayString Condition="level != 0 &amp;&amp; level != size_type(-1)">{{ inner:size={size},used={((inner_node_t *)this)-&gt;used} }}</DisplayString>
     <DisplayString Condition="level == 0">{{ leaf:size={size} }}</DisplayString>
@@ -32,12 +32,10 @@
       <Item Name="[prev]" Condition="level == 0">((leaf_node_t *)this)-&gt;prev</Item>
       <Item Name="[next]" Condition="level == 0">((leaf_node_t *)this)-&gt;next</Item>
       <ArrayItems Condition="level != 0 &amp;&amp; level != size_type(-1)">
-        <Rank>0</Rank>
         <Size>((inner_node_t *)this)-&gt;used</Size>
         <ValuePointer>((inner_node_t *)this)-&gt;item</ValuePointer>
       </ArrayItems>
       <ArrayItems Condition="level != 0 &amp;&amp; level != size_type(-1)">
-        <Rank>0</Rank>
         <Size>((inner_node_t *)this)-&gt;used + 1</Size>
         <ValuePointer>((inner_node_t *)this)-&gt;children</ValuePointer>
       </ArrayItems>

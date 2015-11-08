@@ -12,10 +12,13 @@
 #include <cstring>
 
 
-auto assert = [](bool no_error)
+#define assert(exp) assert_proc(exp, #exp, __FILE__, __LINE__)
+
+auto assert_proc = [](bool no_error, char const *query, char const *file, size_t line)
 {
     if(!no_error)
     {
+        printf("%s(%zd):%s\n", file, line, query);
         *static_cast<int *>(0) = 0;
     }
 };

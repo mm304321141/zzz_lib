@@ -3,11 +3,12 @@
 #include <cstdint>
 #include <algorithm>
 #include <memory>
+#include <cstring>
 #include <type_traits>
 
 
 template<class config_t>
-class b_plus_size_tree
+class b_plus_plus_tree
 {
 public:
     typedef typename config_t::key_type key_type;
@@ -104,9 +105,9 @@ public:
     {
         template<class any_key_compare, class any_allocator_t> root_node_t(any_key_compare &&comp, any_allocator_t &&alloc) : key_compare(std::forward<any_key_compare>(comp)), node_allocator_t(std::forward<any_allocator_t>(alloc))
         {
-            parent = left = right = this;
-            size = 0;
-            level = size_type(-1);
+            node_t::parent = left = right = this;
+            node_t::size = 0;
+            node_t::level = size_type(-1);
         }
         node_t *left;
         node_t *right;
@@ -162,7 +163,7 @@ public:
             key() = std::move(other.key());
             return *this;
         }
-        key_stack_t &operator = (key_stack_t const &key)
+        key_stack_t &operator = (key_stack_t const &other)
         {
             key() = other.key();
             return *this;
@@ -325,29 +326,55 @@ public:
     class iterator
     {
     public:
-        typedef std::bidirectional_iterator_tag iterator_category;
-        typedef typename b_plus_size_tree::value_type value_type;
-        typedef typename b_plus_size_tree::difference_type difference_type;
-        typedef typename b_plus_size_tree::reference reference;
-        typedef typename b_plus_size_tree::pointer pointer;
+        typedef std::random_access_iterator_tag iterator_category;
+        typedef typename b_plus_plus_tree::value_type value_type;
+        typedef typename b_plus_plus_tree::difference_type difference_type;
+        typedef typename b_plus_plus_tree::reference reference;
+        typedef typename b_plus_plus_tree::pointer pointer;
     public:
         iterator(node_t *in_node, size_type in_where) : node(in_node), where(in_where)
         {
         }
-        iterator(pair_pos_t pos, b_plus_size_tree *self) : node(pos.first == nullptr ? static_cast<node_t *>(&self->root_) : static_cast<node_t *>(pos.first)), where(pos.second)
+        iterator(pair_pos_t pos, b_plus_plus_tree *self) : node(pos.first == nullptr ? static_cast<node_t *>(&self->root_) : static_cast<node_t *>(pos.first)), where(pos.second)
         {
         }
         iterator(iterator const &other) : node(other.node), where(other.where)
         {
         }
+        iterator &operator += (difference_type diff)
+        {
+            b_plus_plus_tree::advance_step_(node, where, diff);
+            return *this;
+        }
+        iterator &operator -= (difference_type diff)
+        {
+            b_plus_plus_tree::advance_step_(node, where, -diff);
+            return *this;
+        }
+        iterator operator + (difference_type diff) const
+        {
+            iterator ret = *this;
+            b_plus_plus_tree::advance_step_(ret.node, ret.where, diff);
+            return ret;
+        }
+        iterator operator - (difference_type diff) const
+        {
+            iterator ret = *this;
+            b_plus_plus_tree::advance_step_(ret.node, ret.where, -diff);
+            return ret;
+        }
+        difference_type operator - (iterator const &other) const
+        {
+            return static_cast<difference_type>(b_plus_plus_tree::rank(*this)) - static_cast<difference_type>(b_plus_plus_tree::rank(other));
+        }
         iterator &operator++()
         {
-            b_plus_size_tree::advance_next_(node, where);
+            b_plus_plus_tree::advance_next_(node, where);
             return *this;
         }
         iterator &operator--()
         {
-            b_plus_size_tree::advance_prev_(node, where);
+            b_plus_plus_tree::advance_prev_(node, where);
             return *this;
         }
         iterator operator++(int)
@@ -370,6 +397,26 @@ public:
         {
             return reinterpret_cast<pointer>(static_cast<leaf_node_t *>(node)->item + where);
         }
+        reference operator[](difference_type index) const
+        {
+            return *(*this + index);
+        }
+        bool operator > (iterator const &other) const
+        {
+            return *this - other > 0;
+        }
+        bool operator < (iterator const &other) const
+        {
+            return *this - other < 0;
+        }
+        bool operator >= (iterator const &other) const
+        {
+            return *this - other >= 0;
+        }
+        bool operator <= (iterator const &other) const
+        {
+            return *this - other <= 0;
+        }
         bool operator == (iterator const &other) const
         {
             return node == other.node && where == other.where;
@@ -378,54 +425,79 @@ public:
         {
             return node != other.node || where != other.where;
         }
-    public:
     private:
-        friend class b_plus_size_tree;
+        friend class b_plus_plus_tree;
         node_t *node;
         size_type where;
     };
     class const_iterator
     {
     public:
-        typedef std::bidirectional_iterator_tag iterator_category;
-        typedef typename b_plus_size_tree::value_type value_type;
-        typedef typename b_plus_size_tree::difference_type difference_type;
-        typedef typename b_plus_size_tree::reference reference;
-        typedef typename b_plus_size_tree::const_reference const_reference;
-        typedef typename b_plus_size_tree::pointer pointer;
-        typedef typename b_plus_size_tree::const_pointer const_pointer;
+        typedef std::random_access_iterator_tag iterator_category;
+        typedef typename b_plus_plus_tree::value_type value_type;
+        typedef typename b_plus_plus_tree::difference_type difference_type;
+        typedef typename b_plus_plus_tree::reference reference;
+        typedef typename b_plus_plus_tree::const_reference const_reference;
+        typedef typename b_plus_plus_tree::pointer pointer;
+        typedef typename b_plus_plus_tree::const_pointer const_pointer;
     public:
-        const_iterator(iterator it) : node(it.node), where(it.where)
-        {
-        }
         const_iterator(node_t *in_node, size_type in_where) : node(in_node), where(in_where)
         {
         }
-        const_iterator(pair_pos_t pos, b_plus_size_tree const *self) : node(pos.first == nullptr ? self->root_.parent->parent : pos.first), where(pos.second)
+        const_iterator(pair_pos_t pos, b_plus_plus_tree const *self) : node(pos.first == nullptr ? self->root_.parent->parent : pos.first), where(pos.second)
+        {
+        }
+        const_iterator(iterator const &it) : node(it.node), where(it.where)
         {
         }
         const_iterator(const_iterator const &other) : node(other.node), where(other.where)
         {
         }
+        const_iterator &operator += (difference_type diff)
+        {
+            b_plus_plus_tree::advance_step_(node, where, diff);
+            return *this;
+        }
+        const_iterator &operator -= (difference_type diff)
+        {
+            b_plus_plus_tree::advance_step_(node, where, -diff);
+            return *this;
+        }
+        const_iterator operator + (difference_type diff) const
+        {
+            iterator ret = *this;
+            b_plus_plus_tree::advance_step_(ret.node, ret.where, diff);
+            return ret;
+        }
+        const_iterator operator - (difference_type diff) const
+        {
+            iterator ret = *this;
+            b_plus_plus_tree::advance_step_(ret.node, ret.where, -diff);
+            return ret;
+        }
+        difference_type operator - (const_iterator const &other) const
+        {
+            return static_cast<difference_type>(b_plus_plus_tree::rank(*this)) - static_cast<difference_type>(b_plus_plus_tree::rank(other));
+        }
         const_iterator &operator++()
         {
-            b_plus_size_tree::advance_next_(node, where);
+            b_plus_plus_tree::advance_next_(node, where);
             return *this;
         }
         const_iterator &operator--()
         {
-            b_plus_size_tree::advance_prev_(node, where);
+            b_plus_plus_tree::advance_prev_(node, where);
             return *this;
         }
         const_iterator operator++(int)
         {
-            iterator save(*this);
+            const_iterator save(*this);
             ++*this;
             return save;
         }
         const_iterator operator--(int)
         {
-            iterator save(*this);
+            const_iterator save(*this);
             --*this;
             return save;
         }
@@ -437,6 +509,26 @@ public:
         {
             return reinterpret_cast<const_pointer>(static_cast<leaf_node_t *>(node)->item + where);
         }
+        const_reference operator[](difference_type index) const
+        {
+            return *(*this + index);
+        }
+        bool operator > (const_iterator const &other) const
+        {
+            return *this - other > 0;
+        }
+        bool operator < (const_iterator const &other) const
+        {
+            return *this - other < 0;
+        }
+        bool operator >= (const_iterator const &other) const
+        {
+            return *this - other >= 0;
+        }
+        bool operator <= (const_iterator const &other) const
+        {
+            return *this - other <= 0;
+        }
         bool operator == (const_iterator const &other) const
         {
             return node == other.node && where == other.where;
@@ -446,7 +538,245 @@ public:
             return node != other.node || where != other.where;
         }
     private:
-        friend class b_plus_size_tree;
+        friend class b_plus_plus_tree;
+        node_t *node;
+        size_type where;
+    };
+    class reverse_iterator
+    {
+    public:
+        typedef std::random_access_iterator_tag iterator_category;
+        typedef typename b_plus_plus_tree::value_type value_type;
+        typedef typename b_plus_plus_tree::difference_type difference_type;
+        typedef typename b_plus_plus_tree::reference reference;
+        typedef typename b_plus_plus_tree::pointer pointer;
+    public:
+        reverse_iterator(node_t *in_node, size_type in_where) : node(in_node), where(in_where)
+        {
+        }
+        reverse_iterator(pair_pos_t pos, b_plus_plus_tree *self) : node(pos.first == nullptr ? static_cast<node_t *>(&self->root_) : static_cast<node_t *>(pos.first)), where(pos.second)
+        {
+        }
+        explicit reverse_iterator(iterator const &other) : node(other.node), where(other.where)
+        {
+            ++*this;
+        }
+        reverse_iterator(reverse_iterator const &other) : node(other.node), where(other.where)
+        {
+        }
+        reverse_iterator &operator += (difference_type diff)
+        {
+            b_plus_plus_tree::advance_step_(node, where, -diff);
+            return *this;
+        }
+        reverse_iterator &operator -= (difference_type diff)
+        {
+            b_plus_plus_tree::advance_step_(node, where, diff);
+            return *this;
+        }
+        reverse_iterator operator + (difference_type diff) const
+        {
+            reverse_iterator ret = *this;
+            b_plus_plus_tree::advance_step_(ret.node, ret.where, -diff);
+            return ret;
+        }
+        reverse_iterator operator - (difference_type diff) const
+        {
+            reverse_iterator ret = *this;
+            b_plus_plus_tree::advance_step_(ret.node, ret.where, diff);
+            return ret;
+        }
+        difference_type operator - (reverse_iterator const &other) const
+        {
+            return static_cast<difference_type>(b_plus_plus_tree::rank(other)) - static_cast<difference_type>(b_plus_plus_tree::rank(*this));
+        }
+        reverse_iterator &operator++()
+        {
+            b_plus_plus_tree::advance_prev_(node, where);
+            return *this;
+        }
+        reverse_iterator &operator--()
+        {
+            b_plus_plus_tree::advance_next_(node, where);
+            return *this;
+        }
+        reverse_iterator operator++(int)
+        {
+            reverse_iterator save(*this);
+            ++*this;
+            return save;
+        }
+        reverse_iterator operator--(int)
+        {
+            reverse_iterator save(*this);
+            --*this;
+            return save;
+        }
+        reference operator *() const
+        {
+            return reinterpret_cast<reference>(static_cast<leaf_node_t *>(node)->item[where]);
+        }
+        pointer operator->() const
+        {
+            return reinterpret_cast<pointer>(static_cast<leaf_node_t *>(node)->item + where);
+        }
+        reference operator[](difference_type index) const
+        {
+            return *(*this + index);
+        }
+        bool operator > (reverse_iterator const &other) const
+        {
+            return *this - other > 0;
+        }
+        bool operator < (reverse_iterator const &other) const
+        {
+            return *this - other < 0;
+        }
+        bool operator >= (reverse_iterator const &other) const
+        {
+            return *this - other >= 0;
+        }
+        bool operator <= (reverse_iterator const &other) const
+        {
+            return *this - other <= 0;
+        }
+        bool operator == (reverse_iterator const &other) const
+        {
+            return node == other.node && where == other.where;
+        }
+        bool operator != (reverse_iterator const &other) const
+        {
+            return node != other.node || where != other.where;
+        }
+        iterator base() const
+        {
+            return ++iterator(node, where);
+        }
+    private:
+        friend class b_plus_plus_tree;
+        node_t *node;
+        size_type where;
+    };
+    class const_reverse_iterator
+    {
+    public:
+        typedef std::random_access_iterator_tag iterator_category;
+        typedef typename b_plus_plus_tree::value_type value_type;
+        typedef typename b_plus_plus_tree::difference_type difference_type;
+        typedef typename b_plus_plus_tree::reference reference;
+        typedef typename b_plus_plus_tree::const_reference const_reference;
+        typedef typename b_plus_plus_tree::pointer pointer;
+        typedef typename b_plus_plus_tree::const_pointer const_pointer;
+    public:
+        const_reverse_iterator(node_t *in_node, size_type in_where) : node(in_node), where(in_where)
+        {
+        }
+        const_reverse_iterator(pair_pos_t pos, b_plus_plus_tree const *self) : node(pos.first == nullptr ? self->root_.parent->parent : pos.first), where(pos.second)
+        {
+        }
+        explicit const_reverse_iterator(const_iterator const &other) : node(other.node), where(it.where)
+        {
+            ++*this;
+        }
+        const_reverse_iterator(reverse_iterator const &other) : node(other.node), where(it.where)
+        {
+        }
+        const_reverse_iterator(reverse_iterator it) : node(it.node), where(it.where)
+        {
+        }
+        const_reverse_iterator(const_reverse_iterator const &other) : node(other.node), where(other.where)
+        {
+        }
+        const_reverse_iterator &operator += (difference_type diff)
+        {
+            b_plus_plus_tree::advance_step_(node, where, -diff);
+            return *this;
+        }
+        const_reverse_iterator &operator -= (difference_type diff)
+        {
+            b_plus_plus_tree::advance_step_(node, where, diff);
+            return *this;
+        }
+        const_reverse_iterator operator + (difference_type diff) const
+        {
+            iterator ret = *this;
+            b_plus_plus_tree::advance_step_(ret.node, ret.where, -diff);
+            return ret;
+        }
+        const_reverse_iterator operator - (difference_type diff) const
+        {
+            iterator ret = *this;
+            b_plus_plus_tree::advance_step_(ret.node, ret.where, diff);
+            return ret;
+        }
+        difference_type operator - (const_reverse_iterator const &other) const
+        {
+            return static_cast<difference_type>(b_plus_plus_tree::rank(other)) - static_cast<difference_type>(b_plus_plus_tree::rank(*this));
+        }
+        const_reverse_iterator &operator++()
+        {
+            b_plus_plus_tree::advance_prev_(node, where);
+            return *this;
+        }
+        const_reverse_iterator &operator--()
+        {
+            b_plus_plus_tree::advance_next_(node, where);
+            return *this;
+        }
+        const_reverse_iterator operator++(int)
+        {
+            const_reverse_iterator save(*this);
+            ++*this;
+            return save;
+        }
+        const_reverse_iterator operator--(int)
+        {
+            const_reverse_iterator save(*this);
+            --*this;
+            return save;
+        }
+        const_reference operator *() const
+        {
+            return reinterpret_cast<const_reference>(static_cast<leaf_node_t *>(node)->item[where]);
+        }
+        const_pointer operator->() const
+        {
+            return reinterpret_cast<const_pointer>(static_cast<leaf_node_t *>(node)->item + where);
+        }
+        const_reference operator[](difference_type index) const
+        {
+            return *(*this + index);
+        }
+        bool operator > (const_reverse_iterator const &other) const
+        {
+            return *this - other > 0;
+        }
+        bool operator < (const_reverse_iterator const &other) const
+        {
+            return *this - other < 0;
+        }
+        bool operator >= (const_reverse_iterator const &other) const
+        {
+            return *this - other >= 0;
+        }
+        bool operator <= (const_reverse_iterator const &other) const
+        {
+            return *this - other <= 0;
+        }
+        bool operator == (const_reverse_iterator const &other) const
+        {
+            return node == other.node && where == other.where;
+        }
+        bool operator != (const_reverse_iterator const &other) const
+        {
+            return node != other.node || where != other.where;
+        }
+        const_iterator base() const
+        {
+            return ++iterator(node, where);
+        }
+    private:
+        friend class b_plus_plus_tree;
         node_t *node;
         size_type where;
     };
@@ -464,62 +794,62 @@ protected:
     }
 public:;
        //empty
-       b_plus_size_tree() : root_(key_compare(), allocator_type())
+       b_plus_plus_tree() : root_(key_compare(), allocator_type())
        {
        }
        //empty
-       explicit b_plus_size_tree(key_compare const &comp, allocator_type const &alloc = allocator_type()) : root_(comp, alloc)
+       explicit b_plus_plus_tree(key_compare const &comp, allocator_type const &alloc = allocator_type()) : root_(comp, alloc)
        {
        }
        //empty
-       explicit b_plus_size_tree(allocator_type const &alloc) : root_(key_compare(), alloc)
+       explicit b_plus_plus_tree(allocator_type const &alloc) : root_(key_compare(), alloc)
        {
        }
        //range
-       template <class iterator_t> b_plus_size_tree(iterator_t begin, iterator_t end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : root_(comp, alloc)
+       template <class iterator_t> b_plus_plus_tree(iterator_t begin, iterator_t end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : root_(comp, alloc)
        {
            insert(begin, end);
        }
        //range
-       template <class iterator_t> b_plus_size_tree(iterator_t begin, iterator_t end, allocator_type const &alloc = allocator_type()) : root_(key_compare(), alloc)
+       template <class iterator_t> b_plus_plus_tree(iterator_t begin, iterator_t end, allocator_type const &alloc = allocator_type()) : root_(key_compare(), alloc)
        {
            insert(begin, end);
        }
        //copy
-       b_plus_size_tree(b_plus_size_tree const &other) : root_(other.get_comparator_(), other.get_node_allocator_())
+       b_plus_plus_tree(b_plus_plus_tree const &other) : root_(other.get_comparator_(), other.get_node_allocator_())
        {
            insert(other.begin(), other.end());
        }
        //copy
-       b_plus_size_tree(b_plus_size_tree const &other, allocator_type const &alloc) : root_(other.get_comparator_(), alloc)
+       b_plus_plus_tree(b_plus_plus_tree const &other, allocator_type const &alloc) : root_(other.get_comparator_(), alloc)
        {
            insert(other.begin(), other.end());
        }
        //move
-       b_plus_size_tree(b_plus_size_tree &&other) : root_(key_compare(), node_allocator_t())
+       b_plus_plus_tree(b_plus_plus_tree &&other) : root_(key_compare(), node_allocator_t())
        {
            swap(other);
        }
        //move
-       b_plus_size_tree(b_plus_size_tree &&other, allocator_type const &alloc) : root_(key_compare(), alloc)
+       b_plus_plus_tree(b_plus_plus_tree &&other, allocator_type const &alloc) : root_(key_compare(), alloc)
        {
            insert(std::move_iterator<iterator>(other.begin()), std::move_iterator<iterator>(other.end()));
        }
        //initializer list
-       b_plus_size_tree(std::initializer_list<value_type> il, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : b_plus_size_tree(il.begin(), il.end(), comp, alloc)
+       b_plus_plus_tree(std::initializer_list<value_type> il, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : b_plus_plus_tree(il.begin(), il.end(), comp, alloc)
        {
        }
        //initializer list
-       b_plus_size_tree(std::initializer_list<value_type> il, allocator_type const &alloc) : b_plus_size_tree(il.begin(), il.end(), key_compare(), alloc)
+       b_plus_plus_tree(std::initializer_list<value_type> il, allocator_type const &alloc) : b_plus_plus_tree(il.begin(), il.end(), key_compare(), alloc)
        {
        }
        //destructor
-       ~b_plus_size_tree()
+       ~b_plus_plus_tree()
        {
            clear();
        }
        //copy
-       b_plus_size_tree &operator = (b_plus_size_tree const &other)
+       b_plus_plus_tree &operator = (b_plus_plus_tree const &other)
        {
            if(this == &other)
            {
@@ -532,7 +862,7 @@ public:;
            return *this;
        }
        //move
-       b_plus_size_tree &operator = (b_plus_size_tree &&other)
+       b_plus_plus_tree &operator = (b_plus_plus_tree &&other)
        {
            if(this == &other)
            {
@@ -542,7 +872,7 @@ public:;
            return *this;
        }
        //initializer list
-       b_plus_size_tree &operator = (std::initializer_list<value_type> il)
+       b_plus_plus_tree &operator = (std::initializer_list<value_type> il)
        {
            clear();
            insert(il.begin(), il.end());
@@ -554,7 +884,7 @@ public:;
            return root_;
        }
 
-       void swap(b_plus_size_tree &other)
+       void swap(b_plus_plus_tree &other)
        {
            std::swap(root_, other.root_);
            fix_root_();
@@ -567,22 +897,22 @@ public:;
        //single element
        insert_result_t insert(value_type const &value)
        {
-           return result_<config_t::unique_type>(insert_nohint_<false>(value));
+           return result_<typename config_t::unique_type>(insert_nohint_<false>(value));
        }
        //single element
        template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(in_value_t &&value)
        {
-           return result_<config_t::unique_type>(insert_nohint_<false>(std::forward<in_value_t>(value)));
+           return result_<typename config_t::unique_type>(insert_nohint_<false>(std::forward<in_value_t>(value)));
        }
        //with hint
        insert_result_t insert(const_iterator hint, value_type const &value)
        {
-           return result_<config_t::unique_type>(insert_hint_(hint.node == &root_ ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, value));
+           return result_<typename config_t::unique_type>(insert_hint_(hint.node == &root_ ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, value));
        }
        //with hint
        template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(const_iterator hint, in_value_t &&value)
        {
-           return result_<config_t::unique_type>(insert_hint_(hint.node == &root_ ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, std::forward<in_value_t>(value)));
+           return result_<typename config_t::unique_type>(insert_hint_(hint.node == &root_ ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, std::forward<in_value_t>(value)));
        }
        //range
        template<class iterator_t> void insert(iterator_t begin, iterator_t end)
@@ -601,12 +931,12 @@ public:;
        //single element
        template<class ...args_t> insert_result_t emplace(args_t &&...args)
        {
-           return result_<config_t::unique_type>(insert_nohint_<false>(std::move(storage_type(std::forward<args_t>(args)...))));
+           return result_<typename config_t::unique_type>(insert_nohint_<false>(std::move(storage_type(std::forward<args_t>(args)...))));
        }
        //with hint
        template<class ...args_t> insert_result_t emplace_hint(const_iterator hint, args_t &&...args)
        {
-           return result_<config_t::unique_type>(insert_hint_(hint.node == &root_ ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, std::move(storage_type(std::forward<args_t>(args)...))));
+           return result_<typename config_t::unique_type>(insert_hint_(hint.node == &root_ ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, std::move(storage_type(std::forward<args_t>(args)...))));
        }
 
        iterator find(key_type const &key)
@@ -650,11 +980,12 @@ public:;
            }
            else
            {
-               while(erase_begin != erase_end)
+               size_type pos_begin = rank(erase_begin), pos_end = rank(erase_end);
+               while(pos_begin != pos_end)
                {
-                   erase(erase_begin++);
+                   erase(at(--pos_end));
                }
-               return iterator(const_cast<node_t *>(erase_begin.node));
+               return at(pos_begin);
            }
        }
 
@@ -676,7 +1007,7 @@ public:;
            {
                return 0;
            }
-           pair_cici_t range = b_plus_size_tree::range(min, max);
+           pair_cici_t range = b_plus_plus_tree::range(min, max);
            return std::distance(range.first, range.second);
        }
 
@@ -695,6 +1026,43 @@ public:;
                return pair_cici_t(cend(), cend());
            }
            return pair_cici_t(const_iterator(lower_bound_(min), this), const_iterator(upper_bound_(max), this));
+       }
+
+       //reverse index when index < 0
+       pair_ii_t slice(difference_type slice_begin = 0, difference_type slice_end = 0)
+       {
+           difference_type s_size = size();
+           if(slice_begin < 0)
+           {
+               slice_begin = std::max<difference_type>(s_size + slice_begin, 0);
+           }
+           if(slice_end <= 0)
+           {
+               slice_end = s_size + slice_end;
+           }
+           if(slice_begin > slice_end || slice_begin >= s_size)
+           {
+               return pair_ii_t(end(), end());
+           }
+           return pair_ii_t(at(slice_begin), at(slice_end));
+       }
+       //reverse index when index < 0
+       pair_cici_t slice(difference_type slice_begin = 0, difference_type slice_end = 0) const
+       {
+           difference_type s_size = size();
+           if(slice_begin < 0)
+           {
+               slice_begin = std::max<difference_type>(s_size + slice_begin, 0);
+           }
+           if(slice_end <= 0)
+           {
+               slice_end = s_size + slice_end;
+           }
+           if(slice_begin > slice_end || slice_begin >= s_size)
+           {
+               return pair_cici_t(cend(), cend());
+           }
+           return pair_cici_t(at(slice_begin), at(slice_end));
        }
 
        iterator lower_bound(key_type const &key)
@@ -725,7 +1093,7 @@ public:;
 
        iterator begin()
        {
-           return iterator(root_.left == nullptr ? &root_ : root_.left, 0);
+           return iterator(root_.left, 0);
        }
        iterator end()
        {
@@ -733,7 +1101,7 @@ public:;
        }
        const_iterator begin() const
        {
-           return iterator(root_.left == nullptr ? root_.parent->parent : root_.left, 0);
+           return iterator(root_.left, 0);
        }
        const_iterator end() const
        {
@@ -741,13 +1109,36 @@ public:;
        }
        const_iterator cbegin() const
        {
-           return iterator(root_.left == nullptr ? &root_ : root_.left, 0);
+           return iterator(root_.left, 0);
        }
        const_iterator cend() const
        {
            return const_iterator(root_.parent->parent, 0);
        }
-
+       reverse_iterator rbegin()
+       {
+           return reverse_iterator(root_.right, root_.right->level == 0 ? static_cast<leaf_node_t *>(root_.right)->bound() - 1 : 0);
+       }
+       reverse_iterator rend()
+       {
+           return reverse_iterator(&root_, 0);
+       }
+       const_reverse_iterator rbegin() const
+       {
+           return const_reverse_iterator(root_.right, root_.right->level == 0 ? static_cast<leaf_node_t *>(root_.right)->bound() - 1 : 0);
+       }
+       const_reverse_iterator rend() const
+       {
+           return const_reverse_iterator(root_.parent->parent, 0);
+       }
+       const_reverse_iterator crbegin() const
+       {
+           return const_reverse_iterator(root_.right, root_.right->level == 0 ? static_cast<leaf_node_t *>(root_.right)->bound() - 1 : 0);
+       }
+       const_reverse_iterator crend() const
+       {
+           return const_reverse_iterator(root_.parent->parent, 0);
+       }
 
        reference front()
        {
@@ -771,7 +1162,7 @@ public:;
 
        bool empty() const
        {
-           return is_nil_(get_root_());
+           return root_.parent == &root_;
        }
        void clear()
        {
@@ -789,6 +1180,47 @@ public:;
        size_type max_size() const
        {
            return node_allocator_t(get_node_allocator_()).max_size();
+       }
+
+       //if(index >= size) return end
+       iterator at(size_type index)
+       {
+           return iterator(access_index_(root_.parent, index), this);
+       }
+       //if(index >= size) return end
+       const_iterator at(size_type index) const
+       {
+           return const_iterator(access_index_(root_.parent, index), this);
+       }
+
+       //rank(begin) == 0, key rank when insert
+       size_type rank(key_type const &key) const
+       {
+           pair_pos_t pos = upper_bound_(key);
+           if(pos.first == nullptr)
+           {
+               return root_.size;
+           }
+           else
+           {
+               size_type rank_value;
+               std::tie(std::ignore, rank_value) = advance_root_(pos.first, pos.second);
+               return rank_value;
+           }
+       }
+       //rank(begin) == 0, rank of iterator
+       static size_type rank(const_iterator where)
+       {
+           if(where.node->level != 0)
+           {
+               return where.node->size;
+           }
+           else
+           {
+               size_type rank_value;
+               std::tie(std::ignore, rank_value) = advance_root_(where.node, where.where);
+               return rank_value;
+           }
        }
 
        bool debug_check()
@@ -1032,11 +1464,93 @@ protected:
         }
     }
 
+    static void advance_step_(node_t *&node, size_type &where, difference_type step)
+    {
+        if(node->level != 0)
+        {
+            if(step == 0)
+            {
+                return;
+            }
+            else if(step > 0)
+            {
+                --step;
+                advance_next_(node, where);
+            }
+            else
+            {
+                ++step;
+                advance_prev_(node, where);
+            }
+            if(node->level != 0)
+            {
+                return;
+            }
+        }
+        std::tie(node, where) = advance_root_(node, where);
+        step += where;
+        if(step < 0 || size_type(step) >= node->size)
+        {
+            node = node->parent;
+            where = 0;
+        }
+        else
+        {
+            std::tie(node, where) = access_index_(node, step);
+        }
+    }
+
+    static std::pair<node_t *, size_type> advance_root_(node_t *node, size_type where)
+    {
+        while(node->parent->level != size_type(-1))
+        {
+            inner_node_t *parent = static_cast<inner_node_t *>(node->parent);
+            for(size_type i = 0; ; ++i)
+            {
+                if(parent->children[i] == node)
+                {
+                    node = parent;
+                    break;
+                }
+                else
+                {
+                    where += parent->children[i]->size;
+                }
+            }
+        }
+        return std::make_pair(node, where);
+    }
+
+    static pair_pos_t access_index_(node_t *node, size_type index)
+    {
+        if(index >= node->size)
+        {
+            return std::make_pair(nullptr, 0);
+        }
+        while(node->level > 0)
+        {
+            inner_node_t *inner_node = static_cast<inner_node_t *>(node);
+            for(size_type i = 0; ; ++i)
+            {
+                if(index >= inner_node->children[i]->size)
+                {
+                    index -= inner_node->children[i]->size;
+                }
+                else
+                {
+                    node = inner_node->children[i];
+                    break;
+                }
+            }
+        }
+        return std::make_pair(static_cast<leaf_node_t *>(node), index);
+    }
+
     template<typename node_type> size_type lower_bound_(node_type const *node, key_type const &key) const
     {
         if(std::is_scalar<key_type>::value)
         {
-            node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
+            typename node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
             while(begin != end && get_comparator_()(get_key_()(*begin), key))
             {
                 ++begin;
@@ -1045,7 +1559,7 @@ protected:
         }
         else
         {
-            return std::lower_bound(node->item, node->item + node->bound(), key, [&](node_type::item_type const &left, key_type const &right)->bool
+            return std::lower_bound(node->item, node->item + node->bound(), key, [&](typename node_type::item_type const &left, key_type const &right)->bool
             {
                 return get_comparator_()(get_key_()(left), right);
             }) - node->item;
@@ -1056,7 +1570,7 @@ protected:
     {
         if(std::is_scalar<key_type>::value)
         {
-            node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
+            typename node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
             while(begin != end && !get_comparator_()(key, get_key_()(*begin)))
             {
                 ++begin;
@@ -1065,7 +1579,7 @@ protected:
         }
         else
         {
-            return std::upper_bound(node->item, node->item + node->bound(), key, [&](key_type const &left, node_type::item_type const &right)->bool
+            return std::upper_bound(node->item, node->item + node->bound(), key, [&](key_type const &left, typename node_type::item_type const &right)->bool
             {
                 return get_comparator_()(left, get_key_()(right));
             }) - node->item;
@@ -1086,9 +1600,15 @@ protected:
             node = inner_node->children[where];
         }
         leaf_node_t *leaf_node = static_cast<leaf_node_t *>(node);
-
         size_type where = lower_bound_(leaf_node, key);
-        return std::make_pair(leaf_node, where);
+        if(where >= leaf_node->bound())
+        {
+            return std::make_pair(nullptr, 0);
+        }
+        else
+        {
+            return std::make_pair(leaf_node, where);
+        }
     }
 
     pair_pos_t upper_bound_(key_type const &key) const
@@ -1105,9 +1625,15 @@ protected:
             node = inner_node->children[where];
         }
         leaf_node_t *leaf_node = static_cast<leaf_node_t *>(node);
-
         size_type where = upper_bound_(leaf_node, key);
-        return std::make_pair(leaf_node, where);
+        if(where >= leaf_node->bound())
+        {
+            return std::make_pair(nullptr, 0);
+        }
+        else
+        {
+            return std::make_pair(leaf_node, where);
+        }
     }
 
     template<class iterator_t, class in_value_t> static void construct_one_(iterator_t where, in_value_t &&value)
@@ -2122,6 +2648,7 @@ protected:
             {
                 free_node_<false>(root_.parent);
                 root_.parent = root_.left = root_.right = &root_;
+                --root_.size;
                 return;
             }
             else if((leaf_left == nullptr || leaf_left->is_few()) && (leaf_right == nullptr || leaf_right->is_few()))
