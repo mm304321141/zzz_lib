@@ -6,10 +6,6 @@
 template<class key_t, class unique_t, class comparator_t, class allocator_t>
 struct bpstree_set_config_t
 {
-    template<class in_type> static key_t const &get_key(in_type &value)
-    {
-        return value;
-    }
     typedef key_t key_type;
     typedef key_t const mapped_type;
     typedef key_t const value_type;
@@ -17,6 +13,10 @@ struct bpstree_set_config_t
     typedef comparator_t key_compare;
     typedef allocator_t allocator_type;
     typedef unique_t unique_type;
+    static key_type const &get_key(key_type &value)
+    {
+        return value;
+    }
     template<size_t A, size_t B> struct max_t
     {
         enum
