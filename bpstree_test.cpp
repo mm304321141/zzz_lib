@@ -203,6 +203,11 @@ int main()
         sb2.range(2, 2);
         sb2.count(2);
         sb2.count(2, 2);
+        for(int i = 0; i < 100000; ++i)
+        {
+            aaa.emplace(i);
+        }
+        aaa.clear();
         bpstree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({{1, "2"},{1, "2"},{1, "2"}}, c);
         bpstree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({{1, "2"}}, a);
         alloc_limit = 2;
@@ -344,82 +349,82 @@ int main()
     std::mt19937 mt(0);
     auto mtr = std::uniform_int_distribution<int>(-99999, 99999);
 
-    //std::vector<int> v;
-    //v.resize(20000000);
-    //auto reset = [&mtr, &mt, &v]()
-    //{
-    //    for(auto &value : v)
-    //    {
-    //        value = mtr(mt);
-    //    }
-    //};
+    std::vector<int> v;
+    v.resize(20000000);
+    auto reset = [&mtr, &mt, &v]()
+    {
+        for(auto &value : v)
+        {
+            value = mtr(mt);
+        }
+    };
 
-    //auto testsb = [&mtr, &mt, &c = sb, &v]()
-    //{
-    //    for(int i = 0; i < int(v.size()); ++i)
-    //    {
-    //        c.insert(std::make_pair(i, i));
-    //    }
-    //    for(int i = 0; i < int(v.size()); ++i)
-    //    {
-    //        c.insert(std::make_pair(v[i], i));
-    //    }
-    //    for(int i = 0; i < int(v.size()); ++i)
-    //    {
-    //        c.erase(v[i]);
-    //    }
-    //    c.clear();
-    //};
-    //auto testrb = [&mtr, &mt, &c = rb, &v]()
-    //{
-    //    for(int i = 0; i < int(v.size()); ++i)
-    //    {
-    //        c.insert(std::make_pair(i, i));
-    //    }
-    //    for(int i = 0; i < int(v.size()); ++i)
-    //    {
-    //        c.insert(std::make_pair(v[i], i));
-    //    }
-    //    for(int i = 0; i < int(v.size()); ++i)
-    //    {
-    //        c.erase(v[i]);
-    //    }
-    //    c.clear();
-    //};
-    //reset();
-    //auto ss1 = t();
-    //testsb();
-    //auto se1 = t();
-    //auto rs1 = t();
-    //testrb();
-    //auto re1 = t();
-    //reset();
-    //auto ss2 = t();
-    //testsb();
-    //auto se2 = t();
-    //auto rs2 = t();
-    //testrb();
-    //auto re2 = t();
-    //reset();
-    //auto ss3 = t();
-    //testsb();
-    //auto se3 = t();
-    //auto rs3 = t();
-    //testrb();
-    //auto re3 = t();
+    auto testsb = [&mtr, &mt, &c = sb, &v]()
+    {
+        for(int i = 0; i < int(v.size()); ++i)
+        {
+            c.insert(std::make_pair(i, i));
+        }
+        for(int i = 0; i < int(v.size()); ++i)
+        {
+            c.insert(std::make_pair(v[i], i));
+        }
+        for(int i = 0; i < int(v.size()); ++i)
+        {
+            c.erase(v[i]);
+        }
+        c.clear();
+    };
+    auto testrb = [&mtr, &mt, &c = rb, &v]()
+    {
+        for(int i = 0; i < int(v.size()); ++i)
+        {
+            c.insert(std::make_pair(i, i));
+        }
+        for(int i = 0; i < int(v.size()); ++i)
+        {
+            c.insert(std::make_pair(v[i], i));
+        }
+        for(int i = 0; i < int(v.size()); ++i)
+        {
+            c.erase(v[i]);
+        }
+        c.clear();
+    };
+    reset();
+    auto ss1 = t();
+    testsb();
+    auto se1 = t();
+    auto rs1 = t();
+    testrb();
+    auto re1 = t();
+    reset();
+    auto ss2 = t();
+    testsb();
+    auto se2 = t();
+    auto rs2 = t();
+    testrb();
+    auto re2 = t();
+    reset();
+    auto ss3 = t();
+    testsb();
+    auto se3 = t();
+    auto rs3 = t();
+    testrb();
+    auto re3 = t();
 
-    //v.clear();
+    v.clear();
 
-    //std::cout
-    //    << "sb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se1 - ss1).count() << std::endl
-    //    << "rb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re1 - rs1).count() << std::endl
-    //    << "sb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se2 - ss2).count() << std::endl
-    //    << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl
-    //    << "sb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se3 - ss3).count() << std::endl
-    //    << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl
-    //    ;
+    std::cout
+        << "sb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se1 - ss1).count() << std::endl
+        << "rb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re1 - rs1).count() << std::endl
+        << "sb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se2 - ss2).count() << std::endl
+        << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl
+        << "sb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se3 - ss3).count() << std::endl
+        << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl
+        ;
 
-    //system("pause");
+    system("pause");
 
     //for(int i = 0; i < 20000000; ++i)
     //{

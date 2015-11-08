@@ -13,7 +13,7 @@ struct bpstree_map_config_t
     typedef comparator_t key_compare;
     typedef allocator_t allocator_type;
     typedef unique_t unique_type;
-    static key_type const &get_key(storage_type const &value)
+    template<class in_type> static key_type const &get_key(in_type &&value)
     {
         return value.first;
     }

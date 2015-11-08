@@ -10,7 +10,7 @@ struct sbtree_multimap_config_t
     typedef std::pair<key_t const, value_t> value_type;
     typedef comparator_t key_compare;
     typedef allocator_t allocator_type;
-    static key_type const &get_key(value_type &value)
+    template<class in_type> static key_type const &get_key(in_type &&value)
     {
         return value.first;
     }
