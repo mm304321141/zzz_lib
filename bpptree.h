@@ -365,7 +365,7 @@ public:
         }
         difference_type operator - (iterator const &other) const
         {
-            return static_cast<difference_type>(b_plus_plus_tree::rank(*this)) - static_cast<difference_type>(b_plus_plus_tree::rank(other));
+            return static_cast<difference_type>(b_plus_plus_tree::calculate_rank_(node, where)) - static_cast<difference_type>(b_plus_plus_tree::calculate_rank_(other.node, other.where));
         }
         iterator &operator++()
         {
@@ -465,19 +465,19 @@ public:
         }
         const_iterator operator + (difference_type diff) const
         {
-            iterator ret = *this;
+            const_iterator ret = *this;
             b_plus_plus_tree::advance_step_(ret.node, ret.where, diff);
             return ret;
         }
         const_iterator operator - (difference_type diff) const
         {
-            iterator ret = *this;
+            const_iterator ret = *this;
             b_plus_plus_tree::advance_step_(ret.node, ret.where, -diff);
             return ret;
         }
         difference_type operator - (const_iterator const &other) const
         {
-            return static_cast<difference_type>(b_plus_plus_tree::rank(*this)) - static_cast<difference_type>(b_plus_plus_tree::rank(other));
+            return static_cast<difference_type>(b_plus_plus_tree::calculate_rank_(node, where)) - static_cast<difference_type>(b_plus_plus_tree::calculate_rank_(other.node, other.where));
         }
         const_iterator &operator++()
         {
@@ -588,7 +588,7 @@ public:
         }
         difference_type operator - (reverse_iterator const &other) const
         {
-            return static_cast<difference_type>(b_plus_plus_tree::rank(other)) - static_cast<difference_type>(b_plus_plus_tree::rank(*this));
+            return static_cast<difference_type>(b_plus_plus_tree::calculate_rank_(other.node, other.where)) - static_cast<difference_type>(b_plus_plus_tree::calculate_rank_(node, where));
         }
         reverse_iterator &operator++()
         {
@@ -674,11 +674,11 @@ public:
         const_reverse_iterator(pair_pos_t pos, b_plus_plus_tree const *self) : node(pos.first == nullptr ? self->root_.parent->parent : pos.first), where(pos.second)
         {
         }
-        explicit const_reverse_iterator(const_iterator const &other) : node(other.node), where(it.where)
+        explicit const_reverse_iterator(const_iterator const &other) : node(other.node), where(other.where)
         {
             ++*this;
         }
-        const_reverse_iterator(reverse_iterator const &other) : node(other.node), where(it.where)
+        const_reverse_iterator(reverse_iterator const &other) : node(other.node), where(other.where)
         {
         }
         const_reverse_iterator(reverse_iterator it) : node(it.node), where(it.where)
@@ -699,19 +699,19 @@ public:
         }
         const_reverse_iterator operator + (difference_type diff) const
         {
-            iterator ret = *this;
+            const_reverse_iterator ret = *this;
             b_plus_plus_tree::advance_step_(ret.node, ret.where, -diff);
             return ret;
         }
         const_reverse_iterator operator - (difference_type diff) const
         {
-            iterator ret = *this;
+            const_reverse_iterator ret = *this;
             b_plus_plus_tree::advance_step_(ret.node, ret.where, diff);
             return ret;
         }
         difference_type operator - (const_reverse_iterator const &other) const
         {
-            return static_cast<difference_type>(b_plus_plus_tree::rank(other)) - static_cast<difference_type>(b_plus_plus_tree::rank(*this));
+            return static_cast<difference_type>(b_plus_plus_tree::rank(other.node, other.where)) - static_cast<difference_type>(b_plus_plus_tree::rank(node, where));
         }
         const_reverse_iterator &operator++()
         {
@@ -1211,16 +1211,7 @@ public:;
        //rank(begin) == 0, rank of iterator
        static size_type rank(const_iterator where)
        {
-           if(where.node->level != 0)
-           {
-               return where.node->size;
-           }
-           else
-           {
-               size_type rank_value;
-               std::tie(std::ignore, rank_value) = advance_root_(where.node, where.where);
-               return rank_value;
-           }
+           return calculate_rank_(where.node, where.where);
        }
 
        bool debug_check()
@@ -1497,6 +1488,20 @@ protected:
         else
         {
             std::tie(node, where) = access_index_(node, step);
+        }
+    }
+
+    static size_type calculate_rank_(node_t *node, size_type where)
+    {
+        if(node->level != 0)
+        {
+            return node->size;
+        }
+        else
+        {
+            size_type rank;
+            std::tie(std::ignore, rank) = advance_root_(node, where);
+            return rank;
         }
     }
 
