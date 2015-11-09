@@ -7,6 +7,152 @@
 #include <type_traits>
 
 
+namespace b_plus_plus_tree_detail
+{
+    template<class iterator_t, class in_value_t, class tag_t> void construct_one_(iterator_t where, in_value_t &&value, tag_t)
+    {
+        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
+        ::new(std::addressof(*where)) iterator_value_t(std::forward<in_value_t>(value));
+    }
+
+    template<class iterator_t> void destroy_one_(iterator_t where, std::true_type)
+    {
+    }
+    template<class iterator_t> void destroy_one_(iterator_t where, std::false_type)
+    {
+        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
+        where->~iterator_value_t();
+    }
+
+    template<class iterator_t> void destroy_(iterator_t destroy_begin, iterator_t destroy_end, std::true_type)
+    {
+    }
+    template<class iterator_t> void destroy_(iterator_t destroy_begin, iterator_t destroy_end, std::false_type)
+    {
+        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
+        for(; destroy_begin != destroy_end; ++destroy_begin)
+        {
+            destroy_one_(destroy_begin, std::false_type());
+        }
+    }
+
+    template<class iterator_from_t, class iterator_to_t, class tag_t> void move_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, tag_t)
+    {
+        std::move(move_begin, move_end, to_begin);
+    }
+
+    template<class iterator_from_t, class iterator_to_t, class tag_t> void move_backward_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, tag_t)
+    {
+        std::move_backward(move_begin, move_end, to_begin + (move_end - move_begin));
+    }
+
+    template<class iterator_from_t, class iterator_to_t> void move_construct_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, std::true_type)
+    {
+        std::move(move_begin, move_end, to_begin);
+    }
+
+    template<class iterator_from_t, class iterator_to_t> void move_construct_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, std::false_type)
+    {
+        for(; move_begin != move_end; ++move_begin)
+        {
+            construct_one_(to_begin++, std::move(*move_begin), std::false_type());
+        }
+    }
+
+    template<class iterator_t> void move_next_to_and_construct_(iterator_t move_begin, iterator_t move_end, iterator_t to_begin, std::true_type)
+    {
+        std::move(move_begin, move_end, to_begin);
+    }
+    template<class iterator_t> void move_next_to_and_construct_(iterator_t move_begin, iterator_t move_end, iterator_t to_begin, std::false_type)
+    {
+        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
+        if(to_begin < move_end)
+        {
+            iterator_t split = move_end - (to_begin - move_begin);
+            move_construct_(split, move_end, move_end, std::false_type());
+            move_backward_(move_begin, split, to_begin, std::false_type());
+        }
+        else
+        {
+            move_construct_(move_begin, move_end, to_begin, std::false_type());
+            while(move_end != to_begin)
+            {
+                construct_one_(move_end++, iterator_value_t(), std::false_type());
+            }
+        }
+    }
+
+    template<class iterator_from_t, class iterator_to_t> void move_and_destroy_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, std::true_type)
+    {
+        std::move(move_begin, move_end, to_begin);
+    }
+    template<class iterator_from_t, class iterator_to_t> void move_and_destroy_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, std::false_type)
+    {
+        for(; move_begin != move_end; ++move_begin)
+        {
+            *to_begin++ = std::move(*move_begin);
+            destroy_one_(move_begin, std::false_type());
+        }
+    }
+
+    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, std::true_type)
+    {
+        std::move(move_begin, move_end, to_begin);
+    }
+    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, std::false_type)
+    {
+        for(; move_begin != move_end; ++move_begin)
+        {
+            construct_one_(to_begin++, std::move(*move_begin), std::false_type());
+            destroy_one_(move_begin, std::false_type());
+        }
+    }
+
+    template<class iterator_t, class in_value_t> void move_next_and_insert_one_(iterator_t move_begin, iterator_t move_end, in_value_t &&value, std::true_type)
+    {
+        std::move(move_begin, move_end, move_begin + 1);
+        *move_begin = std::forward<in_value_t>(value);
+    }
+    template<class iterator_t, class in_value_t> void move_next_and_insert_one_(iterator_t move_begin, iterator_t move_end, in_value_t &&value, std::false_type)
+    {
+        if(move_begin == move_end)
+        {
+            construct_one_(move_begin, std::forward<in_value_t>(value), std::false_type());
+        }
+        else
+        {
+            iterator_t to_end = std::next(move_end);
+            construct_one_(--to_end, std::move(*--move_end), std::false_type());
+            while(move_begin != move_end)
+            {
+                *--to_end = std::move(*--move_end);
+            }
+            *move_begin = std::forward<in_value_t>(value);
+        }
+    }
+
+    template<class iterator_t> void move_prev_and_destroy_one_(iterator_t move_begin, iterator_t move_end, std::true_type)
+    {
+        std::move_backward(move_begin, move_end, move_end - 1);
+    }
+    template<class iterator_t> void move_prev_and_destroy_one_(iterator_t move_begin, iterator_t move_end, std::false_type)
+    {
+        if(move_begin == move_end)
+        {
+            destroy_one_(move_begin - 1, std::false_type());
+        }
+        else
+        {
+            iterator_t to_begin = std::prev(move_begin);
+            while(move_begin != move_end)
+            {
+                *to_begin++ = std::move(*move_begin++);
+            }
+            destroy_one_(to_begin, std::false_type());
+        }
+    }
+}
+
 template<class config_t>
 class b_plus_plus_tree
 {
@@ -322,6 +468,10 @@ public:
         }
     };
     typedef get_key_t<key_type, storage_type> get_key_;
+    enum
+    {
+        binary_search_limit = 1024
+    };
 public:
     class iterator
     {
@@ -1272,10 +1422,7 @@ protected:
     }
     void dealloc_inner_node_(inner_node_t *node)
     {
-        for(size_t i = 0; i < node->bound(); ++i)
-        {
-            node->item[i].~key_type();
-        }
+        destroy_(node->item, node->item + node->bound());
         get_node_allocator_().deallocate(reinterpret_cast<memory_node_t *>(node), 1);
     }
 
@@ -1291,10 +1438,7 @@ protected:
     }
     void dealloc_leaf_node_(leaf_node_t *node)
     {
-        for(size_type i = 0; i < node->bound(); ++i)
-        {
-            node->item[i].~storage_type();
-        }
+        destroy_(node->item, node->item + node->bound());
         get_node_allocator_().deallocate(reinterpret_cast<memory_node_t *>(node), 1);
     }
 
@@ -1483,7 +1627,7 @@ protected:
 
     template<typename node_type> size_type lower_bound_(node_type const *node, key_type const &key) const
     {
-        if(std::is_scalar<key_type>::value)
+        if(std::is_scalar<key_type>::value && node_type::max < binary_search_limit)
         {
             typename node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
             while(begin != end && get_comparator_()(get_key_()(*begin), key))
@@ -1503,7 +1647,7 @@ protected:
 
     template<typename node_type> size_type upper_bound_(node_type const *node, key_type const &key) const
     {
-        if(std::is_scalar<key_type>::value)
+        if(std::is_scalar<key_type>::value && node_type::max < binary_search_limit)
         {
             typename node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
             while(begin != end && !get_comparator_()(key, get_key_()(*begin)))
@@ -1570,168 +1714,59 @@ protected:
             return std::make_pair(leaf_node, where);
         }
     }
-
     template<class iterator_t, class in_value_t> static void construct_one_(iterator_t where, in_value_t &&value)
     {
-        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
-        ::new(std::addressof(*where)) iterator_value_t(std::forward<in_value_t>(value));
+        b_plus_plus_tree_detail::construct_one_(where, std::forward<in_value_t>(value), std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::type());
     }
 
     template<class iterator_t> static void destroy_one_(iterator_t where)
     {
-        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
-        where->~iterator_value_t();
+        b_plus_plus_tree_detail::destroy_one_(where, std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::type());
     }
 
     template<class iterator_t> static void destroy_(iterator_t destroy_begin, iterator_t destroy_end)
     {
-        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
-        if(!std::is_scalar<iterator_value_t>::value)
-        {
-            for(; destroy_begin != destroy_end; ++destroy_begin)
-            {
-                destroy_begin->~iterator_value_t();
-            }
-        }
+        b_plus_plus_tree_detail::destroy_(destroy_begin, destroy_end, std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::type());
     }
 
     template<class iterator_from_t, class iterator_to_t> static void move_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
-        std::move(move_begin, move_end, to_begin);
+        b_plus_plus_tree_detail::move_(move_begin, move_end, to_begin, std::is_scalar<typename std::iterator_traits<iterator_from_t>::value_type>::type());
     }
 
     template<class iterator_from_t, class iterator_to_t> static void move_backward_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
-        std::move_backward(move_begin, move_end, to_begin + (move_end - move_begin));
+        b_plus_plus_tree_detail::move_backward_(move_begin, move_end, to_begin, std::is_scalar<typename std::iterator_traits<iterator_from_t>::value_type>::type());
     }
 
     template<class iterator_from_t, class iterator_to_t> static void move_construct_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
-        typedef typename std::iterator_traits<iterator_from_t>::value_type iterator_value_t;
-        if(std::is_scalar<iterator_value_t>::value)
-        {
-            std::memcpy(std::addressof(*to_begin), std::addressof(*move_begin), (move_end - move_begin) * sizeof(iterator_value_t));
-        }
-        else
-        {
-            for(; move_begin != move_end; ++move_begin)
-            {
-                construct_one_(to_begin++, std::move(*move_begin));
-            }
-        }
+        b_plus_plus_tree_detail::move_construct_(move_begin, move_end, to_begin, std::is_scalar<typename std::iterator_traits<iterator_from_t>::value_type>::type());
     }
 
     template<class iterator_t> static void move_next_to_and_construct_(iterator_t move_begin, iterator_t move_end, iterator_t to_begin)
     {
-        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
-        if(std::is_scalar<iterator_value_t>::value)
-        {
-            std::memmove(std::addressof(*to_begin), std::addressof(*move_begin), (move_end - move_begin) * sizeof(iterator_value_t));
-        }
-        else
-        {
-            if(to_begin < move_end)
-            {
-                iterator_t split = move_end - (to_begin - move_begin);
-                move_construct_(split, move_end, move_end);
-                move_backward_(move_begin, split, to_begin);
-            }
-            else
-            {
-                move_construct_(move_begin, move_end, to_begin);
-                while(move_end != to_begin)
-                {
-                    construct_one_(move_end++, iterator_value_t());
-                }
-            }
-        }
+        b_plus_plus_tree_detail::move_next_to_and_construct_(move_begin, move_end, to_begin, std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::type());
     }
 
     template<class iterator_from_t, class iterator_to_t> static void move_and_destroy_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
-        typedef typename std::iterator_traits<iterator_from_t>::value_type iterator_value_t;
-        if(std::is_scalar<iterator_value_t>::value)
-        {
-            std::memcpy(std::addressof(*to_begin), std::addressof(*move_begin), (move_end - move_begin) * sizeof(iterator_value_t));
-        }
-        else
-        {
-            for(; move_begin != move_end; ++move_begin)
-            {
-                *to_begin++ = std::move(*move_begin);
-                destroy_one_(move_begin);
-            }
-        }
+        b_plus_plus_tree_detail::move_and_destroy_(move_begin, move_end, to_begin, std::is_scalar<typename std::iterator_traits<iterator_from_t>::value_type>::type());
     }
 
     template<class iterator_from_t, class iterator_to_t> static void move_construct_and_destroy_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
-        typedef typename std::iterator_traits<iterator_from_t>::value_type iterator_value_t;
-        if(std::is_scalar<iterator_value_t>::value)
-        {
-            std::memcpy(std::addressof(*to_begin), std::addressof(*move_begin), (move_end - move_begin) * sizeof(iterator_value_t));
-        }
-        else
-        {
-            for(; move_begin != move_end; ++move_begin)
-            {
-                construct_one_(to_begin++, std::move(*move_begin));
-                destroy_one_(move_begin);
-            }
-        }
+        b_plus_plus_tree_detail::move_construct_and_destroy_(move_begin, move_end, to_begin, std::is_scalar<typename std::iterator_traits<iterator_from_t>::value_type>::type());
     }
 
     template<class iterator_t, class in_value_t> static void move_next_and_insert_one_(iterator_t move_begin, iterator_t move_end, in_value_t &&value)
     {
-        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
-        if(std::is_scalar<iterator_value_t>::value)
-        {
-            std::memmove(std::addressof(*(move_begin + 1)), std::addressof(*move_begin), (move_end - move_begin) * sizeof(iterator_value_t));
-            *move_begin = std::forward<in_value_t>(value);
-        }
-        else
-        {
-            if(move_begin == move_end)
-            {
-                construct_one_(move_begin, std::forward<in_value_t>(value));
-            }
-            else
-            {
-                iterator_t to_end = std::next(move_end);
-                construct_one_(--to_end, std::move(*--move_end));
-                while(move_begin != move_end)
-                {
-                    *--to_end = std::move(*--move_end);
-                }
-                *move_begin = std::forward<in_value_t>(value);
-            }
-        }
+        b_plus_plus_tree_detail::move_next_and_insert_one_(move_begin, move_end, std::forward<in_value_t>(value), std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::type());
     }
 
     template<class iterator_t> static void move_prev_and_destroy_one_(iterator_t move_begin, iterator_t move_end)
     {
-        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
-        if(std::is_scalar<iterator_value_t>::value)
-        {
-            (move_begin - 1)->~iterator_value_t();
-            std::memmove(std::addressof(*(move_begin - 1)), std::addressof(*move_begin), (move_end - move_begin) * sizeof(iterator_value_t));
-        }
-        else
-        {
-            if(move_begin == move_end)
-            {
-                destroy_one_(move_begin - 1);
-            }
-            else
-            {
-                iterator_t to_begin = std::prev(move_begin);
-                while(move_begin != move_end)
-                {
-                    *to_begin++ = std::move(*move_begin++);
-                }
-                destroy_one_(to_begin);
-            }
-        }
+        b_plus_plus_tree_detail::move_prev_and_destroy_one_(move_begin, move_end, std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::type());
     }
 
     static size_type update_parent_(node_t **update_begin, node_t **update_end, node_t *parent)

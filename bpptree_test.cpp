@@ -174,6 +174,18 @@ public:
 
 int main()
 {
+    [&]()
+    {
+        std::mt19937 mt(0);
+        auto mtr = std::uniform_real_distribution<double>(-99999999, 99999999);
+
+        bpptree_multimap<double, uint64_t> bp;
+        for(int i = 0; i < 100000000; ++i)
+        {
+            bp.emplace(mtr(mt), i);
+        }
+        system("pause");
+    }();
 
     std::multimap<int, int> rb;
     bpptree_multimap<int, int> bp;
