@@ -176,14 +176,24 @@ int main()
 {
     [&]()
     {
+        auto t = std::chrono::high_resolution_clock::now;
         std::mt19937 mt(0);
         auto mtr = std::uniform_real_distribution<double>(-99999999, 99999999);
 
         bpptree_multimap<double, uint64_t> bp;
-        for(int i = 0; i < 100000000; ++i)
+        for(int i = 0; i < 20000000; ++i)
         {
             bp.emplace(mtr(mt), i);
         }
+        uint64_t sum = 0;
+        auto b = t();
+        for(auto &item : bp)
+        {
+            sum += item.second;
+        }
+        auto e = t();
+        std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e - b).count() << std::endl;
+        std::cout << "sum = " << sum << std::endl;
         system("pause");
     }();
 
