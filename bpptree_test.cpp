@@ -220,7 +220,13 @@ int main()
         size_t count = foo.size();
         for(int i = 0; i < 1000000 && count < 32678; ++i)
         {
-            if(foo.emplace(std::to_string(std::rand())).second)
+            //if(foo.emplace(std::to_string(std::rand())).second)
+            //{
+            //    ++count;
+            //}
+            char strint_buffer[32];
+            snprintf(strint_buffer, sizeof strint_buffer, "%d", std::rand());
+            if(foo.emplace(strint_buffer).second)
             {
                 ++count;
             }
