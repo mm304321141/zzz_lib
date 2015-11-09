@@ -208,7 +208,7 @@ int main()
         std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e2 - b2).count() << std::endl;
         std::cout << "sum = " << sum2 << std::endl;
         system("pause");
-    ()};
+    }();
 
     std::multimap<int, int> rb;
     bpptree_multimap<int, int> bp;
