@@ -176,7 +176,28 @@ int main()
 {
 
     std::multimap<int, int> rb;
-    bpptree_multimap<int, int> sb;
+    bpptree_multimap<int, int> bp;
+
+    [&]()
+    {
+        bpptree_set<std::string> foo = {"1", "2"};
+        assert(!foo.insert(foo.begin(), "2").second);
+        size_t count = foo.size();
+        for(int i = 0; i < 1000000 && count < 32678; ++i)
+        {
+            if(foo.emplace(std::to_string(std::rand())).second)
+            {
+                ++count;
+            }
+        }
+        assert(foo.size() == count);
+        assert(foo.erase("2") == 1);
+        while(!foo.empty())
+        {
+            foo.erase(foo.at(std::rand() % foo.size()));
+        }
+        assert(foo.size() == 0);
+    }();
 
     [&]()
     {
@@ -192,11 +213,11 @@ int main()
         aaa3 = aaa;
         aaa3.emplace(7);
         aaa = aaa3;
-        bpptree_multimap<int, int> sb({{1, 2},{1, 2}});
-        bpptree_multimap<int, int> const sb2(sb, bpptree_multimap<int, int>::allocator_type());
-        sb.insert({{3, 4},{5, 6}});
-        sb.insert(sb.begin(), {7, 8});
-        sb.erase(sb.begin() + 1, sb.end());
+        bpptree_multimap<int, int> bp({{1, 2},{1, 2}});
+        bpptree_multimap<int, int> const sb2(bp, bpptree_multimap<int, int>::allocator_type());
+        bp.insert({{3, 4},{5, 6}});
+        bp.insert(bp.begin(), {7, 8});
+        bp.erase(bp.begin() + 1, bp.end());
         sb2.find(0);
         sb2.slice();
         sb2.front();
@@ -249,43 +270,43 @@ int main()
     [&]()
     {
         bpptree_multimap<int, int> sb1;
-        assert(sb.size() == sb1.size());
+        assert(bp.size() == sb1.size());
         for(int i = 0; i < 100; ++i)
         {
-            sb.insert(std::make_pair(rand(), i));
-            sb.insert(std::make_pair(rand(), i));
+            bp.insert(std::make_pair(rand(), i));
+            bp.insert(std::make_pair(rand(), i));
             sb1.insert(std::make_pair(rand(), i));
         }
-        sb.rank(sb.begin() + 2);
-        sb1 = sb;
-        bpptree_multimap<int, int> sb2 = sb;
-        assert(sb.size() == sb1.size());
-        assert(sb.size() == sb2.size());
+        bp.rank(bp.begin() + 2);
+        sb1 = bp;
+        bpptree_multimap<int, int> sb2 = bp;
+        assert(bp.size() == sb1.size());
+        assert(bp.size() == sb2.size());
         assert(sb1.rbegin()->second == (--sb1.end())->second);
         typedef decltype(sb1.rbegin()) riter_t;
         riter_t rit(sb1.begin());
         assert(rit.base() == sb1.begin());
         assert(rit == sb1.rend());
         assert(sb2.rbegin() + 10 == sb2.rend() - 190);
-        assert(sb.at(100)->second == sb.at(50)[50].second);
-        assert(sb.at(74) < sb.at(75));
-        assert(sb.at(75) >= sb.at(75));
-        sb.clear();
-        sb.emplace(0, 1);
-        sb.emplace(0, 0);
-        sb.emplace(0, 3);
-        sb.emplace(0, 4);
-        sb.emplace(0, 2);
-        assert(sb.at(0)->second == 1);
-        assert(sb.at(1)->second == 0);
-        assert(sb.at(2)->second == 3);
-        assert(sb.at(3)->second == 4);
-        assert(sb.at(4)->second == 2);
-        assert(sb.erase(0) == 5);
-        sb.insert(sb1.rbegin(), sb1.rend());
-        assert(sb.get_allocator() == sb2.get_allocator());
+        assert(bp.at(100)->second == bp.at(50)[50].second);
+        assert(bp.at(74) < bp.at(75));
+        assert(bp.at(75) >= bp.at(75));
+        bp.clear();
+        bp.emplace(0, 1);
+        bp.emplace(0, 0);
+        bp.emplace(0, 3);
+        bp.emplace(0, 4);
+        bp.emplace(0, 2);
+        assert(bp.at(0)->second == 1);
+        assert(bp.at(1)->second == 0);
+        assert(bp.at(2)->second == 3);
+        assert(bp.at(3)->second == 4);
+        assert(bp.at(4)->second == 2);
+        assert(bp.erase(0) == 5);
+        bp.insert(sb1.rbegin(), sb1.rend());
+        assert(bp.get_allocator() == sb2.get_allocator());
         sb1.clear();
-        sb.swap(sb1);
+        bp.swap(sb1);
     }();
 
     [&]()
@@ -296,55 +317,55 @@ int main()
         {
             auto n = std::make_pair(i, i);
             rb.insert(n);
-            sb.insert(n);
+            bp.insert(n);
             n = std::make_pair(i, i);
             rb.emplace(i, i);
-            sb.emplace(i, i);
+            bp.emplace(i, i);
         }
         assert(rb.find(0) == rb.begin());
-        assert(sb.find(0) == sb.begin());
+        assert(bp.find(0) == bp.begin());
         assert(rb.find(length / 2 - 1) == ----rb.end());
-        assert(sb.find(length / 2 - 1) == sb.end() - 2);
+        assert(bp.find(length / 2 - 1) == bp.end() - 2);
         assert(rb.count(1) == 2);
-        assert(sb.count(1) == 2);
-        assert(sb.count(1, 2) == 4);
-        assert(sb.count(1, 3) == 6);
-        assert(sb.range(1, 3) == std::make_pair(sb.find(1), sb.find(4)));
-        assert(sb.range(0, 2) == std::make_pair(sb.begin(), sb.begin() + 6));
-        assert(sb.range(2, 3) == sb.slice(4, 8));
-        assert(sb.range(0, length) == sb.slice());
-        assert(sb.front().second == sb.begin()->second);
-        assert(sb.front().second == (--sb.rend())->second);
-        assert(sb.back().second == (--sb.end())->second);
-        assert(sb.back().second == sb.rbegin()->second);
-        assert(sb.rank(0) == 2);
-        assert(sb.rank(1) == 4);
-        assert(sb.rank(length) == sb.size());
-        assert(sb.rank(length / 2) == sb.size());
-        assert(sb.rank(length / 2 - 1) == sb.size());
-        assert(sb.rank(length / 2 - 2) == sb.size() - 2);
+        assert(bp.count(1) == 2);
+        assert(bp.count(1, 2) == 4);
+        assert(bp.count(1, 3) == 6);
+        assert(bp.range(1, 3) == std::make_pair(bp.find(1), bp.find(4)));
+        assert(bp.range(0, 2) == std::make_pair(bp.begin(), bp.begin() + 6));
+        assert(bp.range(2, 3) == bp.slice(4, 8));
+        assert(bp.range(0, length) == bp.slice());
+        assert(bp.front().second == bp.begin()->second);
+        assert(bp.front().second == (--bp.rend())->second);
+        assert(bp.back().second == (--bp.end())->second);
+        assert(bp.back().second == bp.rbegin()->second);
+        assert(bp.rank(0) == 2);
+        assert(bp.rank(1) == 4);
+        assert(bp.rank(length) == bp.size());
+        assert(bp.rank(length / 2) == bp.size());
+        assert(bp.rank(length / 2 - 1) == bp.size());
+        assert(bp.rank(length / 2 - 2) == bp.size() - 2);
         assert(rb.equal_range(2).first == rb.lower_bound(2));
-        assert(sb.equal_range(2).second == sb.upper_bound(2));
-        assert(sb.erase(3) == 2);
+        assert(bp.equal_range(2).second == bp.upper_bound(2));
+        assert(bp.erase(3) == 2);
         assert(rb.erase(3) == 2);
         for(int i = 0; i < length / 2; ++i)
         {
             auto it_rb = rb.begin();
-            auto it_sb = sb.begin();
+            auto it_sb = bp.begin();
             std::advance(it_rb, rand() % rb.size());
-            std::advance(it_sb, rand() % sb.size());
+            std::advance(it_sb, rand() % bp.size());
             rb.erase(it_rb);
-            sb.erase(it_sb);
+            bp.erase(it_sb);
         }
         for(int i = 0; i < length * 2 + 2; ++i)
         {
             auto n = std::make_pair(rand(), rand());
             rb.insert(n);
-            sb.insert(n);
+            bp.insert(n);
         }
         for(int i = 0; i < length; ++i)
         {
-            decltype(sb) const &csb = sb;
+            decltype(bp) const &csb = bp;
             typedef decltype(csb.begin()) iter_t;
             int off = rand() % csb.size();
             iter_t it = csb.at(off);
@@ -372,38 +393,38 @@ int main()
         for(int i = 0; i < length * 2 + length / 2; ++i)
         {
             auto it_rb = rb.rbegin();
-            auto it_sb = sb.rbegin();
+            auto it_sb = bp.rbegin();
             std::advance(it_rb, rand() % rb.size());
-            std::advance(it_sb, rand() % sb.size());
+            std::advance(it_sb, rand() % bp.size());
             rb.erase(--(it_rb.base()));
-            sb.erase(--(it_sb.base()));
+            bp.erase(--(it_sb.base()));
         }
     }();
 
     [&]()
     {
-        bpptree_multimap<int, int> sb;
+        bpptree_multimap<int, int> bp;
         for(int i = 0; i < 10000; ++i)
         {
             int key = rand();
             int val = rand();
-            int where = rand() % std::max<size_t>(1, sb.size() + 1);
-            sb.emplace_hint(std::next(sb.begin(), where), key, val);
+            int where = rand() % std::max<size_t>(1, bp.size() + 1);
+            bp.emplace_hint(std::next(bp.begin(), where), key, val);
             rb.emplace_hint(std::next(rb.begin(), where), key, val);
-            auto sit = sb.begin();
+            auto sit = bp.begin();
             auto rit = rb.begin();
-            for(int j = 0; j < int(sb.size()); ++j, ++sit, ++rit)
+            for(int j = 0; j < int(bp.size()); ++j, ++sit, ++rit)
             {
                 assert(sit->second == rit->second);
             }
         }
-        sb.clear();
+        bp.clear();
         rb.clear();
     }();
 
     auto t = std::chrono::high_resolution_clock::now;
     std::mt19937 mt(0);
-    auto mtr = std::uniform_int_distribution<int>(-99999, 99999);
+    auto mtr = std::uniform_int_distribution<int>(-10000000, 0);
 
     std::vector<int> v;
     v.resize(20000000);
@@ -415,15 +436,15 @@ int main()
         }
     };
 
-    auto testsb = [&mtr, &mt, &c = sb, &v]()
+    auto testbp = [&mtr, &mt, &c = bp, &v]()
     {
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(i, i));
+            c.insert(std::make_pair(v[i], i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(v[i], i));
+            c.insert(std::make_pair(i, i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
@@ -435,11 +456,11 @@ int main()
     {
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(i, i));
+            c.insert(std::make_pair(v[i], i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(v[i], i));
+            c.insert(std::make_pair(i, i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
@@ -448,23 +469,23 @@ int main()
         c.clear();
     };
     reset();
-    auto ss1 = t();
-    testsb();
-    auto se1 = t();
+    auto bs1 = t();
+    testbp();
+    auto be1 = t();
     auto rs1 = t();
     testrb();
     auto re1 = t();
     reset();
-    auto ss2 = t();
-    testsb();
-    auto se2 = t();
+    auto bs2 = t();
+    testbp();
+    auto be2 = t();
     auto rs2 = t();
     testrb();
     auto re2 = t();
     reset();
-    auto ss3 = t();
-    testsb();
-    auto se3 = t();
+    auto bs3 = t();
+    testbp();
+    auto be3 = t();
     auto rs3 = t();
     testrb();
     auto re3 = t();
@@ -472,11 +493,11 @@ int main()
     v.clear();
 
     std::cout
-        << "sb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se1 - ss1).count() << std::endl
+        << "bp time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be1 - bs1).count() << std::endl
         << "rb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re1 - rs1).count() << std::endl
-        << "sb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se2 - ss2).count() << std::endl
+        << "bp time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be2 - bs2).count() << std::endl
         << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl
-        << "sb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se3 - ss3).count() << std::endl
+        << "bp time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be3 - bs3).count() << std::endl
         << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl
         ;
 
@@ -484,7 +505,7 @@ int main()
 
     //for(int i = 0; i < 20000000; ++i)
     //{
-    //    sb.insert(std::make_pair(mtr(mt), i));
+    //    bp.insert(std::make_pair(mtr(mt), i));
     //}
-    //sb.print_tree();
+    //bp.print_tree();
 }
