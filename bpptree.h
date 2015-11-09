@@ -1358,15 +1358,7 @@ public:;
        //rank(begin) == 0, key rank when insert
        size_type rank(key_type const &key) const
        {
-           pair_pos_t pos = upper_bound_(key);
-           if(pos.first == nullptr)
-           {
-               return root_.size;
-           }
-           else
-           {
-               return calculate_rank_(pos.first, pos.second);
-           }
+           return calculate_key_rank_(key);
        }
        //rank(begin) == 0, rank of iterator
        static size_type rank(const_iterator where)
@@ -1563,6 +1555,45 @@ protected:
         {
             std::tie(node, where) = access_index_(node, step);
         }
+    }
+
+    size_type calculate_key_rank_(key_type const &key) const
+    {
+        node_t *node = root_.parent;
+        if(node == &root_)
+        {
+            return root_.size;
+        }
+        size_type rank = 0;
+        while(node->level > 0)
+        {
+            inner_node_t const *inner_node = static_cast<inner_node_t const *>(node);
+            size_type where;
+            if(std::is_scalar<key_type>::value)
+            {
+                for(where = 0; where < inner_node->bound(); ++where)
+                {
+                    if(get_comparator_()(key, get_key_()(inner_node->item[where])))
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        rank += inner_node->children[where]->size;
+                    }
+                }
+            }
+            else
+            {
+                where = upper_bound_(inner_node, key);
+                for(size_type i = 0; i < where; ++i)
+                {
+                    rank += inner_node->children[i]->size;
+                }
+            }
+            node = inner_node->children[where];
+        }
+        return rank + upper_bound_(static_cast<leaf_node_t *>(node), key);
     }
 
     static size_type calculate_rank_(node_t *node, size_type where)

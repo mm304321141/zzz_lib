@@ -180,22 +180,35 @@ int main()
         std::mt19937 mt(0);
         auto mtr = std::uniform_real_distribution<double>(-99999999, 99999999);
 
-        bpptree_multimap<double, uint64_t> bp;
+        bpptree_multiset<double> bp;
+        std::vector<double> vc;
         for(int i = 0; i < 20000000; ++i)
         {
-            bp.emplace(mtr(mt), i);
+            auto v = mtr(mt);
+            bp.emplace(v);
+            vc.push_back(v);
         }
-        uint64_t sum = 0;
-        auto b = t();
-        for(auto &item : bp)
+        std::sort(vc.begin(), vc.end());
+        uint64_t sum1 = 0;
+        uint64_t sum2 = 0;
+        auto b1 = t();
+        for(int i = 0; i < 100000000; ++i)
         {
-            sum += item.second;
+            sum1 += bp.rank(i);
         }
-        auto e = t();
-        std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e - b).count() << std::endl;
-        std::cout << "sum = " << sum << std::endl;
+        auto e1 = t();
+        auto b2 = t();
+        for(int i = 0; i < 100000000; ++i)
+        {
+            sum2 += std::upper_bound(vc.begin(), vc.end(), i) - vc.begin();
+        }
+        auto e2 = t();
+        std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e1 - b1).count() << std::endl;
+        std::cout << "sum = " << sum1 << std::endl;
+        std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e2 - b2).count() << std::endl;
+        std::cout << "sum = " << sum2 << std::endl;
         system("pause");
-    }();
+    ()};
 
     std::multimap<int, int> rb;
     bpptree_multimap<int, int> bp;
@@ -213,6 +226,7 @@ int main()
             }
         }
         assert(foo.size() == count);
+        assert(foo.rank(foo.back()) == foo.size());
         assert(foo.erase("2") == 1);
         while(!foo.empty())
         {
