@@ -50,7 +50,6 @@ namespace b_plus_plus_tree_detail
     {
         std::move(move_begin, move_end, to_begin);
     }
-
     template<class iterator_from_t, class iterator_to_t> void move_construct_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, std::false_type)
     {
         for(; move_begin != move_end; ++move_begin)
@@ -1411,12 +1410,6 @@ protected:
         node->used = 0;
         return node;
     }
-    void dealloc_inner_node_(inner_node_t *node)
-    {
-        destroy_(node->item, node->item + node->bound());
-        get_node_allocator_().deallocate(reinterpret_cast<memory_node_t *>(node), 1);
-    }
-
     leaf_node_t *alloc_leaf_node_(node_t *parent)
     {
         leaf_node_t *node = reinterpret_cast<leaf_node_t *>(get_node_allocator_().allocate(1));
@@ -1427,7 +1420,7 @@ protected:
         node->next = nullptr;
         return node;
     }
-    void dealloc_leaf_node_(leaf_node_t *node)
+    template<class in_node_t> void dealloc_node_(in_node_t *node)
     {
         destroy_(node->item, node->item + node->bound());
         get_node_allocator_().deallocate(reinterpret_cast<memory_node_t *>(node), 1);
@@ -1437,7 +1430,7 @@ protected:
     {
         if(node->level == 0)
         {
-            dealloc_leaf_node_(static_cast<leaf_node_t *>(node));
+            dealloc_node_(static_cast<leaf_node_t *>(node));
         }
         else
         {
@@ -1449,7 +1442,7 @@ protected:
                     free_node_<is_recursive>(leaf_node->children[i]);
                 }
             }
-            dealloc_inner_node_(leaf_node);
+            dealloc_node_(leaf_node);
         }
     }
 
@@ -1674,7 +1667,6 @@ protected:
             }) - node->item;
         }
     }
-
     template<typename node_type> size_type upper_bound_(node_type const *node, key_type const &key) const
     {
         if(std::is_scalar<key_type>::value && node_type::max < binary_search_limit)
@@ -1719,7 +1711,6 @@ protected:
             return std::make_pair(leaf_node, where);
         }
     }
-
     pair_pos_t upper_bound_(key_type const &key) const
     {
         node_t *node = root_.parent;
@@ -1744,6 +1735,7 @@ protected:
             return std::make_pair(leaf_node, where);
         }
     }
+
     template<class iterator_t, class in_value_t> static void construct_one_(iterator_t where, in_value_t &&value)
     {
         b_plus_plus_tree_detail::construct_one_(where, std::forward<in_value_t>(value), std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::type());
@@ -2388,7 +2380,7 @@ protected:
             parent_where = get_parent_(inner_node, parent);
             if(parent != nullptr && parent_where < parent->bound())
             {
-                parent->item[parent_where] = std::move<key_type>(result.last_key);
+                parent->item[parent_where] = std::move(result.last_key.key());
             }
             else
             {
