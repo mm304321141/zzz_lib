@@ -5,11 +5,30 @@
     <Expand>
       <Item Name="[comparator]" ExcludeView="simple">(key_compare &amp;)root_</Item>
       <Item Name="[allocator]" ExcludeView="simple">(node_allocator_t &amp;)root_</Item>
-      <Item Name="[root]">root_</Item>
+      <Item Name="[raw]">root_</Item>
+      <CustomListItems Condition="root_.parent-&gt;size != 0">
+        <Variable InitialValue="root_.left" Name="node"/>
+        <Variable InitialValue="0" Name="where"/>
+        <Variable InitialValue="0" Name="index"/>
+        <Loop>
+          <If Condition="where &gt;= node-&gt;size">
+            <Exec>node = ((leaf_node_t *)node)-&gt;next</Exec>
+            <Exec>where = 0</Exec>
+          </If>
+          <If Condition="node-&gt;size == 0">
+            <Break/>
+          </If>
+          <Item Name="[{index}]">((leaf_node_t *)node)-&gt;item[where]</Item>
+          <Exec>++where</Exec>
+          <Exec>++index</Exec>
+        </Loop>
+      </CustomListItems>
     </Expand>
   </Type>
   <Type Name="b_plus_plus_tree&lt;*&gt;::iterator">
     <AlternativeType Name="b_plus_plus_tree&lt;*&gt;::const_iterator" />
+    <AlternativeType Name="b_plus_plus_tree&lt;*&gt;::reverse_iterator" />
+    <AlternativeType Name="b_plus_plus_tree&lt;*&gt;::const_reverse_iterator" />
     <DisplayString Condition="node-&gt;size != 0">{((leaf_node_t *)node)-&gt;item[where]}</DisplayString>
     <DisplayString Condition="node-&gt;size == 0">end</DisplayString>
     <Expand>
@@ -32,18 +51,27 @@
       <Item Name="[bound]" Condition="level == 0 &amp;&amp; size != 0">size</Item>
       <Item Name="[prev]" Condition="level == 0 &amp;&amp; size != 0">((leaf_node_t *)this)-&gt;prev</Item>
       <Item Name="[next]" Condition="level == 0 &amp;&amp; size != 0">((leaf_node_t *)this)-&gt;next</Item>
-      <ArrayItems Condition="level != 0 &amp;&amp; size != 0">
-        <Size>((inner_node_t *)this)-&gt;used</Size>
-        <ValuePointer>((inner_node_t *)this)-&gt;item</ValuePointer>
-      </ArrayItems>
-      <ArrayItems Condition="level != 0 &amp;&amp; size != 0">
-        <Size>((inner_node_t *)this)-&gt;used + 1</Size>
-        <ValuePointer>((inner_node_t *)this)-&gt;children</ValuePointer>
-      </ArrayItems>
-      <ArrayItems Condition="level == 0 &amp;&amp; size != 0">
-        <Size>size</Size>
-        <ValuePointer>((leaf_node_t *)this)-&gt;item</ValuePointer>
-      </ArrayItems>
+      <CustomListItems Condition="level != 0 &amp;&amp; size != 0">
+        <Variable InitialValue="0" Name="index"/>
+        <Loop>
+          <If Condition="index &gt; ((inner_node_t *)this)-&gt;used">
+            <Break/>
+          </If>
+          <Item Condition="index &lt; ((inner_node_t *)this)-&gt;used" Name="[{((inner_node_t *)this)-&gt;item[index]}]">((inner_node_t *)this)-&gt;children[index]</Item>
+          <Item Condition="index == ((inner_node_t *)this)-&gt;used" Name="[over]">((inner_node_t *)this)-&gt;children[index]</Item>
+          <Exec>++index</Exec>
+        </Loop>
+      </CustomListItems>
+      <CustomListItems Condition="level == 0 &amp;&amp; size != 0">
+        <Variable InitialValue="0" Name="index"/>
+        <Loop>
+          <If Condition="index &gt;= ((leaf_node_t *)this)-&gt;size">
+            <Break/>
+          </If>
+          <Item Name="[{index}]">((leaf_node_t *)this)-&gt;item[index]</Item>
+          <Exec>++index</Exec>
+        </Loop>
+      </CustomListItems>
     </Expand>
   </Type>
 </AutoVisualizer>

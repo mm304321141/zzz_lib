@@ -256,21 +256,21 @@ int main()
         aaa3.emplace(7);
         aaa = aaa3;
         bpptree_multimap<int, int> bp({{1, 2},{1, 2}});
-        bpptree_multimap<int, int> const sb2(bp, bpptree_multimap<int, int>::allocator_type());
+        bpptree_multimap<int, int> const bp2(bp, bpptree_multimap<int, int>::allocator_type());
         bp.insert({{3, 4},{5, 6}});
         bp.insert(bp.begin(), {7, 8});
         bp.erase(bp.begin() + 1, bp.end());
-        sb2.find(0);
-        sb2.slice();
-        sb2.front();
-        sb2.back();
-        sb2.equal_range(2);
-        sb2.lower_bound(2);
-        sb2.upper_bound(2);
-        sb2.range(2, 2);
-        sb2.rank(2);
-        sb2.count(2);
-        sb2.count(2, 2);
+        bp2.find(0);
+        bp2.slice();
+        bp2.front();
+        bp2.back();
+        bp2.equal_range(2);
+        bp2.lower_bound(2);
+        bp2.upper_bound(2);
+        bp2.range(2, 2);
+        bp2.rank(2);
+        bp2.count(2);
+        bp2.count(2, 2);
         for(int i = 0; i < 100000; ++i)
         {
             aaa.emplace(i);
@@ -311,25 +311,25 @@ int main()
 
     [&]()
     {
-        bpptree_multimap<int, int> sb1;
-        assert(bp.size() == sb1.size());
+        bpptree_multimap<int, int> bp1;
+        assert(bp.size() == bp1.size());
         for(int i = 0; i < 100; ++i)
         {
             bp.insert(std::make_pair(rand(), i));
             bp.insert(std::make_pair(rand(), i));
-            sb1.insert(std::make_pair(rand(), i));
+            bp1.insert(std::make_pair(rand(), i));
         }
         bp.rank(bp.begin() + 2);
-        sb1 = bp;
-        bpptree_multimap<int, int> sb2 = bp;
-        assert(bp.size() == sb1.size());
-        assert(bp.size() == sb2.size());
-        assert(sb1.rbegin()->second == (--sb1.end())->second);
-        typedef decltype(sb1.rbegin()) riter_t;
-        riter_t rit(sb1.begin());
-        assert(rit.base() == sb1.begin());
-        assert(rit == sb1.rend());
-        assert(sb2.rbegin() + 10 == sb2.rend() - 190);
+        bp1 = bp;
+        bpptree_multimap<int, int> bp2 = bp;
+        assert(bp.size() == bp1.size());
+        assert(bp.size() == bp2.size());
+        assert(bp1.rbegin()->second == (--bp1.end())->second);
+        typedef decltype(bp1.rbegin()) riter_t;
+        riter_t rit(bp1.begin());
+        assert(rit.base() == bp1.begin());
+        assert(rit == bp1.rend());
+        assert(bp2.rbegin() + 10 == bp2.rend() - 190);
         assert(bp.at(100)->second == bp.at(50)[50].second);
         assert(bp.at(74) < bp.at(75));
         assert(bp.at(75) >= bp.at(75));
@@ -345,10 +345,10 @@ int main()
         assert(bp.at(3)->second == 4);
         assert(bp.at(4)->second == 2);
         assert(bp.erase(0) == 5);
-        bp.insert(sb1.rbegin(), sb1.rend());
-        assert(bp.get_allocator() == sb2.get_allocator());
-        sb1.clear();
-        bp.swap(sb1);
+        bp.insert(bp1.rbegin(), bp1.rend());
+        assert(bp.get_allocator() == bp2.get_allocator());
+        bp1.clear();
+        bp.swap(bp1);
     }();
 
     [&]()
@@ -393,11 +393,11 @@ int main()
         for(int i = 0; i < length / 2; ++i)
         {
             auto it_rb = rb.begin();
-            auto it_sb = bp.begin();
+            auto it_bp = bp.begin();
             std::advance(it_rb, rand() % rb.size());
-            std::advance(it_sb, rand() % bp.size());
+            std::advance(it_bp, rand() % bp.size());
             rb.erase(it_rb);
-            bp.erase(it_sb);
+            bp.erase(it_bp);
         }
         for(int i = 0; i < length * 2 + 2; ++i)
         {
@@ -407,39 +407,39 @@ int main()
         }
         for(int i = 0; i < length; ++i)
         {
-            decltype(bp) const &csb = bp;
-            typedef decltype(csb.begin()) iter_t;
-            int off = rand() % csb.size();
-            iter_t it = csb.at(off);
-            assert(it - csb.begin() == off);
-            assert(it - off == csb.begin());
-            assert(csb.begin() + off == it);
-            assert(csb.begin() + off == csb.end() - (csb.size() - off));
-            iter_t begin = csb.begin(), end = csb.end();
+            decltype(bp) const &cpb = bp;
+            typedef decltype(cpb.begin()) iter_t;
+            int off = rand() % cpb.size();
+            iter_t it = cpb.at(off);
+            assert(it - cpb.begin() == off);
+            assert(it - off == cpb.begin());
+            assert(cpb.begin() + off == it);
+            assert(cpb.begin() + off == cpb.end() - (cpb.size() - off));
+            iter_t begin = cpb.begin(), end = cpb.end();
             for(int i = 0; i < off; ++i)
             {
                 --it;
                 ++begin;
                 --end;
             }
-            assert(csb.end() - end == off);
-            assert(csb.begin() + off == begin);
-            assert(csb.begin() == it);
-            size_t part = csb.size() / 4;
+            assert(cpb.end() - end == off);
+            assert(cpb.begin() + off == begin);
+            assert(cpb.begin() == it);
+            size_t part = cpb.size() / 4;
             size_t a = part + rand() % (part * 2);
             size_t b = rand() % part;
-            assert(csb.at(a) + b == csb.at(a + b));
-            assert(csb.begin() + a == csb.at(a + b) - b);
-            assert(csb.at(a) - csb.at(b) == a - b);
+            assert(cpb.at(a) + b == cpb.at(a + b));
+            assert(cpb.begin() + a == cpb.at(a + b) - b);
+            assert(cpb.at(a) - cpb.at(b) == a - b);
         }
         for(int i = 0; i < length * 2 + length / 2; ++i)
         {
             auto it_rb = rb.rbegin();
-            auto it_sb = bp.rbegin();
+            auto it_bp = bp.rbegin();
             std::advance(it_rb, rand() % rb.size());
-            std::advance(it_sb, rand() % bp.size());
+            std::advance(it_bp, rand() % bp.size());
             rb.erase(--(it_rb.base()));
-            bp.erase(--(it_sb.base()));
+            bp.erase(--(it_bp.base()));
         }
     }();
 
