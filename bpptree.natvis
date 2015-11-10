@@ -36,7 +36,7 @@
     </Expand>
   </Type>
   <Type Name="b_plus_plus_tree&lt;*&gt;::key_stack_t">
-    <DisplayString Condition="true">{*(key_type *)buffer}</DisplayString>
+    <DisplayString Condition="true">{*(key_type *)&amp;key_pod}</DisplayString>
   </Type>
   <Type Name="b_plus_plus_tree&lt;*&gt;::node_t">
     <DisplayString Condition="size == 0">{{ root:size={parent-&gt;size} }}</DisplayString>
