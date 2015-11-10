@@ -169,6 +169,7 @@ public:
     typedef value_type *pointer;
     typedef value_type const *const_pointer;
 
+protected:
     struct node_t
     {
         node_t *parent;
