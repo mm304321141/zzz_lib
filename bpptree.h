@@ -5,6 +5,7 @@
 #include <memory>
 #include <cstring>
 #include <type_traits>
+#include <tuple>
 
 
 namespace b_plus_plus_tree_detail
@@ -242,10 +243,7 @@ protected:
             return node_t::size < min;
         }
     };
-    struct memory_node_t
-    {
-        uint8_t buffer[config_t::memory_block_size];
-    };
+    typedef typename std::aligned_union<config_t::memory_block_size, inner_node_t, leaf_node_t>::type memory_node_t;
     typedef typename allocator_type::template rebind<memory_node_t>::other node_allocator_t;
     struct root_node_t : public node_t, public node_allocator_t, public key_compare
     {
