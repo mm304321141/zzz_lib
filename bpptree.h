@@ -254,12 +254,52 @@ protected:
             return node_t::size < min;
         }
     };
+    template<class, class> struct status_t
+    {
+        status_t() : inner_count(), leaf_count()
+        {
+        }
+        size_type inner_count;
+        size_type leaf_count;
+        static const size_type inner_bound = inner_node_t::max;
+        static const size_type leaf_bound = leaf_node_t::max;
+    };
+    template<class unused_t> struct status_t<std::false_type, unused_t>
+    {
+        status_t()
+        {
+        }
+    };
+    typedef status_t<typename config_t::status_type, void> status_type;
+    template<class, class> struct status_control_t
+    {
+        static void change_leaf(status_type &status, difference_type value)
+        {
+            status.leaf_count += value;
+        }
+        static void change_inner(status_type &status, difference_type value)
+        {
+            status.inner_count += value;
+        }
+    };
+    template<class unused_t> struct status_control_t<std::false_type, unused_t>
+    {
+        static void change_leaf(status_type &, difference_type)
+        {
+        }
+        static void change_inner(status_type &, difference_type)
+        {
+        }
+    };
+    typedef status_control_t<typename config_t::status_type, void> status_control_type;
     typedef typename std::aligned_union<config_t::memory_block_size, inner_node_t, leaf_node_t>::type memory_node_t;
     typedef typename allocator_type::template rebind<memory_node_t>::other node_allocator_t;
-    struct root_node_t : public node_t, public node_allocator_t, public key_compare
+    struct root_node_t : public node_t, public node_allocator_t, public key_compare, public status_type
     {
-        template<class any_key_compare, class any_allocator_t> root_node_t(any_key_compare &&comp, any_allocator_t &&alloc) : key_compare(std::forward<any_key_compare>(comp)), node_allocator_t(std::forward<any_allocator_t>(alloc))
+        template<class any_key_compare, class any_allocator_t> root_node_t(any_key_compare &&comp, any_allocator_t &&alloc) : key_compare(std::forward<any_key_compare>(comp)), node_allocator_t(std::forward<any_allocator_t>(alloc)), status_type()
         {
+            static_assert(inner_node_t::max >= 4, "low memory_block_size");
+            static_assert(leaf_node_t::max >= 4, "low memory_block_size");
             node_t::parent = left = right = this;
             node_t::size = 0;
             node_t::level = 0;
@@ -870,7 +910,7 @@ public:
         }
         difference_type operator - (const_reverse_iterator const &other) const
         {
-            return static_cast<difference_type>(b_plus_plus_tree::rank(other.node, other.where)) - static_cast<difference_type>(b_plus_plus_tree::rank(node, where));
+            return static_cast<difference_type>(b_plus_plus_tree::calculate_rank_(other.node, other.where)) - static_cast<difference_type>(b_plus_plus_tree::calculate_rank_(node, where));
         }
         const_reverse_iterator &operator++()
         {
@@ -1363,15 +1403,32 @@ public:;
            return const_iterator(access_index_(root_.parent, index), this);
        }
 
-       //rank(begin) == 0, key rank when insert
+       //rank(begin) == 0, key rank
        size_type rank(key_type const &key) const
        {
-           return calculate_key_rank_(key);
+           return calculate_key_rank_<true>(key);
        }
        //rank(begin) == 0, rank of iterator
        static size_type rank(const_iterator where)
        {
            return calculate_rank_(where.node, where.where);
+       }
+
+       //rank(begin) == 0, key rank current best
+       size_type lower_rank(key_type const &key) const
+       {
+           return calculate_key_rank_<true>(key);
+       }
+       //rank(begin) == 0, key rank when insert
+       size_type upper_rank(key_type const &key) const
+       {
+           return calculate_key_rank_<false>(key);
+       }
+
+       status_type const &status() const
+       {
+           static_assert(config_t::status_type::value, "status_type false");
+           return root_;
        }
 
 protected:
@@ -1418,6 +1475,7 @@ protected:
         node->size = 0;
         node->level = 1;
         node->used = 0;
+        status_control_type::change_inner(root_, 1);
         return node;
     }
     leaf_node_t *alloc_leaf_node_(node_t *parent)
@@ -1428,6 +1486,7 @@ protected:
         node->level = 0;
         node->prev = nullptr;
         node->next = nullptr;
+        status_control_type::change_leaf(root_, 1);
         return node;
     }
     template<class in_node_t> void dealloc_node_(in_node_t *node)
@@ -1441,6 +1500,7 @@ protected:
         if(node->level == 0)
         {
             dealloc_node_(static_cast<leaf_node_t *>(node));
+            status_control_type::change_leaf(root_, -1);
         }
         else
         {
@@ -1453,6 +1513,7 @@ protected:
                 }
             }
             dealloc_node_(leaf_node);
+            status_control_type::change_inner(root_, -1);
         }
     }
 
@@ -1559,7 +1620,7 @@ protected:
         }
     }
 
-    size_type calculate_key_rank_(key_type const &key) const
+    template<bool is_leftish> size_type calculate_key_rank_(key_type const &key) const
     {
         node_t *node = root_.parent;
         if(node->size == 0)
@@ -1575,7 +1636,7 @@ protected:
             {
                 for(where = 0; where < inner_node->bound(); ++where)
                 {
-                    if(get_comparator_()(key, get_key_()(inner_node->item[where])))
+                    if(is_leftish ? !get_comparator_()(get_key_()(inner_node->item[where]), key) : get_comparator_()(key, get_key_()(inner_node->item[where])))
                     {
                         break;
                     }
@@ -1587,7 +1648,7 @@ protected:
             }
             else
             {
-                where = upper_bound_(inner_node, key);
+                where = is_leftish ? lower_bound_(inner_node, key) : upper_bound_(inner_node, key);
                 for(size_type i = 0; i < where; ++i)
                 {
                     rank += inner_node->children[i]->size;
@@ -1595,7 +1656,7 @@ protected:
             }
             node = inner_node->children[where];
         }
-        return rank + upper_bound_(static_cast<leaf_node_t *>(node), key);
+        return rank + (is_leftish ? lower_bound_(static_cast<leaf_node_t *>(node), key) : upper_bound_(static_cast<leaf_node_t *>(node), key));
     }
 
     static size_type calculate_rank_(node_t *node, size_type where)

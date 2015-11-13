@@ -13,6 +13,7 @@ struct bpptree_set_config_t
     typedef comparator_t key_compare;
     typedef allocator_t allocator_type;
     typedef unique_t unique_type;
+    typedef std::false_type status_type;
     template<class in_type> static key_type const &get_key(in_type &&value)
     {
         return value;

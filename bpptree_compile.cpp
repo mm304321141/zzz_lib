@@ -67,6 +67,8 @@ template<class T> void foo_test(T &bp)
     o.max_size();
     o.at(0);
     o.rank(k);
+    o.lower_rank(k);
+    o.upper_rank(k);
     O::rank(b);
 }
 

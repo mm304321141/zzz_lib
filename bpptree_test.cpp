@@ -18,8 +18,11 @@ auto assert_proc = [](bool no_error, char const *query, char const *file, size_t
 {
     if(!no_error)
     {
-        printf("%s(%zd):%s\n", file, line, query);
-        *static_cast<int *>(0) = 0;
+        static bpptree_set<std::pair<char const *, size_t>> check;
+        if(check.emplace(file, line).second)
+        {
+            printf("%s(%zd):%s\n", file, line, query);
+        }
     }
 };
 
@@ -172,6 +175,26 @@ public:
     }
 };
 
+struct double_multiset_config
+{
+    typedef double key_type;
+    typedef double const mapped_type;
+    typedef double const value_type;
+    typedef double storage_type;
+    typedef std::less<double> key_compare;
+    typedef std::allocator<double> allocator_type;
+    typedef std::false_type unique_type;
+    typedef std::true_type status_type;
+    template<class in_type> static key_type const &get_key(in_type &&value)
+    {
+        return value;
+    }
+    enum
+    {
+        memory_block_size = 256,
+    };
+};
+
 int main()
 {
     [&]()
@@ -180,7 +203,7 @@ int main()
         std::mt19937 mt(0);
         auto mtr = std::uniform_real_distribution<double>(-99999999, 99999999);
 
-        bpptree_multiset<double> bp;
+        b_plus_plus_tree<double_multiset_config> bp;
         std::vector<double> vc;
         for(int i = 0; i < 20000000; ++i)
         {
@@ -194,19 +217,23 @@ int main()
         auto b1 = t();
         for(int i = 0; i < 100000000; ++i)
         {
-            sum1 += bp.rank(i);
+            sum1 += bp.lower_rank(i);
         }
         auto e1 = t();
         auto b2 = t();
         for(int i = 0; i < 100000000; ++i)
         {
-            sum2 += std::upper_bound(vc.begin(), vc.end(), i) - vc.begin();
+            sum2 += std::lower_bound(vc.begin(), vc.end(), i) - vc.begin();
         }
         auto e2 = t();
         std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e1 - b1).count() << std::endl;
         std::cout << "sum = " << sum1 << std::endl;
         std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e2 - b2).count() << std::endl;
         std::cout << "sum = " << sum2 << std::endl;
+        std::cout << "inner count = " << bp.status().inner_count << std::endl;
+        std::cout << "inner bound = " << bp.status().inner_bound << std::endl;
+        std::cout << "leaf count = " << bp.status().leaf_count << std::endl;
+        std::cout << "leaf bound = " << bp.status().leaf_bound << std::endl;
         system("pause");
     }();
 
@@ -232,7 +259,7 @@ int main()
             }
         }
         assert(foo.size() == count);
-        assert(foo.rank(foo.back()) == foo.size());
+        assert(foo.rank(foo.back()) == foo.size() - 1);
         assert(foo.erase("2") == 1);
         while(!foo.empty())
         {
@@ -268,7 +295,7 @@ int main()
         bp2.lower_bound(2);
         bp2.upper_bound(2);
         bp2.range(2, 2);
-        bp2.rank(2);
+        bp2.upper_rank(2);
         bp2.count(2);
         bp2.count(2, 2);
         for(int i = 0; i < 100000; ++i)
@@ -380,12 +407,14 @@ int main()
         assert(bp.front().second == (--bp.rend())->second);
         assert(bp.back().second == (--bp.end())->second);
         assert(bp.back().second == bp.rbegin()->second);
-        assert(bp.rank(0) == 2);
-        assert(bp.rank(1) == 4);
-        assert(bp.rank(length) == bp.size());
-        assert(bp.rank(length / 2) == bp.size());
-        assert(bp.rank(length / 2 - 1) == bp.size());
-        assert(bp.rank(length / 2 - 2) == bp.size() - 2);
+        assert(bp.upper_rank(0) == 2);
+        assert(bp.lower_rank(0) == 0);
+        assert(bp.upper_rank(1) == 4);
+        assert(bp.lower_rank(1) == 2);
+        assert(bp.upper_rank(length) == bp.size());
+        assert(bp.upper_rank(length / 2) == bp.size());
+        assert(bp.upper_rank(length / 2 - 1) == bp.size());
+        assert(bp.upper_rank(length / 2 - 2) == bp.size() - 2);
         assert(rb.equal_range(2).first == rb.lower_bound(2));
         assert(bp.equal_range(2).second == bp.upper_bound(2));
         assert(bp.erase(3) == 2);
@@ -514,34 +543,31 @@ int main()
     auto bs1 = t();
     testbp();
     auto be1 = t();
+    std::cout << "bp time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be1 - bs1).count() << std::endl;
     auto rs1 = t();
     testrb();
     auto re1 = t();
+    std::cout << "rb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re1 - rs1).count() << std::endl;
     reset();
     auto bs2 = t();
     testbp();
     auto be2 = t();
+    std::cout << "bp time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be2 - bs2).count() << std::endl;
     auto rs2 = t();
     testrb();
     auto re2 = t();
+    std::cout << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl;
     reset();
     auto bs3 = t();
     testbp();
     auto be3 = t();
+    std::cout << "bp time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be3 - bs3).count() << std::endl;
     auto rs3 = t();
     testrb();
     auto re3 = t();
+    std::cout << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl;
 
     v.clear();
-
-    std::cout
-        << "bp time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be1 - bs1).count() << std::endl
-        << "rb time 1(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re1 - rs1).count() << std::endl
-        << "bp time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be2 - bs2).count() << std::endl
-        << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl
-        << "bp time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(be3 - bs3).count() << std::endl
-        << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl
-        ;
 
     system("pause");
 
