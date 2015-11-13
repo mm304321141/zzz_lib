@@ -1104,9 +1104,9 @@ public:;
            return result_<typename config_t::unique_type>(insert_nohint_<false>(std::forward<in_value_t>(value)));
        }
        //with hint
-       insert_result_t insert(const_iterator hint, value_type const &value)
+       iterator insert(const_iterator hint, value_type const &value)
        {
-           return result_<typename config_t::unique_type>(insert_hint_(hint.node->size == 0 ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, value));
+           return result_<std::false_type>(insert_hint_(hint.node->size == 0 ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, value));
        }
        //with hint
        template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(const_iterator hint, in_value_t &&value)
