@@ -18,8 +18,8 @@ auto assert_proc = [](bool no_error, char const *query, char const *file, size_t
 {
     if(!no_error)
     {
-        static bpptree_set<std::pair<char const *, size_t>> check;
-        if(check.emplace(file, line).second)
+        static bpptree_set<std::tuple<char const *, char const *, size_t>> check;
+        if(check.emplace(query, file, line).second)
         {
             printf("%s(%zd):%s\n", file, line, query);
         }
@@ -230,10 +230,14 @@ int main()
         std::cout << "sum = " << sum1 << std::endl;
         std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e2 - b2).count() << std::endl;
         std::cout << "sum = " << sum2 << std::endl;
-        std::cout << "inner count = " << bp.status().inner_count << std::endl;
         std::cout << "inner bound = " << bp.status().inner_bound << std::endl;
-        std::cout << "leaf count = " << bp.status().leaf_count << std::endl;
         std::cout << "leaf bound = " << bp.status().leaf_bound << std::endl;
+        std::cout << "inner count = " << bp.status().inner_count << std::endl;
+        std::cout << "leaf count = " << bp.status().leaf_count << std::endl;
+        for(size_t i = 0; i < bp.status().level_count.size(); ++i)
+        {
+            std::cout << "level count [" << i << "] = " << bp.status().level_count[i] << std::endl;
+        }
         system("pause");
     }();
 
