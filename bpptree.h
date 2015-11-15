@@ -272,7 +272,7 @@ protected:
         {
         }
     };
-    typedef status_select_t<typename config_t::status_type, void> status_t;
+    typedef status_select_t<typename config_t::status_type::type, void> status_t;
     template<class, class> struct status_control_select_t
     {
         static void change_leaf(status_t &status, difference_type value)
@@ -317,7 +317,7 @@ protected:
         {
         }
     };
-    typedef status_control_select_t<typename config_t::status_type, void> status_control_t;
+    typedef status_control_select_t<typename config_t::status_type::type, void> status_control_t;
     typedef typename std::aligned_union<config_t::memory_block_size, inner_node_t, leaf_node_t>::type memory_node_t;
     typedef typename allocator_type::template rebind<memory_node_t>::other node_allocator_t;
     struct root_node_t : public node_t, public node_allocator_t, public key_compare, public status_t
@@ -1853,11 +1853,6 @@ protected:
     template<class iterator_from_t, class iterator_to_t> static void move_forward_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
         b_plus_plus_tree_detail::move_forward(move_begin, move_end, to_begin, typename b_plus_plus_tree_detail::get_tag<iterator_from_t>::type());
-    }
-
-    template<class iterator_from_t, class iterator_to_t> static void move_backward_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
-    {
-        b_plus_plus_tree_detail::move_backward(move_begin, move_end, to_begin, typename b_plus_plus_tree_detail::get_tag<iterator_from_t>::type());
     }
 
     template<class iterator_from_t, class iterator_to_t> static void move_construct_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)

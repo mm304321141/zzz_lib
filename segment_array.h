@@ -294,7 +294,7 @@ protected:
         {
         }
     };
-    typedef status_select_t<typename config_t::status_type, void> status_t;
+    typedef status_select_t<typename config_t::status_type::type, void> status_t;
     template<class, class> struct status_control_select_t
     {
         static void change_leaf(status_t &status, difference_type value)
@@ -339,7 +339,7 @@ protected:
         {
         }
     };
-    typedef status_control_select_t<typename config_t::status_type, void> status_control_t;
+    typedef status_control_select_t<typename config_t::status_type::type, void> status_control_t;
     typedef typename std::aligned_union<config_t::memory_block_size, inner_node_t, leaf_node_t>::type memory_node_t;
     typedef typename allocator_type::template rebind<memory_node_t>::other node_allocator_t;
     struct root_node_t : public node_t, public node_allocator_t, public status_t
@@ -973,7 +973,7 @@ public:;
                {
                    while(count-- > 0)
                    {
-                       erase(--cend());
+                       pop_back();
                    }
                    return;
                }
@@ -996,7 +996,7 @@ public:;
                {
                    while(self_count-- > 0)
                    {
-                       erase(--end());
+                       pop_back();
                    }
                    return;
                }
@@ -1086,11 +1086,12 @@ public:;
        }
        void pop_back()
        {
-           erase(--cend());
+           leaf_node_t *leaf_node = static_cast<leaf_node_t *>(root_.right);
+           erase_pos_(leaf_node, leaf_node->bound() - 1);
        }
        void pop_front()
        {
-           erase(cbegin());
+           erase_pos_(static_cast<leaf_node_t *>(root_.left), 0);
        }
 
        template<class ...args_t> iterator emplace(const_iterator where, args_t &&...args)
@@ -1099,11 +1100,11 @@ public:;
        }
        template<class ...args_t> iterator emplace_back(args_t &&...args)
        {
-           return insert(cend(), std::move(value_type(std::forward<args_t>(args)...)));
+           return emplace(cend(), std::forward<args_t>(args)...);
        }
        template<class ...args_t> iterator emplace_front(args_t &&...args)
        {
-           return insert(cbegin(), std::move(value_type(std::forward<args_t>(args)...)));
+           return emplace(cbegin(), std::forward<args_t>(args)...);
        }
 
        iterator erase(const_iterator it)
@@ -1256,6 +1257,30 @@ public:;
            {
                free_node_<true>(root_.parent);
                root_.parent = root_.left = root_.right = &root_;
+           }
+       }
+       void resize(size_type count)
+       {
+           if(count > size())
+           {
+               insert(cend(), count - size(), value_type());
+               return;
+           }
+           while(count < size())
+           {
+               pop_back();
+           }
+       }
+       void resize(size_type count, value_type const &value)
+       {
+           if(count > size())
+           {
+               insert(cend(), count - size(), value);
+               return;
+           }
+           while(count < size())
+           {
+               pop_back();
            }
        }
        size_type size() const
@@ -1566,11 +1591,6 @@ protected:
     template<class iterator_from_t, class iterator_to_t> static void move_forward_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
         segment_array_detail::move_forward(move_begin, move_end, to_begin, typename segment_array_detail::get_tag<iterator_from_t>::type());
-    }
-
-    template<class iterator_from_t, class iterator_to_t> static void move_backward_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
-    {
-        segment_array_detail::move_backward(move_begin, move_end, to_begin, typename segment_array_detail::get_tag<iterator_from_t>::type());
     }
 
     template<class iterator_from_t, class iterator_to_t> static void move_construct_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)

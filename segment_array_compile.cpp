@@ -57,6 +57,8 @@ template<class T> void foo_test(T &bp)
     bp.back();
     bp.empty();
     o.empty();
+    o.resize(1);
+    o.resize(1, v);
     o.size();
     o.max_size();
     o.at(0);
