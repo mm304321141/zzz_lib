@@ -1726,41 +1726,6 @@ protected:
         }
     }
 
-    template<bool is_leftish, class in_value_t> pair_posi_t insert_nohint_(in_value_t &&value)
-    {
-        if(root_.parent->size == 0)
-        {
-            return insert_first_(std::forward<in_value_t>(value));
-        }
-        leaf_node_t *leaf_node;
-        size_type where;
-        std::tie(leaf_node, where) = is_leftish ? lower_bound_(get_key_t()(value)) : upper_bound_(get_key_t()(value));
-        if(leaf_node == nullptr)
-        {
-            leaf_node = static_cast<leaf_node_t *>(root_.right);
-            where = leaf_node->bound();
-        }
-        if(config_t::unique_type::value && (where > 0 || leaf_node->prev != &root_))
-        {
-            if(where == 0)
-            {
-                leaf_node_t *prev_leaf_node = static_cast<leaf_node_t *>(leaf_node->prev);
-                if(!get_comparator_()(get_key_t()(prev_leaf_node->item[prev_leaf_node->bound() - 1]), get_key_t()(value)))
-                {
-                    return std::make_pair(std::make_pair(prev_leaf_node, prev_leaf_node->bound() - 1), false);
-                }
-            }
-            else
-            {
-                if(!get_comparator_()(get_key_t()(leaf_node->item[where - 1]), get_key_t()(value)))
-                {
-                    return std::make_pair(std::make_pair(leaf_node, where - 1), false);
-                }
-            }
-        }
-        return insert_pos_(leaf_node, where, std::forward<in_value_t>(value));
-    }
-
     void split_inner_node_(inner_node_t *inner_node, node_t *&new_node, size_type where)
     {
         size_type mid = (inner_node->bound() >> 1);
