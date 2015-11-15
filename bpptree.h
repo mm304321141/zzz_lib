@@ -1175,13 +1175,15 @@ public:;
            return (pos.first == nullptr || pos.second >= pos.first->bound() || get_comparator_()(key, get_key_t()(pos.first->item[pos.second]))) ? iterator(root_.parent->parent, 0) : iterator(pos.first, pos.second);
        }
 
-       void erase(const_iterator it)
+       iterator erase(const_iterator it)
        {
            if(root_.parent->size == 0)
            {
-               return;
+               return end();
            }
+           size_type pos_at = rank(it);
            erase_pos_(static_cast<leaf_node_t *>(it.node), it.where);
+           return at(pos_at);
        }
        size_type erase(key_type const &key)
        {

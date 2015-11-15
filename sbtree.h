@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
+#include <tuple>
 
 template<class config_t>
 class size_balanced_tree
@@ -642,7 +643,7 @@ public:
     template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, iterator>::type insert(const_iterator hint, in_value_t &&value)
     {
         check_max_size_();
-        return iterator(sbt_insert_hint_<false>(hint.node, sbt_create_node_(std::forward<in_value_t>(value))));
+        return iterator(sbt_insert_hint_(hint.node, sbt_create_node_(std::forward<in_value_t>(value))));
     }
     //range
     template<class iterator_t> void insert(iterator_t begin, iterator_t end)
@@ -682,10 +683,12 @@ public:
         return (is_nil_(where) || get_comparator_()(key, get_key_(where))) ? const_iterator(nil_()) : const_iterator(where);
     }
 
-    void erase(const_iterator where)
+    iterator erase(const_iterator where)
     {
+        const_iterator pos = std::next(where);
         sbt_erase_<false>(where.node);
         sbt_destroy_node_(where.node);
+        return iterator(pos.node);
     }
     size_type erase(key_type const &key)
     {
@@ -911,15 +914,26 @@ public:
         return const_iterator(sbt_at_(index));
     }
 
-    //rank(begin) == 0, key rank when insert
+    //rank(begin) == 0, key rank
     size_type rank(key_type const &key) const
     {
-        return sbt_rank_(bst_upper_bound_(key));
+        return bst_lower_rank_(key);
     }
     //rank(begin) == 0, rank of iterator
     static size_type rank(const_iterator where)
     {
         return sbt_rank_(where.node);
+    }
+
+    //rank(begin) == 0, key rank current best
+    size_type lower_rank(key_type const &key) const
+    {
+        return bst_lower_rank_(key);
+    }
+    //rank(begin) == 0, key rank when insert
+    size_type upper_rank(key_type const &key) const
+    {
+        return bst_upper_rank_(key);
     }
 
 protected:
@@ -1317,6 +1331,44 @@ protected:
             }
             node = parent;
             parent = get_parent_(node);
+        }
+        return rank;
+    }
+
+    size_type bst_lower_rank_(key_type const &key) const
+    {
+        node_t *node = get_root_();
+        size_type rank = 0;
+        while(!is_nil_(node))
+        {
+            if(get_comparator_()(get_key_(node), key))
+            {
+                rank += get_size_(get_left_(node)) + 1;
+                node = get_right_(node);
+            }
+            else
+            {
+                node = get_left_(node);
+            }
+        }
+        return rank;
+    }
+
+    size_type bst_upper_rank_(key_type const &key) const
+    {
+        node_t *node = get_root_();
+        size_type rank = 0;
+        while(!is_nil_(node))
+        {
+            if(get_comparator_()(key, get_key_(node)))
+            {
+                node = get_left_(node);
+            }
+            else
+            {
+                rank += get_size_(get_left_(node)) + 1;
+                node = get_right_(node);
+            }
         }
         return rank;
     }

@@ -18,8 +18,11 @@ auto assert_proc = [](bool no_error, char const *query, char const *file, size_t
 {
     if(!no_error)
     {
-        printf("%s(%zd):%s\n", file, line, query);
-        *static_cast<int *>(0) = 0;
+        static std::set<std::tuple<char const *, char const *, size_t>> check;
+        if(check.emplace(query, file, line).second)
+        {
+            printf("%s(%zd):%s\n", file, line, query);
+        }
     }
 };
 
@@ -393,12 +396,14 @@ int main()
         assert(sb.front().second == (--sb.rend())->second);
         assert(sb.back().second == (--sb.end())->second);
         assert(sb.back().second == sb.rbegin()->second);
-        assert(sb.rank(0) == 2);
-        assert(sb.rank(1) == 4);
-        assert(sb.rank(length) == sb.size());
-        assert(sb.rank(length / 2) == sb.size());
-        assert(sb.rank(length / 2 - 1) == sb.size());
-        assert(sb.rank(length / 2 - 2) == sb.size() - 2);
+        assert(sb.upper_rank(0) == 2);
+        assert(sb.lower_rank(0) == 0);
+        assert(sb.upper_rank(1) == 4);
+        assert(sb.lower_rank(1) == 2);
+        assert(sb.upper_rank(length) == sb.size());
+        assert(sb.upper_rank(length / 2) == sb.size());
+        assert(sb.upper_rank(length / 2 - 1) == sb.size());
+        assert(sb.upper_rank(length / 2 - 2) == sb.size() - 2);
         assert(rb.equal_range(2).first == rb.lower_bound(2));
         assert(sb.equal_range(2).second == sb.upper_bound(2));
         assert(sb.erase(3) == 2);
