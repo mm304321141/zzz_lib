@@ -30,16 +30,22 @@ int main()
 
 
     auto t = std::chrono::high_resolution_clock::now;
-    std::mt19937 mt;
-    auto mtr = std::uniform_int_distribution<int>(0, 25);
+    //std::mt19937 mt;
+    //auto mtr = std::uniform_int_distribution<int>(0, 25);
 
     segment_array_implement<segment_char_array_config> char_arr;
 
+	auto b = t();
+
     for(int i = 0; i <= 999999999; ++i)
     {
-        char_arr.emplace_back("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[mtr(mt)]);
+        //char_arr.emplace_back("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[mtr(mt)]);
+		char_arr.emplace_back("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26]);
     }
 
+	auto e = t();
+
+	std::cout << "time(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(e - b).count() << std::endl;
     std::cout << "inner bound = " << char_arr.status().inner_bound << std::endl;
     std::cout << "leaf bound = " << char_arr.status().leaf_bound << std::endl;
     std::cout << "inner count = " << char_arr.status().inner_count << std::endl;

@@ -70,7 +70,6 @@ namespace segment_array_detail
     }
     template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_assign_tag)
     {
-        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
         for(; destroy_begin != destroy_end; ++destroy_begin)
         {
             destroy_one(destroy_begin, move_assign_tag());
@@ -1947,10 +1946,7 @@ protected:
         size_type parent_where;
         if(leaf_node->is_underflow() && !(leaf_node == root_.parent && leaf_node->bound() >= 1))
         {
-            if(parent == nullptr)
-            {
-                parent_where = get_parent_(leaf_node, parent);
-            }
+            parent_where = get_parent_(leaf_node, parent);
             leaf_node_t *leaf_left, *leaf_right;
             inner_node_t *left_parent, *right_parent;
             get_left_right_parent_(parent, parent_where, leaf_left, left_parent, leaf_right, right_parent);
@@ -2040,10 +2036,7 @@ protected:
         size_type parent_where;
         if(result.has(btree_fixmerge))
         {
-            if(parent == nullptr)
-            {
-                parent_where = get_parent_(inner_node, parent);
-            }
+            parent_where = get_parent_(inner_node, parent);
             if(inner_node->children[where]->parent != nullptr)
             {
                 ++where;

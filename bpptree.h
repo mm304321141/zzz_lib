@@ -42,7 +42,6 @@ namespace b_plus_plus_tree_detail
     }
     template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_assign_tag)
     {
-        typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
         for(; destroy_begin != destroy_end; ++destroy_begin)
         {
             destroy_one(destroy_begin, move_assign_tag());
@@ -320,7 +319,7 @@ protected:
     typedef status_control_select_t<typename config_t::status_type::type, void> status_control_t;
     typedef typename std::aligned_union<config_t::memory_block_size, inner_node_t, leaf_node_t>::type memory_node_t;
     typedef typename allocator_type::template rebind<memory_node_t>::other node_allocator_t;
-    struct root_node_t : public node_t, public node_allocator_t, public key_compare, public status_t
+    struct root_node_t : public node_t, public key_compare, public node_allocator_t, public status_t
     {
         template<class any_key_compare, class any_allocator_t> root_node_t(any_key_compare &&comp, any_allocator_t &&alloc) : key_compare(std::forward<any_key_compare>(comp)), node_allocator_t(std::forward<any_allocator_t>(alloc)), status_t()
         {

@@ -130,7 +130,7 @@ class checker
     {
         if(!b)
         {
-            *static_cast<int *>(0) = 0;
+			abort();
         }
     }
 public:
