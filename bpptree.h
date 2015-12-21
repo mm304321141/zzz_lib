@@ -1035,7 +1035,7 @@ public:;
            insert(begin, end);
        }
        //range
-       template <class iterator_t> b_plus_plus_tree(iterator_t begin, iterator_t end, allocator_type const &alloc = allocator_type()) : root_(key_compare(), alloc)
+       template <class iterator_t> b_plus_plus_tree(iterator_t begin, iterator_t end, allocator_type const &alloc) : root_(key_compare(), alloc)
        {
            insert(begin, end);
        }
