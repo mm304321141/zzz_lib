@@ -1473,7 +1473,7 @@ public:;
 
        status_t const &status() const
        {
-           static_assert(config_t::status_type::value, "status_type false");
+           static_assert(config_t::status_type::value, "status disabled");
            return root_;
        }
 
@@ -1670,16 +1670,16 @@ protected:
                     return;
                 }
                 inner_node_t *parent = static_cast<inner_node_t *>(node->parent);
-                for(node_t **node_ptr = parent->children; ; ++node_ptr)
+                for(node_t **child = parent->children; ; ++child)
                 {
-                    if(*node_ptr == node)
+                    if(*child == node)
                     {
                         node = parent;
                         break;
                     }
                     else
                     {
-                        step += (*node_ptr)->size;
+                        step += (*child)->size;
                     }
                 }
             }
@@ -1695,16 +1695,16 @@ protected:
                     return;
                 }
                 inner_node_t *parent = static_cast<inner_node_t *>(node->parent);
-                for(node_t **node_ptr = parent->children; ; ++node_ptr)
+                for(node_t **child = parent->children; ; ++child)
                 {
-                    if(*node_ptr == node)
+                    if(*child == node)
                     {
                         node = parent;
                         break;
                     }
                     else
                     {
-                        step += (*node_ptr)->size;
+                        step += (*child)->size;
                     }
                 }
             }
@@ -1713,15 +1713,15 @@ protected:
         while(node->level > 0)
         {
             inner_node_t *inner_node = static_cast<inner_node_t *>(node);
-            for(node_t **node_ptr = inner_node->children; ; ++node_ptr)
+            for(node_t **child = inner_node->children; ; ++child)
             {
-                if(size_type(step) >= (*node_ptr)->size)
+                if(size_type(step) >= (*child)->size)
                 {
-                    step -= (*node_ptr)->size;
+                    step -= (*child)->size;
                 }
                 else
                 {
-                    node = *node_ptr;
+                    node = *child;
                     break;
                 }
             }
@@ -1812,15 +1812,15 @@ protected:
         while(node->level > 0)
         {
             inner_node_t *inner_node = static_cast<inner_node_t *>(node);
-            for(node_t **node_ptr = inner_node->children; ; ++node_ptr)
+            for(node_t **child = inner_node->children; ; ++child)
             {
-                if(index >= (*node_ptr)->size)
+                if(index >= (*child)->size)
                 {
-                    index -= (*node_ptr)->size;
+                    index -= (*child)->size;
                 }
                 else
                 {
-                    node = *node_ptr;
+                    node = *child;
                     break;
                 }
             }
@@ -2366,11 +2366,11 @@ protected:
             return 0;
         }
         parent = static_cast<inner_node_t *>(node->parent);
-        for(node_t **node_ptr = parent->children; ; ++node_ptr)
+        for(node_t **child = parent->children; ; ++child)
         {
-            if(*node_ptr == node)
+            if(*child == node)
             {
-                return node_ptr - parent->children;
+                return child - parent->children;
             }
         }
         return 0;
