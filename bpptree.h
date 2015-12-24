@@ -1653,17 +1653,80 @@ protected:
                 return;
             }
         }
-        std::tie(node, where) = advance_root_(node, where);
         step += where;
-        if(step < 0 || size_type(step) >= node->size)
+        if(step == 0)
         {
-            node = node->parent;
             where = 0;
+            return;
+        }
+        if(step > 0)
+        {
+            while(size_type(step) >= node->size)
+            {
+                if(node->parent->size == 0)
+                {
+                    node = node->parent;
+                    where = 0;
+                    return;
+                }
+                inner_node_t *parent = static_cast<inner_node_t *>(node->parent);
+                for(node_t **node_ptr = parent->children; ; ++node_ptr)
+                {
+                    if(*node_ptr == node)
+                    {
+                        node = parent;
+                        break;
+                    }
+                    else
+                    {
+                        step += (*node_ptr)->size;
+                    }
+                }
+            }
         }
         else
         {
-            std::tie(node, where) = access_index_(node, step);
+            do
+            {
+                if(node->parent->size == 0)
+                {
+                    node = node->parent;
+                    where = 0;
+                    return;
+                }
+                inner_node_t *parent = static_cast<inner_node_t *>(node->parent);
+                for(node_t **node_ptr = parent->children; ; ++node_ptr)
+                {
+                    if(*node_ptr == node)
+                    {
+                        node = parent;
+                        break;
+                    }
+                    else
+                    {
+                        step += (*node_ptr)->size;
+                    }
+                }
+            }
+            while(step < 0);
         }
+        while(node->level > 0)
+        {
+            inner_node_t *inner_node = static_cast<inner_node_t *>(node);
+            for(node_t **node_ptr = inner_node->children; ; ++node_ptr)
+            {
+                if(size_type(step) >= (*node_ptr)->size)
+                {
+                    step -= (*node_ptr)->size;
+                }
+                else
+                {
+                    node = *node_ptr;
+                    break;
+                }
+            }
+        }
+        where = step;
     }
 
     template<bool is_leftish> size_type calculate_key_rank_(key_type const &key) const
@@ -1749,18 +1812,19 @@ protected:
         while(node->level > 0)
         {
             inner_node_t *inner_node = static_cast<inner_node_t *>(node);
-            for(size_type i = 0; ; ++i)
+            for(node_t **node_ptr = inner_node->children; ; ++node_ptr)
             {
-                if(index >= inner_node->children[i]->size)
+                if(index >= (*node_ptr)->size)
                 {
-                    index -= inner_node->children[i]->size;
+                    index -= (*node_ptr)->size;
                 }
                 else
                 {
-                    node = inner_node->children[i];
+                    node = *node_ptr;
                     break;
                 }
             }
+
         }
         return std::make_pair(static_cast<leaf_node_t *>(node), index);
     }
@@ -2302,7 +2366,14 @@ protected:
             return 0;
         }
         parent = static_cast<inner_node_t *>(node->parent);
-        return std::find(parent->children, parent->children + parent->bound() + 1, node) - parent->children;
+        for(node_t **node_ptr = parent->children; ; ++node_ptr)
+        {
+            if(*node_ptr == node)
+            {
+                return node_ptr - parent->children;
+            }
+        }
+        return 0;
     }
 
     template<class in_node_t> in_node_t *get_left_(in_node_t *node)
