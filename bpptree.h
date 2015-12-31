@@ -2104,9 +2104,9 @@ protected:
         }
         if(split_node == nullptr)
         {
-            for(node_t *parent = leaf_node->parent; parent->size != 0; parent = parent->parent)
+            for(node_t *node_parent = leaf_node->parent; node_parent->size != 0; node_parent = node_parent->parent)
             {
-                ++parent->size;
+                ++node_parent->size;
             }
         }
         else
@@ -2174,9 +2174,9 @@ protected:
         while(false);
         if(split_node == nullptr)
         {
-            for(node_t *parent = inner_node->parent; parent->size != 0; parent = parent->parent)
+            for(node_t *node_parent = inner_node->parent; node_parent->size != 0; node_parent = node_parent->parent)
             {
-                ++parent->size;
+                ++node_parent->size;
             }
         }
         else
@@ -2543,9 +2543,9 @@ protected:
         }
         else
         {
-            for(node_t *parent = leaf_node->parent; parent->size != 0; parent = parent->parent)
+            for(node_t *node_parent = leaf_node->parent; node_parent->size != 0; node_parent = node_parent->parent)
             {
-                --parent->size;
+                --node_parent->size;
             }
         }
     }
@@ -2667,9 +2667,9 @@ protected:
         }
         else
         {
-            for(node_t *parent = inner_node->parent; parent->size != 0; parent = parent->parent)
+            for(node_t *node_parent = inner_node->parent; node_parent->size != 0; node_parent = node_parent->parent)
             {
-                --parent->size;
+                --node_parent->size;
             }
         }
     }
