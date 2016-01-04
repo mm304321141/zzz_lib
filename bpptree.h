@@ -121,7 +121,7 @@ namespace b_plus_plus_tree_detail
 
     template<class iterator_t, class in_value_t> void move_next_and_insert_one(iterator_t move_begin, iterator_t move_end, in_value_t &&value, move_scalar_tag)
     {
-        std::move(move_begin, move_end, move_begin + 1);
+        std::move_backward(move_begin, move_end, move_begin + 1);
         *move_begin = std::forward<in_value_t>(value);
     }
     template<class iterator_t, class in_value_t> void move_next_and_insert_one(iterator_t move_begin, iterator_t move_end, in_value_t &&value, move_assign_tag)
@@ -132,11 +132,11 @@ namespace b_plus_plus_tree_detail
         }
         else
         {
-            iterator_t to_end = std::next(move_end);
-            construct_one(--to_end, std::move(*--move_end), move_assign_tag());
-            while(move_begin != move_end)
+            iterator_t from_end = std::prev(move_end);
+            construct_one(move_end, std::move(*from_end), move_assign_tag());
+            while(move_begin != from_end)
             {
-                *--to_end = std::move(*--move_end);
+                *--move_end = std::move(*--from_end);
             }
             *move_begin = std::forward<in_value_t>(value);
         }
