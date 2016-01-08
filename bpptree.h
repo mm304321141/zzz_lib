@@ -1174,16 +1174,7 @@ public:;
            return (pos.first == nullptr || pos.second >= pos.first->bound() || get_comparator_()(key, get_key_t()(pos.first->item[pos.second]))) ? iterator(root_.parent->parent, 0) : iterator(pos.first, pos.second);
        }
 
-       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value && !std::is_same<key_type, storage_type>::value, void>::type> mapped_type &operator[](in_key_t const &key)
-       {
-           pair_pos_t pos = lower_bound_(key);
-           if(pos.first == nullptr || pos.second >= pos.first->bound() || get_comparator_()(key, get_key_t()(pos.first->item[pos.second])))
-           {
-               pos = insert_hint_(pos.first, pos.second, std::make_pair(key, mapped_type())).first;
-           }
-           return pos.first->item[pos.second].second;
-       }
-       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value && !std::is_same<key_type, storage_type>::value, void>::type> mapped_type const &operator[](in_key_t const &key) const
+       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value && !std::is_same<key_type, storage_type>::value, void>::type> mapped_type &operator[](in_key_t &&key)
        {
            pair_pos_t pos = lower_bound_(key);
            if(pos.first == nullptr || pos.second >= pos.first->bound() || get_comparator_()(key, get_key_t()(pos.first->item[pos.second])))

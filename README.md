@@ -7,36 +7,44 @@ zzz's c++ lib
 * sbtree_set.h
 * bpptree_map.h
 * bpptree_set.h
-
-可以随机访问的有序容器<br/>
-标准库风格<br/>
-如果你不在意迭代器在容器修改后是否仍然有效<br/>
-那么强烈推荐使用bpptree_map/set系列<br/>
-相比std::map/set内存更小,时间更短<br/>
-a random accessible key value container ...<br/>
-standard library style<br/>
-
-<br/>
-
+* pro_hash_map.h
+* pro_hash_set.h
 * segment_array.h
 
-不连续数组<br/>
-标准库风格<br/>
-内部实际上是B+树节点管理策略<br/>
-任意位置插入/删除成本都很低<br/>
-a segment array implement ...<br/>
-insert/erase anywhere are low cost ...<br/>
+标准库风格容器<br/>
 standard library style<br/>
 
-<br/>
+* sbtree系列
 
-* sparse_array.h
+基于二叉搜索树实现,使用size平衡<br/>
+可以随机访问,随机访问迭代器<br/>
+key可以重复<br/>
 
-稀松数组<br/>
+* bpptree系列
+
+基于B+树实现<br/>
+可以随机访问,随机访问迭代器<br/>
 内存管理使用相同大小内存块<br/>
-a sparse array implement ...<br/>
-use fixed size memory ...<br/>
+相比标准库map,迭代器在插入/删除元素之后会失效<br/>
+sizeof(key)非巨大的情况下,插入/删除/查找速度都超过标准库map<br/>
+sizeof(key)巨大的情况下去,内存占用会偏大,并且性能下降<br/>
+遍历速度任何条件下都很快!比标准库map快得多!<br/>
 
+* pro_hash系列
+
+基于哈希表实现<br/>
+相比标准库unordered_map,迭代器在插入元素之后会失效<br/>
+内部使用内存连续,在rehash动作发生时候,会发生搬运数据操作<br/>
+key不可重复<br/>
+testing...<br/>
+
+* segment_array系列
+
+基于B+树的节点管理策略实现<br/>
+内存管理使用相同大小内存块<br/>
+任意位置插入/删除成本都很低<br/>
+
+<br/>
 <br/>
 
 * sbtree.natvis
@@ -45,3 +53,7 @@ use fixed size memory ...<br/>
 
 加入到工程,调试时候有更友好的视图<br/>
 custom views of native<br/>
+
+* sparse_array.h
+
+稀松数组...不成熟的玩意...<br/>
