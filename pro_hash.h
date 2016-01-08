@@ -190,7 +190,7 @@ public:
     class iterator
     {
     public:
-        typedef std::random_access_iterator_tag iterator_category;
+        typedef std::forward_iterator_tag iterator_category;
         typedef typename pro_hash::value_type value_type;
         typedef typename pro_hash::difference_type difference_type;
         typedef typename pro_hash::reference reference;
@@ -237,7 +237,7 @@ public:
     class const_iterator
     {
     public:
-        typedef std::random_access_iterator_tag iterator_category;
+        typedef std::forward_iterator_tag iterator_category;
         typedef typename pro_hash::value_type value_type;
         typedef typename pro_hash::difference_type difference_type;
         typedef typename pro_hash::reference reference;
