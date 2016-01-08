@@ -190,7 +190,7 @@ public:
     class iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
+        typedef std::random_access_iterator_tag iterator_category;
         typedef typename pro_hash::value_type value_type;
         typedef typename pro_hash::difference_type difference_type;
         typedef typename pro_hash::reference reference;
@@ -237,7 +237,7 @@ public:
     class const_iterator
     {
     public:
-        typedef std::forward_iterator_tag iterator_category;
+        typedef std::random_access_iterator_tag iterator_category;
         typedef typename pro_hash::value_type value_type;
         typedef typename pro_hash::difference_type difference_type;
         typedef typename pro_hash::reference reference;
@@ -251,7 +251,7 @@ public:
         const_iterator(const_iterator const &other) : offset(other.offset), self(other.self)
         {
         }
-        const_iterator(iterator const &it) : offset(other.offset), self(other.self)
+        const_iterator(iterator const &it) : offset(it.offset), self(it.self)
         {
         }
         const_iterator &operator++()
@@ -380,9 +380,12 @@ public:;
                return *this;
            }
            clear();
-           get_comparator_() = other.get_comparator_();
-           get_node_allocator_() = other.get_node_allocator_();
-           insert(other.begin(), other.end());
+           get_hasher() = other.get_hasher();
+           get_key_equal() = other.get_key_equal();
+           get_bucket_allocator_() = other.get_bucket_allocator_();
+           get_index_allocator_() = other.get_index_allocator_();
+           get_value_allocator_() = other.get_value_allocator_();
+           copy_all_<false>(&other.root_);
            return *this;
        }
        //move
@@ -486,7 +489,7 @@ public:;
            return const_iterator(find_value_(key), this);
        }
 
-       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &operator[](in_key_t const &key)
+       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &operator[](in_key_t const &key)
        {
            offset_type offset = root_.size;
            if(root_.size != 0)
@@ -497,7 +500,7 @@ public:;
            {
                offset = insert_value_(std::make_pair(key, mapped_type())).first;
            }
-           return root_.value[offset]->value()->second;
+           return root_.value[offset].value()->second;
        }
 
        iterator erase(const_iterator it)
@@ -507,7 +510,7 @@ public:;
                return end();
            }
            remove_offset_(it.offset);
-           return 1;
+           return iterator(advance_next_(it.offset), this);
        }
        size_type erase(key_type const &key)
        {
@@ -577,7 +580,7 @@ public:;
 
        bool empty() const
        {
-           return root_.data.size == 0;
+           return root_.size == root_.free_count;
        }
        void clear()
        {
@@ -615,7 +618,7 @@ public:;
        }
        float max_load_factor() const
        {
-           return setting_load_factor;
+           return root_.setting_load_factor;
        }
        float load_factor() const
        {
@@ -920,8 +923,10 @@ protected:
         {
             root_.index[root_.index[offset].next].prev = root_.index[offset].prev;
         }
-        index->hash.clear();
-        dealloc_offset_(offset);
+        root_.index[offset].next = root_.free_list;
+        root_.index[offset].hash.clear();
+        root_.free_list = offset;
+        ++root_.free_count;
 
         destroy_one_(root_.value[offset].value());
     }
