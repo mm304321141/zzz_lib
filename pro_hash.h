@@ -81,9 +81,14 @@ protected:
         }
         hash_t(hash_value_type value)
         {
-            set(value);
+            hash = value & ~(hash_value_type(1) << (sizeof(hash_value_type) * 8 - 1));
         }
-        size_type operator % (size_type value) const
+        hash_t &operator = (hash_t const &other)
+        {
+            hash = other.hash;
+            return *this;
+        }
+        template<class any_type> any_type operator % (any_type const &value) const
         {
             return hash % value;
         }
@@ -98,10 +103,6 @@ protected:
         operator bool() const
         {
             return hash != (hash_value_type(1) << (sizeof(hash_value_type) * 8 - 1));
-        }
-        void set(hash_value_type value)
-        {
-            hash = value & ~(hash_value_type(1) << (sizeof(hash_value_type) * 8 - 1));
         }
         void clear()
         {
@@ -146,18 +147,18 @@ protected:
             bucket_count = 0;
             capacity = 0;
             size = 0;
-            free_list = offset_empty;
             free_count = 0;
+            free_list = offset_empty;
             setting_load_factor = 1;
             bucket = nullptr;
             index = nullptr;
             value = nullptr;
         }
-        offset_type bucket_count;
-        offset_type capacity;
-        offset_type size;
+        typename pro_hash::size_type bucket_count;
+        typename pro_hash::size_type capacity;
+        typename pro_hash::size_type size;
+        typename pro_hash::size_type free_count;
         offset_type free_list;
-        offset_type free_count;
         float setting_load_factor;
         offset_type *bucket;
         index_t *index;
@@ -509,7 +510,7 @@ public:;
            {
                return end();
            }
-           remove_offset_(it.offset);
+           remove_offset_(offset_type(it.offset));
            return iterator(advance_next_(it.offset), this);
        }
        size_type erase(key_type const &key)
@@ -730,8 +731,8 @@ protected:
         root_.bucket_count = 0;
         root_.capacity = 0;
         root_.size = 0;
-        root_.free_list = offset_empty;
         root_.free_count = 0;
+        root_.free_list = offset_empty;
         root_.bucket = nullptr;
         root_.index = nullptr;
         root_.value = nullptr;
@@ -739,6 +740,7 @@ protected:
     
     void rehash_(size_type size)
     {
+        size = std::min(size, max_size());
         if(root_.bucket_count != 0)
         {
             get_bucket_allocator_().deallocate(root_.bucket, root_.bucket_count);
@@ -753,11 +755,11 @@ protected:
                 size_type bucket = root_.index[i].hash % size;
                 if(root_.bucket[bucket] != offset_empty)
                 {
-                    root_.index[root_.bucket[bucket]].prev = i;
+                    root_.index[root_.bucket[bucket]].prev = offset_type(i);
                 }
                 root_.index[i].prev = offset_empty;
                 root_.index[i].next = root_.bucket[bucket];
-                root_.bucket[bucket] = i;
+                root_.bucket[bucket] = offset_type(i);
             }
         }
         root_.bucket_count = size;
@@ -765,6 +767,7 @@ protected:
 
     void realloc_(size_type size)
     {
+        size = std::min(size, max_size());
         index_t *new_index = get_index_allocator_().allocate(size);
         value_t *new_value = get_value_allocator_().allocate(size);
 
@@ -784,38 +787,51 @@ protected:
 
     template<bool move> void copy_all_(root_t const *other)
     {
-        root_.bucket_count = other->bucket_count;
-        root_.capacity = other->capacity;
-        root_.size = other->size;
-        root_.free_list = other->free_list;
-        root_.free_count = other->free_count;
-        root_.bucket = get_bucket_allocator_().allocate(other->bucket_count);
-        root_.index = get_index_allocator_().allocate(other->capacity);
-        root_.value = get_value_allocator_().allocate(other->capacity);
-        std::memcpy(root_.bucket, other->bucket, sizeof(offset_type) * other->bucket_count);
-        std::memcpy(root_.index, other->index, sizeof(index_t) * other->capacity);
-        if(move)
+        root_.capacity = root_.size = other->size - other->free_count;
+        root_.setting_load_factor = other->setting_load_factor;
+        root_.bucket_count = size_type(std::ceil(root_.size / root_.setting_load_factor));
+        root_.free_count = 0;
+        root_.free_list = offset_empty;
+        root_.bucket = get_bucket_allocator_().allocate(root_.bucket_count);
+        root_.index = get_index_allocator_().allocate(root_.capacity);
+        root_.value = get_value_allocator_().allocate(root_.capacity);
+        std::memset(root_.bucket, 0xFFFFFFFF, sizeof(offset_type) * root_.bucket_count);
+        std::memset(root_.index, 0xFFFFFFFF, sizeof(index_t) * root_.capacity);
+        for(size_type i = 0, other_i = 0; other_i < other->size; ++other_i)
         {
-            std::uninitialized_copy(std::move_iterator<value_type *>(other->value->value()), std::move_iterator<value_type *>(other->value->value() + other->capacity), root_.value->value());
-        }
-        else
-        {
-            std::uninitialized_copy(other->value->value(), other->value->value() + other->capacity, root_.value->value());
+            if(other->index[other_i].hash)
+            {
+                size_type bucket = other->index[other_i].hash % root_.capacity;
+                if(root_.bucket[bucket] != offset_empty)
+                {
+                    root_.index[root_.bucket[bucket]].prev = offset_type(i);
+                }
+                root_.index[i].prev = offset_empty;
+                root_.index[i].next = root_.bucket[bucket];
+                root_.index[i].hash = other->index[other_i].hash;
+                root_.bucket[bucket] = offset_type(i);
+                construct_one_(root_.value[i].value(), *other->value[other_i].value());
+                ++i;
+            }
         }
     }
 
     void check_grow_()
     {
-        if(root_.size >= max_size())
-        {
-            throw std::length_error("pro_hash too long");
-        }
         if(root_.bucket_count < std::max<size_type>(8, size_type(std::ceil(root_.size / root_.setting_load_factor))))
         {
+            if(root_.bucket_count >= max_size())
+            {
+                throw std::length_error("pro_hash too long");
+            }
             rehash_(std::max<size_type>(8, root_.bucket_count * 2 + 1));
         }
         if(root_.size == root_.capacity)
         {
+            if(root_.capacity >= max_size())
+            {
+                throw std::length_error("pro_hash too long");
+            }
             realloc_(std::max<size_type>({8, root_.capacity * 2 + 1, size_type(std::ceil(root_.bucket_count * root_.setting_load_factor))}));
         }
     }
@@ -850,19 +866,19 @@ protected:
         }
         if(root_.bucket[bucket] != offset_empty)
         {
-            root_.index[root_.bucket[bucket]].prev = offset;
+            root_.index[root_.bucket[bucket]].prev = offset_type(offset);
         }
         root_.index[offset].prev = offset_empty;
         root_.index[offset].next = root_.bucket[bucket];
         root_.index[offset].hash = hash;
-        root_.bucket[bucket] = offset;
+        root_.bucket[bucket] = offset_type(offset);
         return std::make_pair(offset, true);
     }
 
     offset_type find_value_(key_type const &key)
     {
         hash_t hash = get_hasher()(get_key_t()(key));
-        offset_type bucket = hash % root_.bucket_count;
+        size_type bucket = hash % root_.bucket_count;
 
         for(offset_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
         {
@@ -871,7 +887,7 @@ protected:
                 return i;
             }
         }
-        return root_.size;
+        return offset_type(root_.size);
     }
 
     bool remove_value_(key_type const &key)
