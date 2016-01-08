@@ -49,6 +49,7 @@ testing...<br/>
 
 * sbtree.natvis
 * bpptree.natvis
+* pro_hash.natvis
 * segment_array.natvis
 
 加入到工程,调试时候有更友好的视图<br/>

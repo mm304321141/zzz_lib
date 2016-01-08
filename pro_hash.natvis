@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="pro_hash&lt;*&gt;">
+    <DisplayString>{{ size={root_.size - root_.free_count} }}</DisplayString>
+    <Expand>
+      <Item Name="[hasher]" ExcludeView="simple">(hasher &amp;)root_</Item>
+      <Item Name="[key_equal]" ExcludeView="simple">(key_equal &amp;)root_</Item>
+      <Item Name="[allocator]" ExcludeView="simple">(bucket_allocator_t &amp;)root_</Item>
+      <Item Name="[allocator]" ExcludeView="simple">(index_allocator_t &amp;)root_</Item>
+      <Item Name="[allocator]" ExcludeView="simple">(value_allocator_t &amp;)root_</Item>
+      <Item Name="[raw]">root_</Item>
+      <CustomListItems Condition="root_.size - root_.free_count != 0">
+        <Variable InitialValue="0" Name="index"/>
+        <Loop>
+          <If Condition="index &gt;= root_.size">
+            <Break/>
+          </If>
+          <If Condition="root_.index[index].hash.hash != offset_empty">
+            <Item Name="[{index}]">*(value_type *)&amp;root_.value[index].value_pod</Item>
+            <Exec>++index</Exec>
+          </If>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+  <Type Name="pro_hash&lt;*&gt;::iterator">
+    <AlternativeType Name="pro_hash&lt;*&gt;::const_iterator" />
+    <DisplayString Condition="offset != self-&gt;root_.capacity">*(value_type *)&amp;slef->root_.value[index].value_pod</DisplayString>
+    <DisplayString Condition="offset == self-&gt;root_.capacity">end</DisplayString>
+    <Expand>
+      <Item Condition="offset != self-&gt;root_.capacity" Name="[ptr]">*(value_type *)&amp;slef->root_.value[index].value_pod</Item>
+    </Expand>
+  </Type>
+  <Type Name="pro_hash&lt;*&gt;::root_t">
+    <DisplayString>{{ bucket={bucket_count}, capacity={capacity} }}</DisplayString>
+    <Expand>
+      <Item Name="[bucket]">bucket_count</Item>
+      <Item Name="[capacity]">capacity</Item>
+      <Item Name="[size]">size - free_count</Item>
+      <Item Name="[used]">size</Item>
+      <Item Name="[free]">free_count</Item>
+      <Item Name="[load_factor]">setting_load_factor</Item>
+    </Expand>
+  </Type>
+  <Type Name="pro_hash&lt;*&gt;::value_t">
+    <DisplayString>*(value_type *)&amp;value_pod</DisplayString>
+  </Type>
+</AutoVisualizer>

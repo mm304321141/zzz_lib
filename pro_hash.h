@@ -35,6 +35,17 @@ namespace pro_hash_detail
         typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
         where->~iterator_value_t();
     }
+
+    template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_scalar_tag)
+    {
+    }
+    template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_assign_tag)
+    {
+        for(; destroy_begin != destroy_end; ++destroy_begin)
+        {
+            destroy_one(destroy_begin, move_assign_tag());
+        }
+    }
 }
 
 template<class config_t>
@@ -288,49 +299,72 @@ public:;
        {
        }
        //empty
-       explicit pro_hash(hasher const &hash, key_equal const &equal, allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
+       explicit pro_hash(size_type bucket_count, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
        {
+           rehash(bucket_count);
        }
        //empty
        explicit pro_hash(allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
        {
        }
-       //range
-       template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
+       //empty
+       pro_hash(size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
        {
+           rehash(bucket_count);
+       }
+       //empty
+       pro_hash(size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
+       {
+           rehash(bucket_count);
+       }
+       //range
+       template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
+       {
+           rehash(bucket_count);
            insert(begin, end);
        }
        //range
-       template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, allocator_type const &alloc) : root_(key_compare(), alloc)
+       template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
        {
+           rehash(bucket_count);
+           insert(begin, end);
+       }
+       //range
+       template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
+       {
+           rehash(bucket_count);
            insert(begin, end);
        }
        //copy
-       pro_hash(pro_hash const &other) : root_(other.get_comparator_(), other.get_node_allocator_())
+       pro_hash(pro_hash const &other) : root_(other.get_hasher(), other.get_key_equal(), other.get_value_allocator_())
        {
-           insert(other.begin(), other.end());
+           copy_all_<false>(&other.root_);
        }
        //copy
-       pro_hash(pro_hash const &other, allocator_type const &alloc) : root_(other.get_comparator_(), alloc)
+       pro_hash(pro_hash const &other, allocator_type const &alloc) : root_(other.get_hasher(), other.get_key_equal(), alloc)
        {
-           insert(other.begin(), other.end());
+           copy_all_<false>(&other.root_);
        }
        //move
-       pro_hash(pro_hash &&other) : root_(key_compare(), node_allocator_t())
+       pro_hash(pro_hash &&other) : root_(hasher(), key_equal(), value_allocator_t())
        {
            swap(other);
        }
        //move
-       pro_hash(pro_hash &&other, allocator_type const &alloc) : root_(key_compare(), alloc)
+       pro_hash(pro_hash &&other, allocator_type const &alloc) : root_(other.get_hasher(), other.get_key_equal(), alloc)
        {
-           insert(std::move_iterator<iterator>(other.begin()), std::move_iterator<iterator>(other.end()));
+           copy_all_<true>(&other.root_);
        }
        //initializer list
-       pro_hash(std::initializer_list<value_type> il, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : pro_hash(il.begin(), il.end(), hash, equal, alloc)
+       pro_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : pro_hash(il.begin(), il.end(), hash, equal, alloc)
        {
        }
        //initializer list
-       pro_hash(std::initializer_list<value_type> il, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), key_compare(), alloc)
+       pro_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), alloc)
+       {
+       }
+       //initializer list
+       pro_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), hash, alloc)
        {
        }
        //destructor
@@ -623,6 +657,10 @@ protected:
     {
         return root_;
     }
+    value_allocator_t const &get_value_allocator_() const
+    {
+        return root_;
+    }
 
     size_type advance_next_(size_type i) const
     {
@@ -656,6 +694,11 @@ protected:
     template<class iterator_t> static void destroy_one_(iterator_t where)
     {
         pro_hash_detail::destroy_one(where, typename pro_hash_detail::get_tag<iterator_t>::type());
+    }
+
+    template<class iterator_t> static void destroy_range_(iterator_t destroy_begin, iterator_t destroy_end)
+    {
+        pro_hash_detail::destroy_range(destroy_begin, destroy_end, typename pro_hash_detail::get_tag<iterator_t>::type());
     }
 
     void dealloc_all_()
@@ -726,25 +769,36 @@ protected:
         if(root_.capacity != 0)
         {
             std::memcpy(new_index, root_.index, sizeof(index_t) * root_.capacity);
-            if(std::is_pod<value_type>::value)
-            {
-                std::memcpy(new_value, root_.value, sizeof(value_t) * root_.capacity);
-            }
-            else
-            {
-                for(size_type i = 0; i < root_.capacity; ++i)
-                {
-                    value_t *value = root_.value + i;
-                    construct_one_(new_value[i].value(), std::move(*value->value()));
-                    destroy_one_(value);
-                }
-            }
+            std::uninitialized_copy(std::move_iterator<value_type *>(root_.value->value()), std::move_iterator<value_type *>(root_.value->value() + root_.capacity), new_value->value());
+            destroy_range_(root_.value->value(), root_.value->value() + root_.capacity);
             get_index_allocator_().deallocate(root_.index, root_.capacity);
             get_value_allocator_().deallocate(root_.value, root_.capacity);
         }
         root_.capacity = size;
         root_.index = new_index;
         root_.value = new_value;
+    }
+
+    template<bool move> void copy_all_(root_t const *other)
+    {
+        root_.bucket_count = other->bucket_count;
+        root_.capacity = other->capacity;
+        root_.size = other->size;
+        root_.free_list = other->free_list;
+        root_.free_count = other->free_count;
+        root_.bucket = get_bucket_allocator_().allocate(other->bucket_count);
+        root_.index = get_index_allocator_().allocate(other->capacity);
+        root_.value = get_value_allocator_().allocate(other->capacity);
+        std::memcpy(root_.bucket, other->bucket, sizeof(offset_type) * other->bucket_count);
+        std::memcpy(root_.index, other->index, sizeof(index_t) * other->capacity);
+        if(move)
+        {
+            std::uninitialized_copy(std::move_iterator<value_type *>(other->value->value()), std::move_iterator<value_type *>(other->value->value() + other->capacity), root_.value->value());
+        }
+        else
+        {
+            std::uninitialized_copy(other->value->value(), other->value->value() + other->capacity, root_.value->value());
+        }
     }
 
     void check_grow_()
