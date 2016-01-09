@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <algorithm>
+#include <utility>
 #include <memory>
 #include <cstring>
 #include <stdexcept>
@@ -16,9 +17,15 @@ namespace pro_hash_detail
     class move_assign_tag
     {
     };
+    template<class T> struct is_scalar_expaned : public std::is_scalar<T>
+    {
+    };
+    template<class K, class V> struct is_scalar_expaned<std::pair<K, V>> : public std::conditional<std::is_scalar<K>::value && std::is_scalar<V>::value, std::true_type, std::false_type>::type
+    {
+    };
     template<class iterator_t> struct get_tag
     {
-        typedef typename std::conditional<std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::value, move_scalar_tag, move_assign_tag>::type type;
+        typedef typename std::conditional<is_scalar_expaned<typename std::iterator_traits<iterator_t>::value_type>::value, move_scalar_tag, move_assign_tag>::type type;
     };
 
     template<class iterator_t, class tag_t, class ...args_t> void construct_one(iterator_t where, tag_t, args_t &&...args)
@@ -36,14 +43,17 @@ namespace pro_hash_detail
         where->~iterator_value_t();
     }
 
-    template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_scalar_tag)
+    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
     {
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
     }
-    template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_assign_tag)
+    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_assign_tag)
     {
-        for(; destroy_begin != destroy_end; ++destroy_begin)
+        for(; move_begin != move_end; ++move_begin)
         {
-            destroy_one(destroy_begin, move_assign_tag());
+            construct_one(to_begin++, move_assign_tag(), std::move(*move_begin));
+            destroy_one(move_begin, move_assign_tag());
         }
     }
 }
@@ -700,9 +710,9 @@ protected:
         pro_hash_detail::destroy_one(where, typename pro_hash_detail::get_tag<iterator_t>::type());
     }
 
-    template<class iterator_t> static void destroy_range_(iterator_t destroy_begin, iterator_t destroy_end)
+    template<class iterator_from_t, class iterator_to_t> static void move_construct_and_destroy_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
-        pro_hash_detail::destroy_range(destroy_begin, destroy_end, typename pro_hash_detail::get_tag<iterator_t>::type());
+        pro_hash_detail::move_construct_and_destroy(move_begin, move_end, to_begin, typename pro_hash_detail::get_tag<iterator_from_t>::type());
     }
 
     void dealloc_all_()
@@ -813,8 +823,7 @@ protected:
         if(root_.capacity != 0)
         {
             std::memcpy(new_index, root_.index, sizeof(index_t) * root_.capacity);
-            std::uninitialized_copy(std::move_iterator<value_type *>(root_.value->value()), std::move_iterator<value_type *>(root_.value->value() + root_.capacity), new_value->value());
-            destroy_range_(root_.value->value(), root_.value->value() + root_.capacity);
+            move_construct_and_destroy_(root_.value->value(), root_.value->value() + root_.capacity, new_value->value());
             get_index_allocator_().deallocate(root_.index, root_.capacity);
             get_value_allocator_().deallocate(root_.value, root_.capacity);
         }

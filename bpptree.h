@@ -17,9 +17,15 @@ namespace b_plus_plus_tree_detail
     class move_assign_tag
     {
     };
+    template<class T> struct is_scalar_expaned : public std::is_scalar<T>
+    {
+    };
+    template<class K, class V> struct is_scalar_expaned<std::pair<K, V>> : public std::conditional<std::is_scalar<K>::value && std::is_scalar<V>::value, std::true_type, std::false_type>::type
+    {
+    };
     template<class iterator_t> struct get_tag
     {
-        typedef typename std::conditional<std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::value, move_scalar_tag, move_assign_tag>::type type;
+        typedef typename std::conditional<is_scalar_expaned<typename std::iterator_traits<iterator_t>::value_type>::value, move_scalar_tag, move_assign_tag>::type type;
     };
 
     template<class iterator_t, class in_value_t, class tag_t> void construct_one(iterator_t where, in_value_t &&value, tag_t)
@@ -48,31 +54,40 @@ namespace b_plus_plus_tree_detail
         }
     }
 
-    template<class iterator_from_t, class iterator_to_t, class tag_t> void move_forward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, tag_t)
+    template<class iterator_from_t, class iterator_to_t> void move_forward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
+    {
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
+    }
+    template<class iterator_from_t, class iterator_to_t> void move_forward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_assign_tag)
     {
         std::move(move_begin, move_end, to_begin);
     }
 
-    template<class iterator_from_t, class iterator_to_t, class tag_t> void move_backward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, tag_t)
+    template<class iterator_from_t, class iterator_to_t> void move_backward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
+    {
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
+    }
+    template<class iterator_from_t, class iterator_to_t> void move_backward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_assign_tag)
     {
         std::move_backward(move_begin, move_end, to_begin + (move_end - move_begin));
     }
 
     template<class iterator_from_t, class iterator_to_t> void move_construct(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
     {
-        std::move(move_begin, move_end, to_begin);
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
     }
     template<class iterator_from_t, class iterator_to_t> void move_construct(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_assign_tag)
     {
-        for(; move_begin != move_end; ++move_begin)
-        {
-            construct_one(to_begin++, std::move(*move_begin), move_assign_tag());
-        }
+        std::uninitialized_copy(std::move_iterator<iterator_from_t>(move_begin), std::move_iterator<iterator_from_t>(move_end), to_begin);
     }
 
     template<class iterator_t> void move_next_to_and_construct(iterator_t move_begin, iterator_t move_end, iterator_t to_begin, move_scalar_tag)
     {
-        std::move(move_begin, move_end, to_begin);
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
     }
     template<class iterator_t> void move_next_to_and_construct(iterator_t move_begin, iterator_t move_end, iterator_t to_begin, move_assign_tag)
     {
@@ -86,16 +101,14 @@ namespace b_plus_plus_tree_detail
         else
         {
             move_construct(move_begin, move_end, to_begin, move_assign_tag());
-            while(move_end != to_begin)
-            {
-                construct_one(move_end++, iterator_value_t(), move_assign_tag());
-            }
+            std::uninitialized_fill(move_end, to_begin, iterator_value_t());
         }
     }
 
     template<class iterator_from_t, class iterator_to_t> void move_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
     {
-        std::move(move_begin, move_end, to_begin);
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
     }
     template<class iterator_from_t, class iterator_to_t> void move_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_assign_tag)
     {
@@ -108,7 +121,8 @@ namespace b_plus_plus_tree_detail
 
     template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
     {
-        std::move(move_begin, move_end, to_begin);
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
     }
     template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_assign_tag)
     {
@@ -121,7 +135,8 @@ namespace b_plus_plus_tree_detail
 
     template<class iterator_t, class in_value_t> void move_next_and_insert_one(iterator_t move_begin, iterator_t move_end, in_value_t &&value, move_scalar_tag)
     {
-        std::move_backward(move_begin, move_end, move_end + 1);
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*(move_begin + 1), &*move_begin, count * sizeof(*move_begin));
         *move_begin = std::forward<in_value_t>(value);
     }
     template<class iterator_t, class in_value_t> void move_next_and_insert_one(iterator_t move_begin, iterator_t move_end, in_value_t &&value, move_assign_tag)
@@ -134,33 +149,20 @@ namespace b_plus_plus_tree_detail
         {
             iterator_t from_end = std::prev(move_end);
             construct_one(move_end, std::move(*from_end), move_assign_tag());
-            while(move_begin != from_end)
-            {
-                *--move_end = std::move(*--from_end);
-            }
+            move_backward(move_begin, from_end, move_begin + 1, move_assign_tag());
             *move_begin = std::forward<in_value_t>(value);
         }
     }
 
     template<class iterator_t> void move_prev_and_destroy_one(iterator_t move_begin, iterator_t move_end, move_scalar_tag)
     {
-        std::move_backward(move_begin, move_end, move_end - 1);
+        std::ptrdiff_t count = move_end - move_begin;
+        std::memmove(&*(move_begin - 1), &*move_begin, count * sizeof(*move_begin));
     }
     template<class iterator_t> void move_prev_and_destroy_one(iterator_t move_begin, iterator_t move_end, move_assign_tag)
     {
-        if(move_begin == move_end)
-        {
-            destroy_one(move_begin - 1, move_assign_tag());
-        }
-        else
-        {
-            iterator_t to_begin = std::prev(move_begin);
-            while(move_begin != move_end)
-            {
-                *to_begin++ = std::move(*move_begin++);
-            }
-            destroy_one(to_begin, move_assign_tag());
-        }
+        move_forward(move_begin, move_end, move_begin - 1, move_assign_tag());
+        destroy_one(move_end - 1, move_assign_tag());
     }
 }
 
