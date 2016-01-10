@@ -201,7 +201,7 @@ public:
     class iterator
     {
     public:
-        typedef std::random_access_iterator_tag iterator_category;
+        typedef std::forward_iterator_tag iterator_category;
         typedef typename pro_hash::value_type value_type;
         typedef typename pro_hash::difference_type difference_type;
         typedef typename pro_hash::reference reference;
@@ -248,7 +248,7 @@ public:
     class const_iterator
     {
     public:
-        typedef std::random_access_iterator_tag iterator_category;
+        typedef std::forward_iterator_tag iterator_category;
         typedef typename pro_hash::value_type value_type;
         typedef typename pro_hash::difference_type difference_type;
         typedef typename pro_hash::reference reference;
@@ -362,20 +362,20 @@ public:;
            swap(other);
        }
        //move
-       pro_hash(pro_hash &&other, allocator_type const &alloc) : root_(other.get_hasher(), other.get_key_equal(), alloc)
+       pro_hash(pro_hash &&other, allocator_type const &alloc) : root_(std::move(other.get_hasher()), std::move(other.get_key_equal()), alloc)
        {
            copy_all_<true>(&other.root_);
        }
        //initializer list
-       pro_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : pro_hash(il.begin(), il.end(), hash, equal, alloc)
+       pro_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : pro_hash(il.begin(), il.end(), bucket_count, hash, equal, alloc)
        {
        }
        //initializer list
-       pro_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), alloc)
+       pro_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), bucket_count, alloc)
        {
        }
        //initializer list
-       pro_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), hash, alloc)
+       pro_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), bucket_count, hash, alloc)
        {
        }
        //destructor
