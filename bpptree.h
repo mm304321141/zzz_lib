@@ -17,15 +17,15 @@ namespace b_plus_plus_tree_detail
     class move_assign_tag
     {
     };
-    template<class T> struct is_scalar_expaned : public std::is_scalar<T>
+    template<class T> struct is_scalar_expand : public std::is_scalar<T>
     {
     };
-    template<class K, class V> struct is_scalar_expaned<std::pair<K, V>> : public std::conditional<std::is_scalar<K>::value && std::is_scalar<V>::value, std::true_type, std::false_type>::type
+    template<class K, class V> struct is_scalar_expand<std::pair<K, V>> : public std::conditional<std::is_scalar<K>::value && std::is_scalar<V>::value, std::true_type, std::false_type>::type
     {
     };
     template<class iterator_t> struct get_tag
     {
-        typedef typename std::conditional<is_scalar_expaned<typename std::iterator_traits<iterator_t>::value_type>::value, move_scalar_tag, move_assign_tag>::type type;
+        typedef typename std::conditional<is_scalar_expand<typename std::iterator_traits<iterator_t>::value_type>::value, move_scalar_tag, move_assign_tag>::type type;
     };
 
     template<class iterator_t, class in_value_t, class tag_t> void construct_one(iterator_t where, in_value_t &&value, tag_t)
