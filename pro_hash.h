@@ -108,15 +108,15 @@ protected:
         }
         bool operator !() const
         {
-            return hash == (hash_value_type(1) << (sizeof(hash_value_type) * 8 - 1));
+            return hash == ~hash_value_type(0);
         }
         operator bool() const
         {
-            return hash != (hash_value_type(1) << (sizeof(hash_value_type) * 8 - 1));
+            return hash != ~hash_value_type(0);
         }
         void clear()
         {
-            hash = (hash_value_type(1) << (sizeof(hash_value_type) * 8 - 1));
+            hash = ~hash_value_type(0);
         }
     };
     struct index_t
