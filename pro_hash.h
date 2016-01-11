@@ -403,420 +403,421 @@ protected:
     {
         return std::make_pair(iterator(posi.first, this), posi.second);
     }
-public:;
-       //empty
-       pro_hash() : root_(hasher(), key_equal(), allocator_type())
-       {
-       }
-       //empty
-       explicit pro_hash(size_type bucket_count, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
-       {
-           rehash(bucket_count);
-       }
-       //empty
-       explicit pro_hash(allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
-       {
-       }
-       //empty
-       pro_hash(size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
-       {
-           rehash(bucket_count);
-       }
-       //empty
-       pro_hash(size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
-       {
-           rehash(bucket_count);
-       }
-       //range
-       template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
-       {
-           rehash(bucket_count);
-           insert(begin, end);
-       }
-       //range
-       template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
-       {
-           rehash(bucket_count);
-           insert(begin, end);
-       }
-       //range
-       template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
-       {
-           rehash(bucket_count);
-           insert(begin, end);
-       }
-       //copy
-       pro_hash(pro_hash const &other) : root_(other.get_hasher(), other.get_key_equal(), other.get_value_allocator_())
-       {
-           copy_all_<false>(&other.root_);
-       }
-       //copy
-       pro_hash(pro_hash const &other, allocator_type const &alloc) : root_(other.get_hasher(), other.get_key_equal(), alloc)
-       {
-           copy_all_<false>(&other.root_);
-       }
-       //move
-       pro_hash(pro_hash &&other) : root_(hasher(), key_equal(), value_allocator_t())
-       {
-           swap(other);
-       }
-       //move
-       pro_hash(pro_hash &&other, allocator_type const &alloc) : root_(std::move(other.get_hasher()), std::move(other.get_key_equal()), alloc)
-       {
-           copy_all_<true>(&other.root_);
-       }
-       //initializer list
-       pro_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : pro_hash(il.begin(), il.end(), bucket_count, hash, equal, alloc)
-       {
-       }
-       //initializer list
-       pro_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), bucket_count, alloc)
-       {
-       }
-       //initializer list
-       pro_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), bucket_count, hash, alloc)
-       {
-       }
-       //destructor
-       ~pro_hash()
-       {
-           dealloc_all_();
-       }
-       //copy
-       pro_hash &operator = (pro_hash const &other)
-       {
-           if(this == &other)
-           {
-               return *this;
-           }
-           clear();
-           get_hasher() = other.get_hasher();
-           get_key_equal() = other.get_key_equal();
-           get_bucket_allocator_() = other.get_bucket_allocator_();
-           get_index_allocator_() = other.get_index_allocator_();
-           get_value_allocator_() = other.get_value_allocator_();
-           copy_all_<false>(&other.root_);
-           return *this;
-       }
-       //move
-       pro_hash &operator = (pro_hash &&other)
-       {
-           if(this == &other)
-           {
-               return *this;
-           }
-           swap(other);
-           return *this;
-       }
-       //initializer list
-       pro_hash &operator = (std::initializer_list<value_type> il)
-       {
-           clear();
-           insert(il.begin(), il.end());
-           return *this;
-       }
+public:
+    //empty
+    pro_hash() : root_(hasher(), key_equal(), allocator_type())
+    {
+    }
+    //empty
+    explicit pro_hash(size_type bucket_count, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
+    {
+        rehash(bucket_count);
+    }
+    //empty
+    explicit pro_hash(allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
+    {
+    }
+    //empty
+    pro_hash(size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
+    {
+        rehash(bucket_count);
+    }
+    //empty
+    pro_hash(size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
+    {
+        rehash(bucket_count);
+    }
+    //range
+    template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
+    {
+        rehash(bucket_count);
+        insert(begin, end);
+    }
+    //range
+    template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
+    {
+        rehash(bucket_count);
+        insert(begin, end);
+    }
+    //range
+    template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
+    {
+        rehash(bucket_count);
+        insert(begin, end);
+    }
+    //copy
+    pro_hash(pro_hash const &other) : root_(other.get_hasher(), other.get_key_equal(), other.get_value_allocator_())
+    {
+        copy_all_<false>(&other.root_);
+    }
+    //copy
+    pro_hash(pro_hash const &other, allocator_type const &alloc) : root_(other.get_hasher(), other.get_key_equal(), alloc)
+    {
+        copy_all_<false>(&other.root_);
+    }
+    //move
+    pro_hash(pro_hash &&other) : root_(hasher(), key_equal(), value_allocator_t())
+    {
+        swap(other);
+    }
+    //move
+    pro_hash(pro_hash &&other, allocator_type const &alloc) : root_(std::move(other.get_hasher()), std::move(other.get_key_equal()), alloc)
+    {
+        copy_all_<true>(&other.root_);
+    }
+    //initializer list
+    pro_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : pro_hash(il.begin(), il.end(), bucket_count, hash, equal, alloc)
+    {
+    }
+    //initializer list
+    pro_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), bucket_count, alloc)
+    {
+    }
+    //initializer list
+    pro_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), bucket_count, hash, alloc)
+    {
+    }
+    //destructor
+    ~pro_hash()
+    {
+        dealloc_all_();
+    }
+    //copy
+    pro_hash &operator = (pro_hash const &other)
+    {
+        if(this == &other)
+        {
+            return *this;
+        }
+        clear();
+        get_hasher() = other.get_hasher();
+        get_key_equal() = other.get_key_equal();
+        get_bucket_allocator_() = other.get_bucket_allocator_();
+        get_index_allocator_() = other.get_index_allocator_();
+        get_value_allocator_() = other.get_value_allocator_();
+        copy_all_<false>(&other.root_);
+        return *this;
+    }
+    //move
+    pro_hash &operator = (pro_hash &&other)
+    {
+        if(this == &other)
+        {
+            return *this;
+        }
+        swap(other);
+        return *this;
+    }
+    //initializer list
+    pro_hash &operator = (std::initializer_list<value_type> il)
+    {
+        clear();
+        insert(il.begin(), il.end());
+        return *this;
+    }
 
-       allocator_type get_allocator() const
-       {
-           return *static_cast<value_allocator_t const *>(&root_);
-       }
-       hasher hash_function() const
-       {
-           return *static_cast<hasher const *>(&root_);
-       }
-       key_equal key_eq() const
-       {
-           return *static_cast<key_equal const *>(&root_);
-       }
+    allocator_type get_allocator() const
+    {
+        return *static_cast<value_allocator_t const *>(&root_);
+    }
+    hasher hash_function() const
+    {
+        return *static_cast<hasher const *>(&root_);
+    }
+    key_equal key_eq() const
+    {
+        return *static_cast<key_equal const *>(&root_);
+    }
 
-       void swap(pro_hash &other)
-       {
-           std::swap(root_, other.root_);
-       }
+    void swap(pro_hash &other)
+    {
+        std::swap(root_, other.root_);
+    }
 
-       typedef std::pair<iterator, iterator> pair_ii_t;
-       typedef std::pair<const_iterator, const_iterator> pair_cici_t;
+    typedef std::pair<iterator, iterator> pair_ii_t;
+    typedef std::pair<const_iterator, const_iterator> pair_cici_t;
 
-       //single element
-       insert_result_t insert(value_type const &value)
-       {
-           return result_(insert_value_(value));
-       }
-       //single element
-       template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(in_value_t &&value)
-       {
-           return result_(insert_value_(std::forward<in_value_t>(value)));
-       }
-       //with hint
-       iterator insert(const_iterator hint, value_type const &value)
-       {
-           return result_(insert_value_(value));
-       }
-       //with hint
-       template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(const_iterator hint, in_value_t &&value)
-       {
-           return result_(insert_value_(std::forward<in_value_t>(value)));
-       }
-       //range
-       template<class iterator_t> void insert(iterator_t begin, iterator_t end)
-       {
-           for(; begin != end; ++begin)
-           {
-               emplace_hint(cend(), *begin);
-           }
-       }
-       //initializer list
-       void insert(std::initializer_list<value_type> il)
-       {
-           insert(il.begin(), il.end());
-       }
+    //single element
+    insert_result_t insert(value_type const &value)
+    {
+        return result_(insert_value_(value));
+    }
+    //single element
+    template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(in_value_t &&value)
+    {
+        return result_(insert_value_(std::forward<in_value_t>(value)));
+    }
+    //with hint
+    iterator insert(const_iterator hint, value_type const &value)
+    {
+        return result_(insert_value_(value));
+    }
+    //with hint
+    template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(const_iterator hint, in_value_t &&value)
+    {
+        return result_(insert_value_(std::forward<in_value_t>(value)));
+    }
+    //range
+    template<class iterator_t> void insert(iterator_t begin, iterator_t end)
+    {
+        for(; begin != end; ++begin)
+        {
+            emplace_hint(cend(), *begin);
+        }
+    }
+    //initializer list
+    void insert(std::initializer_list<value_type> il)
+    {
+        insert(il.begin(), il.end());
+    }
 
-       //single element
-       template<class ...args_t> insert_result_t emplace(args_t &&...args)
-       {
-           return result_(insert_value_(std::forward<args_t>(args)...));
-       }
-       //with hint
-       template<class ...args_t> insert_result_t emplace_hint(const_iterator hint, args_t &&...args)
-       {
-           return result_(insert_value_(std::forward<args_t>(args)...));
-       }
+    //single element
+    template<class ...args_t> insert_result_t emplace(args_t &&...args)
+    {
+        return result_(insert_value_(std::forward<args_t>(args)...));
+    }
+    //with hint
+    template<class ...args_t> insert_result_t emplace_hint(const_iterator hint, args_t &&...args)
+    {
+        return result_(insert_value_(std::forward<args_t>(args)...));
+    }
 
-       iterator find(key_type const &key)
-       {
-           if(root_.size == 0)
-           {
-               return end();
-           }
-           return iterator(find_value_(key), this);
-       }
-       const_iterator find(key_type const &key) const
-       {
-           if(root_.size == 0)
-           {
-               return cend();
-           }
-           return const_iterator(find_value_(key), this);
-       }
+    iterator find(key_type const &key)
+    {
+        if(root_.size == 0)
+        {
+            return end();
+        }
+        return iterator(find_value_(key), this);
+    }
+    const_iterator find(key_type const &key) const
+    {
+        if(root_.size == 0)
+        {
+            return cend();
+        }
+        return const_iterator(find_value_(key), this);
+    }
 
-       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &at(in_key_t const &key)
-       {
-           offset_type offset = root_.size;
-           if(root_.size != 0)
-           {
-               offset = find_value_(key);
-           }
-           if(offset == root_.size)
-           {
-               throw std::out_of_range("pro_hash out of range");
-           }
-           return root_.value[offset].value()->second;
-       }
-       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type const &at(in_key_t const &key) const
-       {
-           offset_type offset = root_.size;
-           if(root_.size != 0)
-           {
-               offset = find_value_(key);
-           }
-           if(offset == root_.size)
-           {
-               throw std::out_of_range("pro_hash out of range");
-           }
-           return root_.value[offset].value()->second;
-       }
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &at(in_key_t const &key)
+    {
+        offset_type offset = root_.size;
+        if(root_.size != 0)
+        {
+            offset = find_value_(key);
+        }
+        if(offset == root_.size)
+        {
+            throw std::out_of_range("pro_hash out of range");
+        }
+        return root_.value[offset].value()->second;
+    }
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type const &at(in_key_t const &key) const
+    {
+        offset_type offset = root_.size;
+        if(root_.size != 0)
+        {
+            offset = find_value_(key);
+        }
+        if(offset == root_.size)
+        {
+            throw std::out_of_range("pro_hash out of range");
+        }
+        return root_.value[offset].value()->second;
+    }
 
-       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &operator[](in_key_t const &key)
-       {
-           offset_type offset = root_.size;
-           if(root_.size != 0)
-           {
-               offset = find_value_(key);
-           }
-           if(offset == root_.size)
-           {
-               offset = insert_value_(std::make_pair(key, mapped_type())).first;
-           }
-           return root_.value[offset].value()->second;
-       }
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &operator[](in_key_t const &key)
+    {
+        offset_type offset = root_.size;
+        if(root_.size != 0)
+        {
+            offset = find_value_(key);
+        }
+        if(offset == root_.size)
+        {
+            offset = insert_value_(std::make_pair(key, mapped_type())).first;
+        }
+        return root_.value[offset].value()->second;
+    }
 
-       iterator erase(const_iterator it)
-       {
-           if(root_.size == 0)
-           {
-               return end();
-           }
-           remove_offset_(offset_type(it.offset));
-           return iterator(advance_next_(it.offset), this);
-       }
-       size_type erase(key_type const &key)
-       {
-           if(root_.size == 0)
-           {
-               return 0;
-           }
-           return remove_value_(key) ? 1 : 0;
-       }
-       iterator erase(const_iterator erase_begin, const_iterator erase_end)
-       {
-           if(erase_begin == cbegin() && erase_end == cend())
-           {
-               clear();
-               return end();
-           }
-           else
-           {
-               while(erase_begin != erase_end)
-               {
-                   erase(erase_begin++);
-               }
-               return erase_begin;
-           }
-       }
+    iterator erase(const_iterator it)
+    {
+        if(root_.size == 0)
+        {
+            return end();
+        }
+        remove_offset_(offset_type(it.offset));
+        return iterator(advance_next_(it.offset), this);
+    }
+    size_type erase(key_type const &key)
+    {
+        if(root_.size == 0)
+        {
+            return 0;
+        }
+        return remove_value_(key) ? 1 : 0;
+    }
+    iterator erase(const_iterator erase_begin, const_iterator erase_end)
+    {
+        if(erase_begin == cbegin() && erase_end == cend())
+        {
+            clear();
+            return end();
+        }
+        else
+        {
+            while(erase_begin != erase_end)
+            {
+                erase(erase_begin++);
+            }
+            return erase_begin;
+        }
+    }
 
-       size_type count(key_type const &key) const
-       {
-           return find(key) == end() ? 0 : 1;
-       }
+    size_type count(key_type const &key) const
+    {
+        return find(key) == end() ? 0 : 1;
+    }
 
-       pair_ii_t equal_range(key_type const &key)
-       {
-           auto where = find(key);
-           return std::make_pair(where, where == end() ? where : std::next(where));
-       }
-       pair_cici_t equal_range(key_type const &key) const
-       {
-           auto where = find(key);
-           return std::make_pair(where, where == end() ? where : std::next(where));
-       }
+    pair_ii_t equal_range(key_type const &key)
+    {
+        auto where = find(key);
+        return std::make_pair(where, where == end() ? where : std::next(where));
+    }
+    pair_cici_t equal_range(key_type const &key) const
+    {
+        auto where = find(key);
+        return std::make_pair(where, where == end() ? where : std::next(where));
+    }
 
-       iterator begin()
-       {
-           return iterator(find_begin_(), this);
-       }
-       iterator end()
-       {
-           return iterator(root_.size, this);
-       }
-       const_iterator begin() const
-       {
-           return const_iterator(find_begin_(), this);
-       }
-       const_iterator end() const
-       {
-           return const_iterator(root_.size, this);
-       }
-       const_iterator cbegin() const
-       {
-           return const_iterator(find_begin_(), this);
-       }
-       const_iterator cend() const
-       {
-           return const_iterator(root_.size, this);
-       }
+    iterator begin()
+    {
+        return iterator(find_begin_(), this);
+    }
+    iterator end()
+    {
+        return iterator(root_.size, this);
+    }
+    const_iterator begin() const
+    {
+        return const_iterator(find_begin_(), this);
+    }
+    const_iterator end() const
+    {
+        return const_iterator(root_.size, this);
+    }
+    const_iterator cbegin() const
+    {
+        return const_iterator(find_begin_(), this);
+    }
+    const_iterator cend() const
+    {
+        return const_iterator(root_.size, this);
+    }
 
-       bool empty() const
-       {
-           return root_.size == root_.free_count;
-       }
-       void clear()
-       {
-           clear_all_();
-       }
-       size_type size() const
-       {
-           return root_.size - root_.free_count;
-       }
-       size_type max_size() const
-       {
-           return offset_empty - 1;
-       }
+    bool empty() const
+    {
+        return root_.size == root_.free_count;
+    }
+    void clear()
+    {
+        clear_all_();
+    }
+    size_type size() const
+    {
+        return root_.size - root_.free_count;
+    }
+    size_type max_size() const
+    {
+        return offset_empty - 1;
+    }
 
-       local_iterator begin(size_type n)
-       {
-           return local_iterator(root_.bucket[n], this);
-       }
-       local_iterator end(size_type n)
-       {
-           return local_iterator(offset_empty, this);
-       }
-       const_local_iterator begin(size_type n) const
-       {
-           return const_local_iterator(root_.bucket[n], this);
-       }
-       const_local_iterator end(size_type n) const
-       {
-           return const_local_iterator(offset_empty, this);
-       }
-       const_local_iterator cbegin(size_type n) const
-       {
-           return const_local_iterator(root_.bucket[n], this);
-       }
-       const_local_iterator cend(size_type n) const
-       {
-           return const_local_iterator(offset_empty, this);
-       }
+    local_iterator begin(size_type n)
+    {
+        return local_iterator(root_.bucket[n], this);
+    }
+    local_iterator end(size_type n)
+    {
+        return local_iterator(offset_empty, this);
+    }
+    const_local_iterator begin(size_type n) const
+    {
+        return const_local_iterator(root_.bucket[n], this);
+    }
+    const_local_iterator end(size_type n) const
+    {
+        return const_local_iterator(offset_empty, this);
+    }
+    const_local_iterator cbegin(size_type n) const
+    {
+        return const_local_iterator(root_.bucket[n], this);
+    }
+    const_local_iterator cend(size_type n) const
+    {
+        return const_local_iterator(offset_empty, this);
+    }
 
-       size_type bucket_count() const
-       {
-           return root_.bucket_count;
-       }
-       size_type  max_bucket_count() const
-       {
-           return max_size();
-       }
+    size_type bucket_count() const
+    {
+        return root_.bucket_count;
+    }
+    size_type  max_bucket_count() const
+    {
+        return max_size();
+    }
 
-       size_type bucket_size(size_type n) const
-       {
-           size_type step = 0;
-           for(size_type i = root_.bucket[n]; i != offset_empty; i = root_.index[i].next)
-           {
-               ++step
-           }
-           return step;
-       }
+    size_type bucket_size(size_type n) const
+    {
+        size_type step = 0;
+        for(size_type i = root_.bucket[n]; i != offset_empty; i = root_.index[i].next)
+        {
+            ++step
+        }
+        return step;
+    }
 
-       size_type bucket(key_type const &key) const
-       {
-           if(root_.size != 0)
-           {
-               return hash_t(get_key_t()(key)) % root_.bucket_count;
-           }
-           else
-           {
-               return 0;
-           }
-       }
+    size_type bucket(key_type const &key) const
+    {
+        if(root_.size == 0)
+        {
+            return 0;
+        }
+        return hash_t(get_key_t()(key)) % root_.bucket_count;
+    }
 
-       void reserve(size_type count)
-       {
-           rehash(size_type(std::ceil(count / root_.setting_load_factor)));
-       }
-       void rehash(size_type count)
-       {
-           rehash_(std::max<size_type>({8, count, size_type(std::ceil(size() / root_.setting_load_factor))}));
-       }
+    void reserve(size_type count)
+    {
+        rehash(size_type(std::ceil(count / root_.setting_load_factor)));
+    }
+    void rehash(size_type count)
+    {
+        rehash_(std::max<size_type>({8, count, size_type(std::ceil(size() / root_.setting_load_factor))}));
+    }
 
-       void max_load_factor(float ml)
-       {
-           if(ml <= 0)
-           {
-               return;
-           }
-           root_.setting_load_factor = ml;
-           if(root_.size != 0)
-           {
-               rehash_(size_type(std::ceil(size() / root_.setting_load_factor)));
-           }
-       }
-       float max_load_factor() const
-       {
-           return root_.setting_load_factor;
-       }
-       float load_factor() const
-       {
-           return size() / float(root_.bucket_count);
-       }
+    void max_load_factor(float ml)
+    {
+        if(ml <= 0)
+        {
+            return;
+        }
+        root_.setting_load_factor = ml;
+        if(root_.size != 0)
+        {
+            rehash_(size_type(std::ceil(size() / root_.setting_load_factor)));
+        }
+    }
+    float max_load_factor() const
+    {
+        return root_.setting_load_factor;
+    }
+    float load_factor() const
+    {
+        if(root_.size == 0)
+        {
+            return 0;
+        }
+        return size() / float(root_.bucket_count);
+    }
 
 protected:
     root_t root_;
@@ -972,7 +973,7 @@ protected:
             }
         }
     }
-    
+
     void rehash_(size_type size)
     {
         size = std::min(size, max_size());
@@ -1149,5 +1150,5 @@ protected:
 
         destroy_one_(root_.value[offset].value());
     }
-    
+
 };
