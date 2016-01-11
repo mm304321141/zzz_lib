@@ -670,7 +670,7 @@ public:
             {
                 erase(erase_begin++);
             }
-            return erase_begin;
+            return iterator(erase_begin.offset, this);
         }
     }
 
@@ -761,7 +761,7 @@ public:
     {
         return root_.bucket_count;
     }
-    size_type  max_bucket_count() const
+    size_type max_bucket_count() const
     {
         return max_size();
     }
@@ -771,7 +771,7 @@ public:
         size_type step = 0;
         for(size_type i = root_.bucket[n]; i != offset_empty; i = root_.index[i].next)
         {
-            ++step
+            ++step;
         }
         return step;
     }
@@ -782,7 +782,7 @@ public:
         {
             return 0;
         }
-        return hash_t(get_key_t()(key)) % root_.bucket_count;
+        return hash_t(get_hasher()(key)) % root_.bucket_count;
     }
 
     void reserve(size_type count)
@@ -846,7 +846,15 @@ protected:
     {
         return root_;
     }
+    bucket_allocator_t const &get_bucket_allocator_() const
+    {
+        return root_;
+    }
     index_allocator_t &get_index_allocator_()
+    {
+        return root_;
+    }
+    index_allocator_t const &get_index_allocator_() const
     {
         return root_;
     }
@@ -1079,9 +1087,9 @@ protected:
         return std::make_pair(offset, true);
     }
 
-    offset_type find_value_(key_type const &key)
+    offset_type find_value_(key_type const &key) const
     {
-        hash_t hash = get_hasher()(get_key_t()(key));
+        hash_t hash = get_hasher()(key);
         size_type bucket = hash % root_.bucket_count;
 
         for(offset_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
@@ -1096,7 +1104,7 @@ protected:
 
     bool remove_value_(key_type const &key)
     {
-        hash_t hash = get_hasher()(get_key_t()(key));
+        hash_t hash = get_hasher()(key);
         size_type bucket = hash % root_.bucket_count;
         size_type last = offset_empty;
 
