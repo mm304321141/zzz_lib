@@ -297,6 +297,105 @@ public:
         size_type offset;
         pro_hash const *self;
     };
+    class local_iterator
+    {
+    public:
+        typedef std::forward_iterator_tag iterator_category;
+        typedef typename pro_hash::value_type value_type;
+        typedef typename pro_hash::difference_type difference_type;
+        typedef typename pro_hash::reference reference;
+        typedef typename pro_hash::pointer pointer;
+    public:
+        local_iterator(size_type _offset, pro_hash const *_self) : offset(_offset), self(_self)
+        {
+        }
+        local_iterator(local_iterator const &other) : offset(other.offset), self(other.self)
+        {
+        }
+        local_iterator &operator++()
+        {
+            offset = self->local_advance_next_(offset);
+            return *this;
+        }
+        local_iterator operator++(int)
+        {
+            local_iterator save(*this);
+            ++*this;
+            return save;
+        }
+        reference operator *() const
+        {
+            return *self->root_.value[offset].value();
+        }
+        pointer operator->() const
+        {
+            return self->root_.value[offset].value();
+        }
+        bool operator == (local_iterator const &other) const
+        {
+            return offset == other.offset && self == other.self;
+        }
+        bool operator != (local_iterator const &other) const
+        {
+            return offset != other.offset || self != other.self;
+        }
+    private:
+        friend class pro_hash;
+        size_type offset;
+        pro_hash const *self;
+    };
+    class const_local_iterator
+    {
+    public:
+        typedef std::forward_iterator_tag iterator_category;
+        typedef typename pro_hash::value_type value_type;
+        typedef typename pro_hash::difference_type difference_type;
+        typedef typename pro_hash::reference reference;
+        typedef typename pro_hash::const_reference const_reference;
+        typedef typename pro_hash::pointer pointer;
+        typedef typename pro_hash::const_pointer const_pointer;
+    public:
+        const_local_iterator(size_type _offset, pro_hash const *_self) : offset(_offset), self(_self)
+        {
+        }
+        const_local_iterator(const_local_iterator const &other) : offset(other.offset), self(other.self)
+        {
+        }
+        const_local_iterator(iterator const &it) : offset(it.offset), self(it.self)
+        {
+        }
+        const_local_iterator &operator++()
+        {
+            offset = self->local_advance_next_(offset);
+            return *this;
+        }
+        const_local_iterator operator++(int)
+        {
+            const_local_iterator save(*this);
+            ++*this;
+            return save;
+        }
+        const_reference operator *() const
+        {
+            return *self->root_.value[offset].value();
+        }
+        const_pointer operator->() const
+        {
+            return self->root_.value[offset].value();
+        }
+        bool operator == (const_local_iterator const &other) const
+        {
+            return offset == other.offset && self == other.self;
+        }
+        bool operator != (const_local_iterator const &other) const
+        {
+            return offset != other.offset || self != other.self;
+        }
+    private:
+        friend class pro_hash;
+        size_type offset;
+        pro_hash const *self;
+    };
     typedef std::pair<iterator, bool> pair_ib_t, insert_result_t;
     typedef std::pair<size_type, bool> pair_posi_t;
 protected:
@@ -500,6 +599,33 @@ public:;
            return const_iterator(find_value_(key), this);
        }
 
+       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &at(in_key_t const &key)
+       {
+           offset_type offset = root_.size;
+           if(root_.size != 0)
+           {
+               offset = find_value_(key);
+           }
+           if(offset == root_.size)
+           {
+               throw std::out_of_range("pro_hash out of range");
+           }
+           return root_.value[offset].value()->second;
+       }
+       template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type const &at(in_key_t const &key) const
+       {
+           offset_type offset = root_.size;
+           if(root_.size != 0)
+           {
+               offset = find_value_(key);
+           }
+           if(offset == root_.size)
+           {
+               throw std::out_of_range("pro_hash out of range");
+           }
+           return root_.value[offset].value()->second;
+       }
+
        template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &operator[](in_key_t const &key)
        {
            offset_type offset = root_.size;
@@ -606,6 +732,62 @@ public:;
            return offset_empty - 1;
        }
 
+       local_iterator begin(size_type n)
+       {
+           return local_iterator(root_.bucket[n], this);
+       }
+       local_iterator end(size_type n)
+       {
+           return local_iterator(offset_empty, this);
+       }
+       const_local_iterator begin(size_type n) const
+       {
+           return const_local_iterator(root_.bucket[n], this);
+       }
+       const_local_iterator end(size_type n) const
+       {
+           return const_local_iterator(offset_empty, this);
+       }
+       const_local_iterator cbegin(size_type n) const
+       {
+           return const_local_iterator(root_.bucket[n], this);
+       }
+       const_local_iterator cend(size_type n) const
+       {
+           return const_local_iterator(offset_empty, this);
+       }
+
+       size_type bucket_count() const
+       {
+           return root_.bucket_count;
+       }
+       size_type  max_bucket_count() const
+       {
+           return max_size();
+       }
+
+       size_type bucket_size(size_type n) const
+       {
+           size_type step = 0;
+           for(size_type i = root_.bucket[n]; i != offset_empty; i = root_.index[i].next)
+           {
+               ++step
+           }
+           return step;
+       }
+
+       size_type bucket(key_type const &key) const
+       {
+           if(root_.size != 0)
+           {
+               return hash_t(get_key_t()(key)) % root_.bucket_count;
+           }
+           else
+           {
+               return 0;
+           }
+       }
+
        void reserve(size_type count)
        {
            rehash(size_type(std::ceil(count / root_.setting_load_factor)));
@@ -686,6 +868,11 @@ protected:
             }
         }
         return i;
+    }
+
+    size_type local_advance_next_(size_type i) const
+    {
+        return root_.index[i].next;
     }
 
     size_type find_begin_() const
