@@ -17,8 +17,8 @@
           </If>
           <If Condition="root_.index[index].hash.hash != ~hash_value_type(0)">
             <Item Name="[{index}]">*(value_type *)&amp;root_.value[index].value_pod</Item>
-            <Exec>++index</Exec>
           </If>
+          <Exec>++index</Exec>
         </Loop>
       </CustomListItems>
     </Expand>
@@ -42,12 +42,57 @@
   <Type Name="pro_hash&lt;*&gt;::root_t">
     <DisplayString>{{ bucket={bucket_count}, capacity={capacity} }}</DisplayString>
     <Expand>
-      <Item Name="[bucket]">bucket_count</Item>
-      <Item Name="[capacity]">capacity</Item>
-      <Item Name="[size]">size - free_count</Item>
+      <Synthetic Name="[bucket]">
+        <DisplayString>{{ size={bucket_count} }}</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>bucket_count</Size>
+            <ValuePointer>bucket</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[index]">
+        <DisplayString>{{ size={size - free_count}, capacity={capacity} }}</DisplayString>
+        <Expand>
+          <Item Name="[capacity]">capacity</Item>
+          <Item Name="[size]">size - free_count</Item>
+          <ArrayItems>
+            <Size>size</Size>
+            <ValuePointer>index</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[value]">
+        <DisplayString>{{ size={size - free_count}, capacity={capacity} }}</DisplayString>
+        <Expand>
+          <Item Name="[capacity]">capacity</Item>
+          <Item Name="[size]">size - free_count</Item>
+          <ArrayItems>
+            <Size>size</Size>
+            <ValuePointer>value</ValuePointer>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[free_list]">
+        <DisplayString>{{ size={free_count} }}</DisplayString>
+        <Expand>
+          <CustomListItems>
+            <Variable InitialValue="0" Name="i"/>
+            <Variable InitialValue="free_list" Name="current"/>
+            <Loop>
+              <If Condition="current == offset_empty">
+                <Break/>
+              </If>
+              <Item Name="[{i}]">current</Item>
+              <Exec>++i</Exec>
+              <Exec>current = index[current].next</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
       <Item Name="[used]">size</Item>
-      <Item Name="[free]">free_count</Item>
-      <Item Name="[load_factor]">setting_load_factor</Item>
+      <Item Name="[load_factor]" Condition="bucket_count != 0">(size - free_count) / float(bucket_count)</Item>
+      <Item Name="[max_load_factor]">setting_load_factor</Item>
     </Expand>
   </Type>
   <Type Name="pro_hash&lt;*&gt;::hash_t">
@@ -55,6 +100,6 @@
     <DisplayString Condition="hash == ~hash_value_type(0)">empty</DisplayString>
   </Type>
   <Type Name="pro_hash&lt;*&gt;::value_t">
-    <DisplayString >{*(value_type *)&amp;value_pod}</DisplayString>
+    <DisplayString>{*(value_type *)&amp;value_pod}</DisplayString>
   </Type>
 </AutoVisualizer>

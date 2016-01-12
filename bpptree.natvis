@@ -40,14 +40,14 @@
   </Type>
   <Type Name="b_plus_plus_tree&lt;*&gt;::node_t">
     <DisplayString Condition="size == 0">{{ root:size={parent-&gt;size} }}</DisplayString>
-    <DisplayString Condition="level != 0 &amp;&amp; size != 0">{{ inner:size={size},used={((inner_node_t *)this)-&gt;used} }}</DisplayString>
+    <DisplayString Condition="level != 0 &amp;&amp; size != 0">{{ inner:size={size},used={((inner_node_t *)this)-&gt;used + 1} }}</DisplayString>
     <DisplayString Condition="level == 0 &amp;&amp; size != 0 ">{{ leaf:size={size} }}</DisplayString>
     <Expand>
       <Item Name="[size]">size</Item>
       <Item Name="[root]" Condition="size == 0 &amp;&amp; parent-&gt;size > 0">((root_node_t *)this)-&gt;parent</Item>
       <Item Name="[most left]" Condition="size == 0 &amp;&amp; parent-&gt;size > 0">((root_node_t *)this)-&gt;left</Item>
       <Item Name="[most right]" Condition="size == 0 &amp;&amp; parent-&gt;size > 0">((root_node_t *)this)-&gt;right</Item>
-      <Item Name="[bound]" Condition="level != 0 &amp;&amp; size != 0">((inner_node_t *)this)-&gt;used</Item>
+      <Item Name="[bound]" Condition="level != 0 &amp;&amp; size != 0">((inner_node_t *)this)-&gt;used + 1</Item>
       <Item Name="[bound]" Condition="level == 0 &amp;&amp; size != 0">size</Item>
       <Item Name="[prev]" Condition="level == 0 &amp;&amp; size != 0">((leaf_node_t *)this)-&gt;prev</Item>
       <Item Name="[next]" Condition="level == 0 &amp;&amp; size != 0">((leaf_node_t *)this)-&gt;next</Item>
