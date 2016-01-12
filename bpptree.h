@@ -1534,7 +1534,7 @@ protected:
         get_node_allocator_().deallocate(reinterpret_cast<memory_node_t *>(node), 1);
     }
 
-    template<bool is_recursive>void free_node_(node_t *node)
+    template<bool is_recursive> void free_node_(node_t *node)
     {
         if(node->level == 0)
         {

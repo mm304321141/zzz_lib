@@ -13,7 +13,7 @@ struct pro_hash_map_config_t
     typedef key_equal_t key_equal;
     typedef allocator_t allocator_type;
     typedef std::uintptr_t offset_type;
-    typedef decltype(hasher()(key_type())) hash_value_type;
+    typedef typename std::result_of<hasher(key_type)>::type hash_value_type;
     template<class in_type> static key_type const &get_key(in_type &&value)
     {
         return value.first;
