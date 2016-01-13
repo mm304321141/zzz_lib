@@ -35,7 +35,7 @@ sizeof(key)巨大的情况下去,内存占用会偏大,并且性能下降<br/>
 基于哈希表实现<br/>
 相比标准库unordered_map,迭代器在插入元素之后会失效<br/>
 内部使用内存连续,在rehash动作发生时候,会发生搬运数据操作<br/>
-key不可重复<br/>
+在允许重复key时候,equal_range返回local_iterator,仅支持erase操作<br/>
 
 * segment_array系列
 

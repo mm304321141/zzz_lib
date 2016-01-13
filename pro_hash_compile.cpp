@@ -17,6 +17,8 @@ template<class T> void foo_test(T &hs)
     O o, oo;
     auto b = hs.cbegin();
     auto e = hs.cend();
+    auto lb = hs.cbegin(0);
+    auto le = hs.cend(0);
     T o00(0, h, ke, a);
     T o01(a);
     T o02(0, a);
@@ -47,6 +49,8 @@ template<class T> void foo_test(T &hs)
     o.erase(o.cbegin());
     o.erase(k);
     o.erase(b, e);
+    o.erase(lb);
+    o.erase(lb, le);
     hs.count(k);
     hs.equal_range(k);
     hs.begin();
@@ -57,8 +61,6 @@ template<class T> void foo_test(T &hs)
     o.empty();
     o.size();
     o.max_size();
-    auto lb = hs.cbegin(0);
-    auto le = hs.cend(0);
     while(lb != le)
     {
         ++lb;
@@ -80,17 +82,33 @@ void foo()
     pro_hash_map<std::string, std::string> bp_1;
     pro_hash_map<int, int> const bp_2;
     pro_hash_map<std::string, std::string> const bp_3;
+    pro_hash_multimap<int, int> bp_4;
+    pro_hash_multimap<std::string, std::string> bp_5;
+    pro_hash_multimap<int, int> const bp_6;
+    pro_hash_multimap<std::string, std::string> const bp_7;
     pro_hash_set<int> bp_8;
     pro_hash_set<std::string> bp_9;
     pro_hash_set<int> const bp_a;
     pro_hash_set<std::string> const bp_b;
+    pro_hash_multiset<int> bp_c;
+    pro_hash_multiset<std::string> bp_d;
+    pro_hash_multiset<int> const bp_e;
+    pro_hash_multiset<std::string> const bp_f;
 
     foo_test(bp_0);
     foo_test(bp_1);
     foo_test(bp_2);
     foo_test(bp_3);
+    foo_test(bp_4);
+    foo_test(bp_5);
+    foo_test(bp_6);
+    foo_test(bp_7);
     foo_test(bp_8);
     foo_test(bp_9);
     foo_test(bp_a);
     foo_test(bp_b);
+    foo_test(bp_c);
+    foo_test(bp_d);
+    foo_test(bp_e);
+    foo_test(bp_f);
 }

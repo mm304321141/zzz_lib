@@ -3,7 +3,7 @@
 #include "pro_hash.h"
 
 
-template<class key_t, class hasher_t, class key_equal_t, class allocator_t>
+template<class key_t, class unique_t, class hasher_t, class key_equal_t, class allocator_t>
 struct pro_hash_set_config_t
 {
     typedef key_t key_type;
@@ -14,10 +14,13 @@ struct pro_hash_set_config_t
     typedef allocator_t allocator_type;
     typedef std::uintptr_t offset_type;
     typedef typename std::result_of<hasher(key_type)>::type hash_value_type;
+    typedef unique_t unique_type;
     template<class in_type> static key_type const &get_key(in_type &&value)
     {
         return value;
     }
 };
 template<class key_t, class hasher_t = std::hash<key_t>, class key_equal_t = std::equal_to<key_t>, class allocator_t = std::allocator<key_t>>
-using pro_hash_set = pro_hash<pro_hash_set_config_t<key_t, hasher_t, key_equal_t, allocator_t>>;
+using pro_hash_set = pro_hash<pro_hash_set_config_t<key_t, std::true_type, hasher_t, key_equal_t, allocator_t>>;
+template<class key_t, class hasher_t = std::hash<key_t>, class key_equal_t = std::equal_to<key_t>, class allocator_t = std::allocator<key_t>>
+using pro_hash_multiset = pro_hash<pro_hash_set_config_t<key_t, std::false_type, hasher_t, key_equal_t, allocator_t>>;

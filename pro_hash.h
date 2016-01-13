@@ -193,10 +193,6 @@ protected:
         }
     };
     typedef get_key_select_t<key_type, value_type> get_key_t;
-    enum
-    {
-        binary_search_limit = 1024
-    };
 public:
     class iterator
     {
@@ -361,7 +357,7 @@ public:
         const_local_iterator(const_local_iterator const &other) : offset(other.offset), self(other.self)
         {
         }
-        const_local_iterator(iterator const &it) : offset(it.offset), self(it.self)
+        const_local_iterator(local_iterator const &it) : offset(it.offset), self(it.self)
         {
         }
         const_local_iterator &operator++()
@@ -396,13 +392,19 @@ public:
         size_type offset;
         pro_hash const *self;
     };
-    typedef std::pair<iterator, bool> pair_ib_t, insert_result_t;
-    typedef std::pair<size_type, bool> pair_posi_t;
+    typedef typename std::conditional<config_t::unique_type::value, std::pair<iterator, bool>, iterator>::type insert_result_t;
+    typedef std::pair<iterator, bool> pair_ib_t;
 protected:
-    insert_result_t result_(pair_posi_t posi)
+    typedef std::pair<size_type, bool> pair_posi_t;
+    template<class unique_type> typename std::enable_if<unique_type::value, insert_result_t>::type result_(pair_posi_t posi)
     {
         return std::make_pair(iterator(posi.first, this), posi.second);
     }
+    template<class unique_type> typename std::enable_if<!unique_type::value, insert_result_t>::type result_(pair_posi_t posi)
+    {
+        return iterator(posi.first, this);
+    }
+
 public:
     //empty
     pro_hash() : root_(hasher(), key_equal(), allocator_type())
@@ -536,26 +538,28 @@ public:
 
     typedef std::pair<iterator, iterator> pair_ii_t;
     typedef std::pair<const_iterator, const_iterator> pair_cici_t;
+    typedef std::pair<local_iterator, local_iterator> pair_lili_t;
+    typedef std::pair<const_local_iterator, const_local_iterator> pair_clicli_t;
 
     //single element
     insert_result_t insert(value_type const &value)
     {
-        return result_(insert_value_(value));
+        return result_<typename config_t::unique_type>(insert_value_(value));
     }
     //single element
     template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(in_value_t &&value)
     {
-        return result_(insert_value_(std::forward<in_value_t>(value)));
+        return result_<typename config_t::unique_type>(insert_value_(std::forward<in_value_t>(value)));
     }
     //with hint
     iterator insert(const_iterator hint, value_type const &value)
     {
-        return result_(insert_value_(value));
+        return result_<typename config_t::unique_type>(insert_value_(value));
     }
     //with hint
     template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(const_iterator hint, in_value_t &&value)
     {
-        return result_(insert_value_(std::forward<in_value_t>(value)));
+        return result_<typename config_t::unique_type>(insert_value_(std::forward<in_value_t>(value)));
     }
     //range
     template<class iterator_t> void insert(iterator_t begin, iterator_t end)
@@ -574,12 +578,12 @@ public:
     //single element
     template<class ...args_t> insert_result_t emplace(args_t &&...args)
     {
-        return result_(insert_value_(std::forward<args_t>(args)...));
+        return result_<typename config_t::unique_type>(insert_value_(std::forward<args_t>(args)...));
     }
     //with hint
     template<class ...args_t> insert_result_t emplace_hint(const_iterator hint, args_t &&...args)
     {
-        return result_(insert_value_(std::forward<args_t>(args)...));
+        return result_<typename config_t::unique_type>(insert_value_(std::forward<args_t>(args)...));
     }
 
     iterator find(key_type const &key)
@@ -599,7 +603,7 @@ public:
         return const_iterator(find_value_(key), this);
     }
 
-    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &at(in_key_t const &key)
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &at(in_key_t const &key)
     {
         offset_type offset = root_.size;
         if(root_.size != 0)
@@ -612,7 +616,7 @@ public:
         }
         return root_.value[offset].value()->second;
     }
-    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type const &at(in_key_t const &key) const
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type const &at(in_key_t const &key) const
     {
         offset_type offset = root_.size;
         if(root_.size != 0)
@@ -626,7 +630,7 @@ public:
         return root_.value[offset].value()->second;
     }
 
-    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &operator[](in_key_t const &key)
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &operator[](in_key_t &&key)
     {
         offset_type offset = root_.size;
         if(root_.size != 0)
@@ -635,7 +639,7 @@ public:
         }
         if(offset == root_.size)
         {
-            offset = insert_value_(std::make_pair(key, mapped_type())).first;
+            offset = insert_value_(key, mapped_type()).first;
         }
         return root_.value[offset].value()->second;
     }
@@ -646,8 +650,18 @@ public:
         {
             return end();
         }
-        remove_offset_(offset_type(it.offset));
+        remove_offset_(it.offset);
         return iterator(advance_next_(it.offset), this);
+    }
+    local_iterator erase(const_local_iterator it)
+    {
+        if(root_.size == 0)
+        {
+            return local_iterator(offset_empty, this);
+        }
+        size_type next = local_advance_next_(offset_type(it.offset));
+        remove_offset_(it.offset);
+        return local_iterator(next, this);
     }
     size_type erase(key_type const &key)
     {
@@ -655,7 +669,7 @@ public:
         {
             return 0;
         }
-        return remove_value_(key) ? 1 : 0;
+        return remove_value_(config_t::unique_type(), key);
     }
     iterator erase(const_iterator erase_begin, const_iterator erase_end)
     {
@@ -673,21 +687,67 @@ public:
             return iterator(erase_begin.offset, this);
         }
     }
+    local_iterator erase(const_local_iterator erase_begin, const_local_iterator erase_end)
+    {
+        while(erase_begin != erase_end)
+        {
+            erase(erase_begin++);
+        }
+        return local_iterator(erase_begin.offset, this);
+    }
 
     size_type count(key_type const &key) const
     {
         return find(key) == end() ? 0 : 1;
     }
 
-    pair_ii_t equal_range(key_type const &key)
+    template<class = typename std::enable_if<config_t::unique_type::value, void>::type> pair_ii_t equal_range(key_type const &key)
     {
         auto where = find(key);
-        return std::make_pair(where, where == end() ? where : std::next(where));
+        if(where == end())
+        {
+            return std::make_pair(end(), end());
+        }
+        else
+        {
+            return std::make_pair(where, iterator(advance_next_(where.offset), this));
+        }
     }
-    pair_cici_t equal_range(key_type const &key) const
+    template<class = typename std::enable_if<config_t::unique_type::value, void>::type> pair_cici_t equal_range(key_type const &key) const
     {
         auto where = find(key);
-        return std::make_pair(where, where == end() ? where : std::next(where));
+        if(where == cend())
+        {
+            return std::make_pair(cend(), cend());
+        }
+        else
+        {
+            return std::make_pair(where, const_iterator(advance_next_(where.offset), this));
+        }
+    }
+    template<class = typename std::enable_if<!config_t::unique_type::value, void>::type> pair_lili_t equal_range(key_type const &key)
+    {
+        auto where = find(key);
+        if(where == end())
+        {
+            return std::make_pair(local_iterator(offset_empty, this), local_iterator(offset_empty, this));
+        }
+        else
+        {
+            return std::make_pair(local_iterator(where.offset, this), local_iterator(local_find_equal_(where.offset), this));
+        }
+    }
+    template<class = typename std::enable_if<!config_t::unique_type::value, void>::type> pair_clicli_t equal_range(key_type const &key) const
+    {
+        auto where = find(key);
+        if(where == end())
+        {
+            return std::make_pair(const_local_iterator(offset_empty, this), const_local_iterator(offset_empty, this));
+        }
+        else
+        {
+            return std::make_pair(const_local_iterator(where.offset, this), const_local_iterator(local_find_equal_(where.offset), this));
+        }
     }
 
     iterator begin()
@@ -884,6 +944,18 @@ protected:
         return root_.index[i].next;
     }
 
+    size_type local_find_equal_(size_type i) const
+    {
+        hash_t hash = root_.index[i].hash;
+        size_type next;
+        do
+        {
+            next = root_.index[i].next;
+        }
+        while(next == offset_empty || root_.index[next].hash != hash || !get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(*root_.value[next].value())));
+        return next;
+    }
+
     size_type find_begin_() const
     {
         for(size_type i = 0; i < root_.size; ++i)
@@ -982,7 +1054,7 @@ protected:
         }
     }
 
-    static bool is_prime(size_type candidate)
+    static bool is_prime_(size_type candidate)
     {
         if((candidate & 1) != 0)
         {
@@ -1001,7 +1073,7 @@ protected:
 
     static size_type get_prime_(size_type size)
     {
-        static size_type const primes[] =
+        static size_type const prime_array[] =
         {
             7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919,
             1103, 1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591,
@@ -1009,18 +1081,18 @@ protected:
             187751, 225307, 270371, 324449, 389357, 467237, 560689, 672827, 807403, 968897, 1162687, 1395263,
             1674319, 2009191, 2411033, 2893249, 3471899, 4166287, 4999559, 5999471, 7199369
         };
-        for(auto p : primes)
+        for(auto prime : prime_array)
         {
-            if(p >= size)
+            if(prime >= size)
             {
-                return p;
+                return prime;
             }
         }
-        for(size_type i = (size | 1); i < std::numeric_limits<uint32_t>::max(); i += 2)
+        for(size_type prime = (size | 1); prime < std::numeric_limits<uint32_t>::max(); prime += 2)
         {
-            if(is_prime(i) && ((i - 1) % 101 != 0))
+            if(is_prime_(prime) && ((prime - 1) % 101 != 0))
             {
-                return i;
+                return prime;
             }
         }
         return size;
@@ -1100,10 +1172,10 @@ protected:
     template<class ...args_t> pair_posi_t insert_value_(args_t &&...args)
     {
         check_grow_();
-        return insert_value_uncheck_(std::forward<args_t>(args)...);
+        return insert_value_uncheck_(config_t::unique_type(), std::forward<args_t>(args)...);
     }
 
-    template<class in_t, class ...args_t> pair_posi_t insert_value_uncheck_(in_t &&in, args_t &&...args)
+    template<class in_t, class ...args_t> pair_posi_t insert_value_uncheck_(std::true_type, in_t &&in, args_t &&...args)
     {
         hash_t hash = get_hasher()(get_key_t()(in));
         size_type bucket = hash % root_.bucket_count;
@@ -1125,68 +1197,119 @@ protected:
         {
             ++root_.size;
         }
+        root_.index[offset].hash = hash;
+        root_.index[offset].next = root_.bucket[bucket];
+        root_.index[offset].prev = offset_empty;
         if(root_.bucket[bucket] != offset_empty)
         {
             root_.index[root_.bucket[bucket]].prev = offset_type(offset);
         }
-        root_.index[offset].prev = offset_empty;
-        root_.index[offset].next = root_.bucket[bucket];
-        root_.index[offset].hash = hash;
         root_.bucket[bucket] = offset_type(offset);
         return std::make_pair(offset, true);
     }
 
-    offset_type find_value_(key_type const &key) const
+    template<class in_t, class ...args_t> pair_posi_t insert_value_uncheck_(std::false_type, in_t &&in, args_t &&...args)
+    {
+        hash_t hash = get_hasher()(get_key_t()(in));
+        size_type bucket = hash % root_.bucket_count;
+        size_type where;
+        for(where = root_.bucket[bucket]; where != offset_empty; where = root_.index[where].next)
+        {
+            if(root_.index[where].hash == hash && get_key_equal()(get_key_t()(*root_.value[where].value()), get_key_t()(in)))
+            {
+                break;
+            }
+        }
+        size_type offset = root_.free_list == offset_empty ? root_.size : root_.free_list;
+        construct_one_(root_.value[offset].value(), std::forward<in_t>(in), std::forward<args_t>(args)...);
+        if(offset == root_.free_list)
+        {
+            root_.free_list = root_.index[offset].next;
+            --root_.free_count;
+        }
+        else
+        {
+            ++root_.size;
+        }
+        root_.index[offset].hash = hash;
+        if(where == offset_empty)
+        {
+            root_.index[offset].next = root_.bucket[bucket];
+            root_.index[offset].prev = offset_empty;
+            if(root_.bucket[bucket] != offset_empty)
+            {
+                root_.index[root_.bucket[bucket]].prev = offset_type(offset);
+            }
+            root_.bucket[bucket] = offset_type(offset);
+        }
+        else
+        {
+            root_.index[offset].next = root_.index[where].next;
+            root_.index[offset].prev = offset_type(where);
+            root_.index[where].next = offset_type(offset);
+            if(root_.index[offset].next != offset_empty)
+            {
+                root_.index[root_.index[offset].next].prev = offset_type(offset);
+            }
+        }
+        return std::make_pair(offset, true);
+    }
+
+    size_type find_value_(key_type const &key) const
     {
         hash_t hash = get_hasher()(key);
         size_type bucket = hash % root_.bucket_count;
 
-        for(offset_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
+        for(size_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
         {
             if(root_.index[i].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(key)))
             {
                 return i;
             }
         }
-        return offset_type(root_.size);
+        return root_.size;
     }
 
-    bool remove_value_(key_type const &key)
+    size_type remove_value_(std::true_type, key_type const &key)
     {
-        hash_t hash = get_hasher()(key);
-        size_type bucket = hash % root_.bucket_count;
-        size_type last = offset_empty;
-
-        for(offset_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
+        size_type offset = find_value_(key);
+        if(offset != root_.size)
         {
-            if(root_.index[i].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(key)))
-            {
-                if(last == offset_empty)
-                {
-                    root_.bucket[bucket] = root_.index[i].next;
-                }
-                else
-                {
-                    root_.index[last].next = root_.index[i].next;
-                }
-                if(root_.index[i].next != offset_empty)
-                {
-                    root_.index[root_.index[i].next].prev = root_.index[i].prev;
-                }
-                root_.index[i].next = root_.free_list;
-                root_.index[i].hash.clear();
-                root_.free_list = i;
-                ++root_.free_count;
-
-                destroy_one_(root_.value[i].value());
-                return true;
-            }
-            last = i;
+            remove_offset_(offset);
+            return 1;
         }
-        return false;
+        else
+        {
+            return 0;
+        }
     }
 
-    void remove_offset_(offset_type offset)
+    size_type remove_value_(std::false_type, key_type const &key)
+    {
+        size_type offset = find_value_(key);
+        if(offset != root_.size)
+        {
+            hash_t hash = root_.index[offset].hash;
+            size_type count = 1;
+            while(true)
+            {
+                size_type next = root_.index[offset].next;
+                remove_offset_(offset);
+                if(next == offset_empty || root_.index[next].hash != hash || !get_key_equal()(get_key_t()(*root_.value[next].value()), get_key_t()(key)))
+                {
+                    return count;
+                }
+                offset = next;
+                ++count;
+            }
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    void remove_offset_(size_type offset)
     {
         if(root_.index[offset].prev != offset_empty)
         {
@@ -1202,7 +1325,7 @@ protected:
         }
         root_.index[offset].next = root_.free_list;
         root_.index[offset].hash.clear();
-        root_.free_list = offset;
+        root_.free_list = offset_type(offset);
         ++root_.free_count;
 
         destroy_one_(root_.value[offset].value());
