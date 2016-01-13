@@ -7,8 +7,8 @@ zzz's c++ lib
 * sbtree_set.h
 * bpptree_map.h
 * bpptree_set.h
-* pro_hash_map.h
-* pro_hash_set.h
+* chash_map.h
+* chash_set.h
 * segment_array.h
 
 标准库风格容器<br/>
@@ -18,7 +18,7 @@ standard library style<br/>
 
 基于二叉搜索树实现,使用size平衡<br/>
 可以随机访问,随机访问迭代器<br/>
-key可以重复<br/>
+有multimap/multiset实现<br/>
 
 * bpptree系列
 
@@ -29,13 +29,17 @@ key可以重复<br/>
 sizeof(key)非巨大的情况下,插入/删除/查找速度都超过标准库map<br/>
 sizeof(key)巨大的情况下去,内存占用会偏大,并且性能下降<br/>
 遍历速度任何条件下都很快!比标准库map快得多!<br/>
+有map/set/multimap/multiset实现<br/>
 
-* pro_hash系列
+* chash系列
 
 基于哈希表实现<br/>
+内存集中分配,尽可能利用缓存加速<br/>
 相比标准库unordered_map,迭代器在插入元素之后会失效<br/>
-内部使用内存连续,在rehash动作发生时候,会发生搬运数据操作<br/>
+插入元素可能导致扩容,产生搬运数据操作<br/>
+遍历速度飞快!<br/>
 在允许重复key时候,equal_range返回local_iterator,仅支持erase操作<br/>
+有map/set/multimap/multiset实现<br/>
 
 * segment_array系列
 
@@ -48,7 +52,7 @@ sizeof(key)巨大的情况下去,内存占用会偏大,并且性能下降<br/>
 
 * sbtree.natvis
 * bpptree.natvis
-* pro_hash.natvis
+* chash.natvis
 * segment_array.natvis
 
 加入到工程,调试时候有更友好的视图<br/>

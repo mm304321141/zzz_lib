@@ -9,7 +9,7 @@
 #include <type_traits>
 
 
-namespace pro_hash_detail
+namespace contiguous_hash_detail
 {
     class move_scalar_tag
     {
@@ -59,7 +59,7 @@ namespace pro_hash_detail
 }
 
 template<class config_t>
-class pro_hash
+class contiguous_hash
 {
 public:
     typedef typename config_t::key_type key_type;
@@ -152,7 +152,7 @@ protected:
             , value_allocator_t(std::forward<any_allocator_type>(alloc))
         {
             static_assert(std::is_unsigned<offset_type>::value && std::is_integral<offset_type>::value, "offset_type must be unsighed integer");
-            static_assert(sizeof(offset_type) <= sizeof(pro_hash::size_type), "offset_type too big");
+            static_assert(sizeof(offset_type) <= sizeof(contiguous_hash::size_type), "offset_type too big");
             static_assert(std::is_integral<hash_value_type>::value, "hash_value_type must be integer");
             bucket_count = 0;
             capacity = 0;
@@ -164,10 +164,10 @@ protected:
             index = nullptr;
             value = nullptr;
         }
-        typename pro_hash::size_type bucket_count;
-        typename pro_hash::size_type capacity;
-        typename pro_hash::size_type size;
-        typename pro_hash::size_type free_count;
+        typename contiguous_hash::size_type bucket_count;
+        typename contiguous_hash::size_type capacity;
+        typename contiguous_hash::size_type size;
+        typename contiguous_hash::size_type free_count;
         offset_type free_list;
         float setting_load_factor;
         offset_type *bucket;
@@ -198,12 +198,12 @@ public:
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
-        typedef typename pro_hash::value_type value_type;
-        typedef typename pro_hash::difference_type difference_type;
-        typedef typename pro_hash::reference reference;
-        typedef typename pro_hash::pointer pointer;
+        typedef typename contiguous_hash::value_type value_type;
+        typedef typename contiguous_hash::difference_type difference_type;
+        typedef typename contiguous_hash::reference reference;
+        typedef typename contiguous_hash::pointer pointer;
     public:
-        iterator(size_type _offset, pro_hash const *_self) : offset(_offset), self(_self)
+        iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
         {
         }
         iterator(iterator const &other) : offset(other.offset), self(other.self)
@@ -237,22 +237,22 @@ public:
             return offset != other.offset || self != other.self;
         }
     private:
-        friend class pro_hash;
+        friend class contiguous_hash;
         size_type offset;
-        pro_hash const *self;
+        contiguous_hash const *self;
     };
     class const_iterator
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
-        typedef typename pro_hash::value_type value_type;
-        typedef typename pro_hash::difference_type difference_type;
-        typedef typename pro_hash::reference reference;
-        typedef typename pro_hash::const_reference const_reference;
-        typedef typename pro_hash::pointer pointer;
-        typedef typename pro_hash::const_pointer const_pointer;
+        typedef typename contiguous_hash::value_type value_type;
+        typedef typename contiguous_hash::difference_type difference_type;
+        typedef typename contiguous_hash::reference reference;
+        typedef typename contiguous_hash::const_reference const_reference;
+        typedef typename contiguous_hash::pointer pointer;
+        typedef typename contiguous_hash::const_pointer const_pointer;
     public:
-        const_iterator(size_type _offset, pro_hash const *_self) : offset(_offset), self(_self)
+        const_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
         {
         }
         const_iterator(const_iterator const &other) : offset(other.offset), self(other.self)
@@ -289,20 +289,20 @@ public:
             return offset != other.offset || self != other.self;
         }
     private:
-        friend class pro_hash;
+        friend class contiguous_hash;
         size_type offset;
-        pro_hash const *self;
+        contiguous_hash const *self;
     };
     class local_iterator
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
-        typedef typename pro_hash::value_type value_type;
-        typedef typename pro_hash::difference_type difference_type;
-        typedef typename pro_hash::reference reference;
-        typedef typename pro_hash::pointer pointer;
+        typedef typename contiguous_hash::value_type value_type;
+        typedef typename contiguous_hash::difference_type difference_type;
+        typedef typename contiguous_hash::reference reference;
+        typedef typename contiguous_hash::pointer pointer;
     public:
-        local_iterator(size_type _offset, pro_hash const *_self) : offset(_offset), self(_self)
+        local_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
         {
         }
         local_iterator(local_iterator const &other) : offset(other.offset), self(other.self)
@@ -336,22 +336,22 @@ public:
             return offset != other.offset || self != other.self;
         }
     private:
-        friend class pro_hash;
+        friend class contiguous_hash;
         size_type offset;
-        pro_hash const *self;
+        contiguous_hash const *self;
     };
     class const_local_iterator
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
-        typedef typename pro_hash::value_type value_type;
-        typedef typename pro_hash::difference_type difference_type;
-        typedef typename pro_hash::reference reference;
-        typedef typename pro_hash::const_reference const_reference;
-        typedef typename pro_hash::pointer pointer;
-        typedef typename pro_hash::const_pointer const_pointer;
+        typedef typename contiguous_hash::value_type value_type;
+        typedef typename contiguous_hash::difference_type difference_type;
+        typedef typename contiguous_hash::reference reference;
+        typedef typename contiguous_hash::const_reference const_reference;
+        typedef typename contiguous_hash::pointer pointer;
+        typedef typename contiguous_hash::const_pointer const_pointer;
     public:
-        const_local_iterator(size_type _offset, pro_hash const *_self) : offset(_offset), self(_self)
+        const_local_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
         {
         }
         const_local_iterator(const_local_iterator const &other) : offset(other.offset), self(other.self)
@@ -388,9 +388,9 @@ public:
             return offset != other.offset || self != other.self;
         }
     private:
-        friend class pro_hash;
+        friend class contiguous_hash;
         size_type offset;
-        pro_hash const *self;
+        contiguous_hash const *self;
     };
     typedef typename std::conditional<config_t::unique_type::value, std::pair<iterator, bool>, iterator>::type insert_result_t;
     typedef std::pair<iterator, bool> pair_ib_t;
@@ -407,85 +407,85 @@ protected:
 
 public:
     //empty
-    pro_hash() : root_(hasher(), key_equal(), allocator_type())
+    contiguous_hash() : root_(hasher(), key_equal(), allocator_type())
     {
     }
     //empty
-    explicit pro_hash(size_type bucket_count, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
-    {
-        rehash(bucket_count);
-    }
-    //empty
-    explicit pro_hash(allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
-    {
-    }
-    //empty
-    pro_hash(size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
+    explicit contiguous_hash(size_type bucket_count, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
     {
         rehash(bucket_count);
     }
     //empty
-    pro_hash(size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
+    explicit contiguous_hash(allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
+    {
+    }
+    //empty
+    contiguous_hash(size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
+    {
+        rehash(bucket_count);
+    }
+    //empty
+    contiguous_hash(size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
     {
         rehash(bucket_count);
     }
     //range
-    template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
+    template <class iterator_t> contiguous_hash(iterator_t begin, iterator_t end, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : root_(hash, equal, alloc)
     {
         rehash(bucket_count);
         insert(begin, end);
     }
     //range
-    template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
+    template <class iterator_t> contiguous_hash(iterator_t begin, iterator_t end, size_type bucket_count, allocator_type const &alloc) : root_(hasher(), key_equal(), alloc)
     {
         rehash(bucket_count);
         insert(begin, end);
     }
     //range
-    template <class iterator_t> pro_hash(iterator_t begin, iterator_t end, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
+    template <class iterator_t> contiguous_hash(iterator_t begin, iterator_t end, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : root_(hash, key_equal(), alloc)
     {
         rehash(bucket_count);
         insert(begin, end);
     }
     //copy
-    pro_hash(pro_hash const &other) : root_(other.get_hasher(), other.get_key_equal(), other.get_value_allocator_())
+    contiguous_hash(contiguous_hash const &other) : root_(other.get_hasher(), other.get_key_equal(), other.get_value_allocator_())
     {
         copy_all_<false>(&other.root_);
     }
     //copy
-    pro_hash(pro_hash const &other, allocator_type const &alloc) : root_(other.get_hasher(), other.get_key_equal(), alloc)
+    contiguous_hash(contiguous_hash const &other, allocator_type const &alloc) : root_(other.get_hasher(), other.get_key_equal(), alloc)
     {
         copy_all_<false>(&other.root_);
     }
     //move
-    pro_hash(pro_hash &&other) : root_(hasher(), key_equal(), value_allocator_t())
+    contiguous_hash(contiguous_hash &&other) : root_(hasher(), key_equal(), value_allocator_t())
     {
         swap(other);
     }
     //move
-    pro_hash(pro_hash &&other, allocator_type const &alloc) : root_(std::move(other.get_hasher()), std::move(other.get_key_equal()), alloc)
+    contiguous_hash(contiguous_hash &&other, allocator_type const &alloc) : root_(std::move(other.get_hasher()), std::move(other.get_key_equal()), alloc)
     {
         copy_all_<true>(&other.root_);
     }
     //initializer list
-    pro_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : pro_hash(il.begin(), il.end(), bucket_count, hash, equal, alloc)
+    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : contiguous_hash(il.begin(), il.end(), bucket_count, hash, equal, alloc)
     {
     }
     //initializer list
-    pro_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), bucket_count, alloc)
+    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : contiguous_hash(il.begin(), il.end(), bucket_count, alloc)
     {
     }
     //initializer list
-    pro_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : pro_hash(il.begin(), il.end(), bucket_count, hash, alloc)
+    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : contiguous_hash(il.begin(), il.end(), bucket_count, hash, alloc)
     {
     }
     //destructor
-    ~pro_hash()
+    ~contiguous_hash()
     {
         dealloc_all_();
     }
     //copy
-    pro_hash &operator = (pro_hash const &other)
+    contiguous_hash &operator = (contiguous_hash const &other)
     {
         if(this == &other)
         {
@@ -501,7 +501,7 @@ public:
         return *this;
     }
     //move
-    pro_hash &operator = (pro_hash &&other)
+    contiguous_hash &operator = (contiguous_hash &&other)
     {
         if(this == &other)
         {
@@ -511,7 +511,7 @@ public:
         return *this;
     }
     //initializer list
-    pro_hash &operator = (std::initializer_list<value_type> il)
+    contiguous_hash &operator = (std::initializer_list<value_type> il)
     {
         clear();
         insert(il.begin(), il.end());
@@ -531,7 +531,7 @@ public:
         return *static_cast<key_equal const *>(&root_);
     }
 
-    void swap(pro_hash &other)
+    void swap(contiguous_hash &other)
     {
         std::swap(root_, other.root_);
     }
@@ -612,7 +612,7 @@ public:
         }
         if(offset == root_.size)
         {
-            throw std::out_of_range("pro_hash out of range");
+            throw std::out_of_range("contiguous_hash out of range");
         }
         return root_.value[offset].value()->second;
     }
@@ -625,7 +625,7 @@ public:
         }
         if(offset == root_.size)
         {
-            throw std::out_of_range("pro_hash out of range");
+            throw std::out_of_range("contiguous_hash out of range");
         }
         return root_.value[offset].value()->second;
     }
@@ -970,17 +970,17 @@ protected:
 
     template<class iterator_t, class ...args_t> static void construct_one_(iterator_t where, args_t &&...args)
     {
-        pro_hash_detail::construct_one(where, typename pro_hash_detail::get_tag<iterator_t>::type(), std::forward<args_t>(args)...);
+        contiguous_hash_detail::construct_one(where, typename contiguous_hash_detail::get_tag<iterator_t>::type(), std::forward<args_t>(args)...);
     }
 
     template<class iterator_t> static void destroy_one_(iterator_t where)
     {
-        pro_hash_detail::destroy_one(where, typename pro_hash_detail::get_tag<iterator_t>::type());
+        contiguous_hash_detail::destroy_one(where, typename contiguous_hash_detail::get_tag<iterator_t>::type());
     }
 
     template<class iterator_from_t, class iterator_to_t> static void move_construct_and_destroy_(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin)
     {
-        pro_hash_detail::move_construct_and_destroy(move_begin, move_end, to_begin, typename pro_hash_detail::get_tag<iterator_from_t>::type());
+        contiguous_hash_detail::move_construct_and_destroy(move_begin, move_end, to_begin, typename contiguous_hash_detail::get_tag<iterator_from_t>::type());
     }
 
     void dealloc_all_()
@@ -1155,7 +1155,7 @@ protected:
         {
             if(root_.bucket_count >= max_size())
             {
-                throw std::length_error("pro_hash too long");
+                throw std::length_error("contiguous_hash too long");
             }
             rehash_(root_.bucket_count * 2);
         }
@@ -1163,7 +1163,7 @@ protected:
         {
             if(root_.capacity >= max_size())
             {
-                throw std::length_error("pro_hash too long");
+                throw std::length_error("contiguous_hash too long");
             }
             realloc_(std::max<size_type>({8, root_.capacity * 2, size_type(std::ceil(root_.bucket_count * root_.setting_load_factor))}));
         }

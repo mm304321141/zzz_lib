@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <Type Name="pro_hash&lt;*&gt;">
+  <Type Name="contiguous_hash&lt;*&gt;">
     <DisplayString>{{ size={root_.size - root_.free_count} }}</DisplayString>
     <Expand>
       <Item Name="[hasher]" ExcludeView="simple">(hasher &amp;)root_</Item>
@@ -23,23 +23,23 @@
       </CustomListItems>
     </Expand>
   </Type>
-  <Type Name="pro_hash&lt;*&gt;::iterator">
-    <AlternativeType Name="pro_hash&lt;*&gt;::const_iterator" />
+  <Type Name="contiguous_hash&lt;*&gt;::iterator">
+    <AlternativeType Name="contiguous_hash&lt;*&gt;::const_iterator" />
     <DisplayString Condition="offset != self-&gt;root_.size">{*(value_type *)&amp;self->root_.value[offset].value_pod}</DisplayString>
     <DisplayString Condition="offset == self-&gt;root_.size">end</DisplayString>
     <Expand>
       <Item Condition="offset != self-&gt;root_.size" Name="[ptr]">*(value_type *)&amp;self->root_.value[offset].value_pod</Item>
     </Expand>
   </Type>
-  <Type Name="pro_hash&lt;*&gt;::local_iterator">
-    <AlternativeType Name="pro_hash&lt;*&gt;::const_local_iterator" />
+  <Type Name="contiguous_hash&lt;*&gt;::local_iterator">
+    <AlternativeType Name="contiguous_hash&lt;*&gt;::const_local_iterator" />
     <DisplayString Condition="offset != offset_empty">{*(value_type *)&amp;self->root_.value[offset].value_pod}</DisplayString>
     <DisplayString Condition="offset == offset_empty">end</DisplayString>
     <Expand>
       <Item Condition="offset != offset_empty" Name="[ptr]">*(value_type *)&amp;self->root_.value[offset].value_pod</Item>
     </Expand>
   </Type>
-  <Type Name="pro_hash&lt;*&gt;::root_t">
+  <Type Name="contiguous_hash&lt;*&gt;::root_t">
     <DisplayString>{{ bucket={bucket_count}, capacity={capacity} }}</DisplayString>
     <Expand>
       <Synthetic Name="[bucket]">
@@ -95,11 +95,11 @@
       <Item Name="[max_load_factor]">setting_load_factor</Item>
     </Expand>
   </Type>
-  <Type Name="pro_hash&lt;*&gt;::hash_t">
+  <Type Name="contiguous_hash&lt;*&gt;::hash_t">
     <DisplayString Condition="hash != ~hash_value_type(0)">{hash}</DisplayString>
     <DisplayString Condition="hash == ~hash_value_type(0)">empty</DisplayString>
   </Type>
-  <Type Name="pro_hash&lt;*&gt;::value_t">
+  <Type Name="contiguous_hash&lt;*&gt;::value_t">
     <DisplayString>{*(value_type *)&amp;value_pod}</DisplayString>
   </Type>
 </AutoVisualizer>

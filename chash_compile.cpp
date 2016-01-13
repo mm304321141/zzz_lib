@@ -1,8 +1,8 @@
 
 #define _SCL_SECURE_NO_WARNINGS
 
-#include "pro_hash_map.h"
-#include "pro_hash_set.h"
+#include "chash_map.h"
+#include "chash_set.h"
 
 #include <string>
 
@@ -78,22 +78,22 @@ template<class T> void foo_test(T &hs)
 
 void foo()
 {
-    pro_hash_map<int, int> bp_0;
-    pro_hash_map<std::string, std::string> bp_1;
-    pro_hash_map<int, int> const bp_2;
-    pro_hash_map<std::string, std::string> const bp_3;
-    pro_hash_multimap<int, int> bp_4;
-    pro_hash_multimap<std::string, std::string> bp_5;
-    pro_hash_multimap<int, int> const bp_6;
-    pro_hash_multimap<std::string, std::string> const bp_7;
-    pro_hash_set<int> bp_8;
-    pro_hash_set<std::string> bp_9;
-    pro_hash_set<int> const bp_a;
-    pro_hash_set<std::string> const bp_b;
-    pro_hash_multiset<int> bp_c;
-    pro_hash_multiset<std::string> bp_d;
-    pro_hash_multiset<int> const bp_e;
-    pro_hash_multiset<std::string> const bp_f;
+    chash_map<int, int> bp_0;
+    chash_map<std::string, std::string> bp_1;
+    chash_map<int, int> const bp_2;
+    chash_map<std::string, std::string> const bp_3;
+    chash_multimap<int, int> bp_4;
+    chash_multimap<std::string, std::string> bp_5;
+    chash_multimap<int, int> const bp_6;
+    chash_multimap<std::string, std::string> const bp_7;
+    chash_set<int> bp_8;
+    chash_set<std::string> bp_9;
+    chash_set<int> const bp_a;
+    chash_set<std::string> const bp_b;
+    chash_multiset<int> bp_c;
+    chash_multiset<std::string> bp_d;
+    chash_multiset<int> const bp_e;
+    chash_multiset<std::string> const bp_f;
 
     foo_test(bp_0);
     foo_test(bp_1);
