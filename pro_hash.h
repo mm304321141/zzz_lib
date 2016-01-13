@@ -669,7 +669,7 @@ public:
         {
             return 0;
         }
-        return remove_value_(config_t::unique_type(), key);
+        return remove_value_(typename config_t::unique_type(), key);
     }
     iterator erase(const_iterator erase_begin, const_iterator erase_end)
     {
@@ -701,7 +701,7 @@ public:
         return find(key) == end() ? 0 : 1;
     }
 
-    template<class = typename std::enable_if<config_t::unique_type::value, void>::type> pair_ii_t equal_range(key_type const &key)
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value, void>::type> pair_ii_t equal_range(in_key_t const &key)
     {
         auto where = find(key);
         if(where == end())
@@ -713,7 +713,7 @@ public:
             return std::make_pair(where, iterator(advance_next_(where.offset), this));
         }
     }
-    template<class = typename std::enable_if<config_t::unique_type::value, void>::type> pair_cici_t equal_range(key_type const &key) const
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value, void>::type> pair_cici_t equal_range(in_key_t const &key) const
     {
         auto where = find(key);
         if(where == cend())
@@ -725,7 +725,7 @@ public:
             return std::make_pair(where, const_iterator(advance_next_(where.offset), this));
         }
     }
-    template<class = typename std::enable_if<!config_t::unique_type::value, void>::type> pair_lili_t equal_range(key_type const &key)
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !config_t::unique_type::value, void>::type> pair_lili_t equal_range(in_key_t const &key)
     {
         auto where = find(key);
         if(where == end())
@@ -737,7 +737,7 @@ public:
             return std::make_pair(local_iterator(where.offset, this), local_iterator(local_find_equal_(where.offset), this));
         }
     }
-    template<class = typename std::enable_if<!config_t::unique_type::value, void>::type> pair_clicli_t equal_range(key_type const &key) const
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !config_t::unique_type::value, void>::type> pair_clicli_t equal_range(in_key_t const &key) const
     {
         auto where = find(key);
         if(where == end())
@@ -1172,7 +1172,7 @@ protected:
     template<class ...args_t> pair_posi_t insert_value_(args_t &&...args)
     {
         check_grow_();
-        return insert_value_uncheck_(config_t::unique_type(), std::forward<args_t>(args)...);
+        return insert_value_uncheck_(typename config_t::unique_type(), std::forward<args_t>(args)...);
     }
 
     template<class in_t, class ...args_t> pair_posi_t insert_value_uncheck_(std::true_type, in_t &&in, args_t &&...args)
