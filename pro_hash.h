@@ -982,9 +982,53 @@ protected:
         }
     }
 
+    static bool is_prime(size_type candidate)
+    {
+        if((candidate & 1) != 0)
+        {
+            size_type limit = size_type(std::sqrt(candidate));
+            for(size_type divisor = 3; divisor <= limit; divisor += 2)
+            {
+                if((candidate % divisor) == 0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return (candidate == 2);
+    }
+
+    static size_type get_prime_(size_type size)
+    {
+        static size_type const primes[] =
+        {
+            7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919,
+            1103, 1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591,
+            17519, 21023, 25229, 30293, 36353, 43627, 52361, 62851, 75431, 90523, 108631, 130363, 156437,
+            187751, 225307, 270371, 324449, 389357, 467237, 560689, 672827, 807403, 968897, 1162687, 1395263,
+            1674319, 2009191, 2411033, 2893249, 3471899, 4166287, 4999559, 5999471, 7199369
+        };
+        for(auto p : primes)
+        {
+            if(p >= size)
+            {
+                return p;
+            }
+        }
+        for(size_type i = (size | 1); i < std::numeric_limits<uint32_t>::max(); i += 2)
+        {
+            if(is_prime(i) && ((i - 1) % 101 != 0))
+            {
+                return i;
+            }
+        }
+        return size;
+    }
+
     void rehash_(size_type size)
     {
-        size = std::min(size, max_size());
+        size = std::min(get_prime_(size), max_size());
         if(root_.bucket_count != 0)
         {
             get_bucket_allocator_().deallocate(root_.bucket, root_.bucket_count);
@@ -1011,6 +1055,10 @@ protected:
 
     void realloc_(size_type size)
     {
+        if(size * sizeof(value_t) > 0x1000)
+        {
+            size = ((size * sizeof(value_t) + std::max<size_type>(sizeof(value_t), 0x1000) - 1) & (~size_type(0) ^ 0xFFF)) / sizeof(value_t);
+        }
         size = std::min(size, max_size());
         index_t *new_index = get_index_allocator_().allocate(size);
         value_t *new_value = get_value_allocator_().allocate(size);
@@ -1030,21 +1078,22 @@ protected:
 
     void check_grow_()
     {
-        if(root_.bucket_count * root_.setting_load_factor <= root_.size)
+        size_type new_size = size() + 1;
+        if(root_.bucket_count * root_.setting_load_factor < new_size)
         {
             if(root_.bucket_count >= max_size())
             {
                 throw std::length_error("pro_hash too long");
             }
-            rehash_(std::max<size_type>(8, root_.bucket_count * 2 + 1));
+            rehash_(root_.bucket_count * 2);
         }
-        if(root_.size == root_.capacity)
+        if(new_size > root_.capacity)
         {
             if(root_.capacity >= max_size())
             {
                 throw std::length_error("pro_hash too long");
             }
-            realloc_(std::max<size_type>({8, root_.capacity * 2 + 1, size_type(std::ceil(root_.bucket_count * root_.setting_load_factor))}));
+            realloc_(std::max<size_type>({8, root_.capacity * 2, size_type(std::ceil(root_.bucket_count * root_.setting_load_factor))}));
         }
     }
 
