@@ -1157,7 +1157,7 @@ protected:
             {
                 throw std::length_error("contiguous_hash too long");
             }
-            rehash_(root_.bucket_count * 2);
+            rehash_(size_type(root_.bucket_count * config_t::grow_proportion()));
         }
         if(new_size > root_.capacity)
         {
@@ -1165,7 +1165,7 @@ protected:
             {
                 throw std::length_error("contiguous_hash too long");
             }
-            realloc_(std::max<size_type>({8, root_.capacity * 2, size_type(std::ceil(root_.bucket_count * root_.setting_load_factor))}));
+            realloc_(std::max<size_type>({8, size_type(root_.capacity * config_t::grow_proportion()), size_type(std::ceil(root_.bucket_count * root_.setting_load_factor))}));
         }
     }
 

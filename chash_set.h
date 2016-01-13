@@ -15,6 +15,10 @@ struct chash_set_config_t
     typedef std::uintptr_t offset_type;
     typedef typename std::result_of<hasher(key_type)>::type hash_value_type;
     typedef unique_t unique_type;
+    static float grow_proportion()
+    {
+        return 2;
+    }
     template<class in_type> static key_type const &get_key(in_type &&value)
     {
         return value;
