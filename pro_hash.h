@@ -952,7 +952,7 @@ protected:
         {
             next = root_.index[i].next;
         }
-        while(next == offset_empty || root_.index[next].hash != hash || !get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(*root_.value[next].value())));
+        while(next != offset_empty && root_.index[next].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(*root_.value[next].value())));
         return next;
     }
 
