@@ -184,12 +184,20 @@ protected:
         {
             return config_t::get_key(value);
         }
+        template<class ...args_t> key_type const &operator()(key_type const &in, args_t &&...args)
+        {
+            return (*this)(in);
+        }
     };
     template<class k_t> struct get_key_select_t<k_t, k_t>
     {
         key_type const &operator()(key_type const &value)
         {
             return config_t::get_key(value);
+        }
+        template<class in_t, class ...args_t> key_type operator()(in_t const &in, args_t const &...args)
+        {
+            return key_type(in, args...);
         }
     };
     typedef get_key_select_t<key_type, value_type> get_key_t;
@@ -1175,13 +1183,46 @@ protected:
         return insert_value_uncheck_(typename config_t::unique_type(), std::forward<args_t>(args)...);
     }
 
-    template<class in_t, class ...args_t> pair_posi_t insert_value_uncheck_(std::true_type, in_t &&in, args_t &&...args)
+    template<class in_t, class ...args_t> typename std::enable_if<std::is_same<key_type, value_type>::value && !std::is_same<typename std::remove_reference<in_t>::type, key_type>::value, pair_posi_t>::type insert_value_uncheck_(std::true_type, in_t &&in, args_t &&...args)
     {
-        hash_t hash = get_hasher()(get_key_t()(in));
+        key_type key = get_key_t()(in, args...);
+        hash_t hash = get_hasher()(key);
         size_type bucket = hash % root_.bucket_count;
         for(size_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
         {
-            if(root_.index[i].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(in)))
+            if(root_.index[i].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(key)))
+            {
+                return std::make_pair(i, false);
+            }
+        }
+        size_type offset = root_.free_list == offset_empty ? root_.size : root_.free_list;
+        construct_one_(root_.value[offset].value(), std::move(key));
+        if(offset == root_.free_list)
+        {
+            root_.free_list = root_.index[offset].next;
+            --root_.free_count;
+        }
+        else
+        {
+            ++root_.size;
+        }
+        root_.index[offset].hash = hash;
+        root_.index[offset].next = root_.bucket[bucket];
+        root_.index[offset].prev = offset_empty;
+        if(root_.bucket[bucket] != offset_empty)
+        {
+            root_.index[root_.bucket[bucket]].prev = offset_type(offset);
+        }
+        root_.bucket[bucket] = offset_type(offset);
+        return std::make_pair(offset, true);
+    }
+    template<class in_t, class ...args_t> typename std::enable_if<!std::is_same<key_type, value_type>::value || std::is_same<typename std::remove_reference<in_t>::type, key_type>::value, pair_posi_t>::type insert_value_uncheck_(std::true_type, in_t &&in, args_t &&...args)
+    {
+        hash_t hash = get_hasher()(get_key_t()(in, args...));
+        size_type bucket = hash % root_.bucket_count;
+        for(size_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
+        {
+            if(root_.index[i].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(in, args...)))
             {
                 return std::make_pair(i, false);
             }
@@ -1210,16 +1251,6 @@ protected:
 
     template<class in_t, class ...args_t> pair_posi_t insert_value_uncheck_(std::false_type, in_t &&in, args_t &&...args)
     {
-        hash_t hash = get_hasher()(get_key_t()(in));
-        size_type bucket = hash % root_.bucket_count;
-        size_type where;
-        for(where = root_.bucket[bucket]; where != offset_empty; where = root_.index[where].next)
-        {
-            if(root_.index[where].hash == hash && get_key_equal()(get_key_t()(*root_.value[where].value()), get_key_t()(in)))
-            {
-                break;
-            }
-        }
         size_type offset = root_.free_list == offset_empty ? root_.size : root_.free_list;
         construct_one_(root_.value[offset].value(), std::forward<in_t>(in), std::forward<args_t>(args)...);
         if(offset == root_.free_list)
@@ -1230,6 +1261,16 @@ protected:
         else
         {
             ++root_.size;
+        }
+        hash_t hash = get_hasher()(get_key_t()(*root_.value[offset].value()));
+        size_type bucket = hash % root_.bucket_count;
+        size_type where;
+        for(where = root_.bucket[bucket]; where != offset_empty; where = root_.index[where].next)
+        {
+            if(root_.index[where].hash == hash && get_key_equal()(get_key_t()(*root_.value[where].value()), get_key_t()(*root_.value[offset].value())))
+            {
+                break;
+            }
         }
         root_.index[offset].hash = hash;
         if(where == offset_empty)
