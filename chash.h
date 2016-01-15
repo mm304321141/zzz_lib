@@ -1139,6 +1139,14 @@ protected:
         {
             size = ((size * sizeof(value_t) + std::max<size_type>(sizeof(value_t), 0x1000) - 1) & (~size_type(0) ^ 0xFFF)) / sizeof(value_t);
         }
+        else if(size * sizeof(value_t) > 0x100)
+        {
+            size = ((size * sizeof(value_t) + std::max<size_type>(sizeof(value_t), 0x100) - 1) & (~size_type(0) ^ 0xFF)) / sizeof(value_t);
+        }
+        else
+        {
+            size = ((size * sizeof(value_t) + std::max<size_type>(sizeof(value_t), 0x10) - 1) & (~size_type(0) ^ 0xF)) / sizeof(value_t);
+        }
         size = std::min(size, max_size());
         index_t *new_index = get_index_allocator_().allocate(size);
         value_t *new_value = get_value_allocator_().allocate(size);
@@ -1159,13 +1167,13 @@ protected:
     void check_grow_()
     {
         size_type new_size = size() + 1;
-        if(root_.bucket_count * root_.setting_load_factor < new_size)
+        if(new_size > root_.bucket_count * root_.setting_load_factor)
         {
             if(root_.bucket_count >= max_size())
             {
                 throw std::length_error("contiguous_hash too long");
             }
-            rehash_(size_type(root_.bucket_count * config_t::grow_proportion()));
+            rehash_(size_type(std::ceil(root_.bucket_count * config_t::grow_proportion())));
         }
         if(new_size > root_.capacity)
         {
@@ -1173,7 +1181,7 @@ protected:
             {
                 throw std::length_error("contiguous_hash too long");
             }
-            realloc_(std::max<size_type>({8, size_type(root_.capacity * config_t::grow_proportion()), size_type(std::ceil(root_.bucket_count * root_.setting_load_factor))}));
+            realloc_(size_type(std::ceil(std::max<float>(root_.capacity * config_t::grow_proportion(), root_.bucket_count * root_.setting_load_factor))));
         }
     }
 
