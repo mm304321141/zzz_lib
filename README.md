@@ -35,7 +35,6 @@ sizeof(key)巨大的情况下去,内存占用会偏大,并且性能下降<br/>
 
 基于哈希表实现<br/>
 内存集中分配,尽可能利用缓存加速<br/>
-相比标准库unordered_map,迭代器在插入元素之后会失效<br/>
 插入元素可能导致扩容,产生搬运数据操作<br/>
 遍历速度飞快!<br/>
 在允许重复key时候,equal_range返回local_iterator,仅支持erase操作<br/>
