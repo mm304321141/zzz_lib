@@ -1826,12 +1826,10 @@ protected:
     {
         if(std::is_scalar<key_type>::value && size_type(node_type::max) < size_type(binary_search_limit))
         {
-            typename node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
-            while(begin != end && get_comparator_()(get_key_t()(*begin), key))
+            return std::find_if(node->item, node->item + node->bound(), [&](typename node_type::item_type const &item)->bool
             {
-                ++begin;
-            }
-            return begin - node->item;
+                return !get_comparator_()(get_key_t()(item), key);
+            }) - node->item;
         }
         else
         {
@@ -1845,12 +1843,10 @@ protected:
     {
         if(std::is_scalar<key_type>::value && size_type(node_type::max) < size_type(binary_search_limit))
         {
-            typename node_type::item_type const *begin = node->item, *const end = node->item + node->bound();
-            while(begin != end && !get_comparator_()(key, get_key_t()(*begin)))
+            return std::find_if(node->item, node->item + node->bound(), [&](typename node_type::item_type const &item)->bool
             {
-                ++begin;
-            }
-            return begin - node->item;
+                return get_comparator_()(key, get_key_t()(item));
+            }) - node->item;
         }
         else
         {
