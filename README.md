@@ -57,6 +57,20 @@ sizeof(key)巨大的情况下去,内存占用会偏大,并且性能下降<br/>
 加入到工程,调试时候有更友好的视图<br/>
 custom views of native<br/>
 
+<br/>
+<br/>
+<br/>
+
+* split_iterator
+
+迭代器方式进行split<br/>
+适配std::string<br/>
+不需要额外的内存存储split后的数据<br/>
+无法预知总共会split多少段<br/>
+附带了**不完整**string_ref实现<br/>
+
+<br/>
+
 * sparse_array.h
 
 稀松数组...不成熟的玩意...<br/>

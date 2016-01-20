@@ -77,10 +77,7 @@ public:
     typedef value_type *pointer;
     typedef value_type const *const_pointer;
 
-    enum
-    {
-        offset_empty = offset_type(-1)
-    };
+    static constexpr offset_type offset_empty = offset_type(-1);
 
 protected:
     struct hash_t
