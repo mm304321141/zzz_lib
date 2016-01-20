@@ -47,7 +47,7 @@ template<class char_t, class integer_t> integer_t string_to_integer(char_t const
     return neg && std::is_unsigned<integer_t>::value ? result * -1 : result;
 }
 
-template<class char_t, class read_t> read_t string_to_real(char_t const *s, size_t l)
+template<class char_t, class real_t> real_t string_to_real(char_t const *s, size_t l)
 {
     double result = 0.0;
     std::intptr_t nc, neg = s[0] == '-' ? 1 : 0;
@@ -99,10 +99,10 @@ template<class char_t, class read_t> read_t string_to_real(char_t const *s, size
             default: break;
         }
     }
-    return read_t(neg ? result * -1.0 : result);
+    return real_t(neg ? result * -1.0 : result);
 }
 
-template<class char_t, class traits_t = std::char_traits<char_t>> class string_ref
+template<class char_t = char, class traits_t = std::char_traits<char_t>> class string_ref
 {
 public:
     typedef traits_t traits_type;
