@@ -86,6 +86,22 @@ int main()
             std::cout << split[i].to_value<int>() << std::endl;
         }
     }();
+    []
+    {
+        std::string str = "aaa,111,ccc";
+        std::string v1;
+        int v2;
+        string_ref<> v3;
+        make_split(str, ',').fill(v1, v2, v3);
+    }();
+    []
+    {
+        std::wstring str = L"aaa,111,ccc";
+        std::wstring v1;
+        int v2;
+        string_ref<wchar_t> v3;
+        make_split(str, L',').fill(v1, v2, v3);
+    }();
 
     system("pause");
 }

@@ -544,6 +544,57 @@ public:
     };
     typedef iterator const_iterator;
 
+private:
+    template<class unuse, class T> struct fill_value_t
+    {
+        int operator()(iterator &it, T &value, bool &error)
+        {
+            if(it.self != nullptr)
+            {
+                value = it->to_value<T>();
+                ++it;
+            }
+            else
+            {
+                error = true;
+            }
+            return 0;
+        }
+    };
+    template<class unuse> struct fill_value_t<unuse, string_type>
+    {
+        int operator()(iterator &it, string_type &value, bool &error)
+        {
+            if(it.self != nullptr)
+            {
+                value = *it;
+                ++it;
+            }
+            else
+            {
+                error = true;
+            }
+            return 0;
+        }
+    };
+    template<class unuse, class allocator_t> struct fill_value_t<unuse, std::basic_string<typename string_type::value_type, typename string_type::traits_type, allocator_t>>
+    {
+        int operator()(iterator &it, std::basic_string<typename string_type::value_type, typename string_type::traits_type, allocator_t> &value, bool &error)
+        {
+            if(it.self != nullptr)
+            {
+                value = *it;
+                ++it;
+            }
+            else
+            {
+                error = true;
+            }
+            return 0;
+        }
+    };
+public:
+
     typedef std::pair<string_type, string_type> pair_ss_t;
     
     split_container(split_container const &) = default;
@@ -598,6 +649,15 @@ public:
             _ref.substr(0, pos), _ref.substr(pos + _finder.size())
         };
     }
+
+    template<class ...args_t> bool fill(args_t &...value)
+    {
+        bool error = false;
+        iterator it = begin();
+        std::initializer_list<int>({fill_value_t<void, args_t>()(it, value, error)...});
+        return !error;
+    }
+
     size_type size() const
     {
         if(_size == 0)
@@ -612,6 +672,7 @@ public:
         }
         return _size;
     }
+
     string_type operator[](size_type index)
     {
         if(index == 0)
