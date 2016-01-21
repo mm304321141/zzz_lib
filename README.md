@@ -66,8 +66,10 @@ custom views of native<br/>
 迭代器方式进行split<br/>
 适配std::string<br/>
 不需要额外的内存存储split后的数据<br/>
-无法预知总共会split多少段<br/>
-附带了**不完整**string_ref实现<br/>
+提供了size(),惰性计算,不推荐使用<br/>
+提供了operator\[index\],从头扫描实现,不推荐使用<br/>
+**请保证**传入的字符串的有效期,split过程中不会拷贝字符串<br/>
+string_ref实现**不完整**,提供了to_value<>替换ato?接口<br/>
 
 <br/>
 
