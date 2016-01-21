@@ -211,9 +211,7 @@ public:
         iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
         {
         }
-        iterator(iterator const &other) : offset(other.offset), self(other.self)
-        {
-        }
+        iterator(iterator const &) = default;
         iterator &operator++()
         {
             offset = self->advance_next_(offset);
@@ -260,9 +258,7 @@ public:
         const_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
         {
         }
-        const_iterator(const_iterator const &other) : offset(other.offset), self(other.self)
-        {
-        }
+        const_iterator(const_iterator const &) = default;
         const_iterator(iterator const &it) : offset(it.offset), self(it.self)
         {
         }
@@ -310,9 +306,7 @@ public:
         local_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
         {
         }
-        local_iterator(local_iterator const &other) : offset(other.offset), self(other.self)
-        {
-        }
+        local_iterator(local_iterator const &) = default;
         local_iterator &operator++()
         {
             offset = self->local_advance_next_(offset);
@@ -359,9 +353,7 @@ public:
         const_local_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
         {
         }
-        const_local_iterator(const_local_iterator const &other) : offset(other.offset), self(other.self)
-        {
-        }
+        const_local_iterator(const_local_iterator const &) = default;
         const_local_iterator(local_iterator const &it) : offset(it.offset), self(it.self)
         {
         }

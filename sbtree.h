@@ -70,9 +70,7 @@ public:
         explicit iterator(node_t *in_node) : node(in_node)
         {
         }
-        iterator(iterator const &other) : node(other.node)
-        {
-        }
+        iterator(iterator const &) = default;
         iterator &operator += (difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, diff);
@@ -174,9 +172,7 @@ public:
         const_iterator(iterator const &other) : node(other.node)
         {
         }
-        const_iterator(const_iterator const &other) : node(other.node)
-        {
-        }
+        const_iterator(const_iterator const &) = default;
         const_iterator &operator += (difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, diff);
@@ -277,9 +273,7 @@ public:
         {
             ++*this;
         }
-        reverse_iterator(reverse_iterator const &other) : node(other.node)
-        {
-        }
+        reverse_iterator(reverse_iterator const &) = default;
         reverse_iterator &operator += (difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, -diff);
@@ -389,9 +383,7 @@ public:
         const_reverse_iterator(reverse_iterator const &other) : node(other.node)
         {
         }
-        const_reverse_iterator(const_reverse_iterator const &other) : node(other.node)
-        {
-        }
+        const_reverse_iterator(const_reverse_iterator const &) = default;
         const_reverse_iterator &operator += (difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, -diff);

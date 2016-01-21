@@ -564,9 +564,7 @@ public:
         iterator(pair_pos_t pos, b_plus_plus_tree *self) : node(pos.first == nullptr ? static_cast<node_t *>(&self->root_) : static_cast<node_t *>(pos.first)), where(pos.second)
         {
         }
-        iterator(iterator const &other) : node(other.node), where(other.where)
-        {
-        }
+        iterator(iterator const &) = default;
         iterator &operator += (difference_type diff)
         {
             b_plus_plus_tree::advance_step_(node, where, diff);
@@ -676,9 +674,7 @@ public:
         const_iterator(iterator const &it) : node(it.node), where(it.where)
         {
         }
-        const_iterator(const_iterator const &other) : node(other.node), where(other.where)
-        {
-        }
+        const_iterator(const_iterator const &) = default;
         const_iterator &operator += (difference_type diff)
         {
             b_plus_plus_tree::advance_step_(node, where, diff);
@@ -787,9 +783,7 @@ public:
         {
             ++*this;
         }
-        reverse_iterator(reverse_iterator const &other) : node(other.node), where(other.where)
-        {
-        }
+        reverse_iterator(reverse_iterator const &) = default;
         reverse_iterator &operator += (difference_type diff)
         {
             b_plus_plus_tree::advance_step_(node, where, -diff);
@@ -910,9 +904,7 @@ public:
         const_reverse_iterator(reverse_iterator it) : node(it.node), where(it.where)
         {
         }
-        const_reverse_iterator(const_reverse_iterator const &other) : node(other.node), where(other.where)
-        {
-        }
+        const_reverse_iterator(const_reverse_iterator const &) = default;
         const_reverse_iterator &operator += (difference_type diff)
         {
             b_plus_plus_tree::advance_step_(node, where, -diff);

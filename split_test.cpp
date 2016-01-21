@@ -40,6 +40,17 @@ auto assert_proc = [](bool no_error, char const *query, char const *file, size_t
 
 int main()
 {
+    auto test_to_real = [](char const *s)
+    {
+        double l = std::atof(s);
+        double r = string_ref<>(s).to_value<double>();
+        printf("%f\n%f\n%f\n\n", l, r, (l - r) / l);
+    };
+
+    test_to_real("1234567890.1234567890");
+    test_to_real("1234567890.1234567890e3");
+    test_to_real("-1234567890.1234567890e-3");
+
     []
     {
         std::string str = "1234,5678.9012 3456";
@@ -54,17 +65,25 @@ int main()
         {
             std::cout << item.to_value<int>() << std::endl;
         }
-        std::cout << string_ref<char>("-999.888888").to_value<double>() << std::endl;
     }();
     []
     {
         std::string str = "/1//23/456///";
-        auto it = make_split(str, '/');
+        auto split = make_split(str, '/');
         std::vector<std::string> token;
-        std::copy(it, it.end(), std::back_inserter(token));
+        std::copy(split.begin(), split.end(), std::back_inserter(token));
         for(auto item : token)
         {
             std::cout << item << std::endl;
+        }
+    }();
+    []
+    {
+        std::string str = "/1//23/456///";
+        auto split = make_split(str, '/');
+        for(size_t i = 0; i <= split.size(); ++i)
+        {
+            std::cout << split[i].to_value<int>() << std::endl;
         }
     }();
 

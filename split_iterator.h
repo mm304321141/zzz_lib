@@ -14,6 +14,10 @@
 template<class char_t, class integer_t> integer_t string_to_integer(char_t const *s, size_t l)
 {
     integer_t result = 0;
+    if(l == 0)
+    {
+        return result;
+    }
     size_t nc, neg = s[0] == '-' ? 1 : 0;
     for(nc = neg; nc != l && isdigit(s[nc]); ++nc)
         ;
@@ -44,16 +48,20 @@ template<class char_t, class integer_t> integer_t string_to_integer(char_t const
             default: break;
         }
     }
-    return neg && std::is_unsigned<integer_t>::value ? result * -1 : result;
+    return neg && !std::is_unsigned<integer_t>::value ? result * -1 : result;
 }
 
 template<class char_t, class real_t> real_t string_to_real(char_t const *s, size_t l)
 {
     double result = 0.0;
-    std::intptr_t nc, neg = s[0] == '-' ? 1 : 0;
-    for(nc = neg; nc != std::intptr_t(l) && (isdigit(s[nc]) && s[nc] != '.'); ++nc)
+    if(l == 0)
+    {
+        return real_t(result);
+    }
+    std::intptr_t i, nc, neg = s[0] == '-' ? 1 : 0;
+    for(nc = neg; size_t(nc) != l && (isdigit(s[nc]) && s[nc] != '.'); ++nc)
         ;
-    for(std::intptr_t i = neg; i != std::intptr_t(l) && (isdigit(s[i]) || s[i] == '.'); ++i)
+    for(i = neg; size_t(i) != l && (isdigit(s[i]) || s[i] == '.'); ++i)
     {
         switch(nc - i)
         {
@@ -99,6 +107,10 @@ template<class char_t, class real_t> real_t string_to_real(char_t const *s, size
             default: break;
         }
     }
+    if(size_t(i) != l && s[i] == 'e')
+    {
+        result *= std::pow(10, string_to_integer<char_t, std::intptr_t>(s + i + 1, l - i - 1));
+    }
     return real_t(neg ? result * -1.0 : result);
 }
 
@@ -120,7 +132,7 @@ public:
     constexpr string_ref() : _ptr(), _len()
     {
     }
-    constexpr string_ref(string_ref const &other) = default;
+    constexpr string_ref(string_ref const &) = default;
     template<class allocator_t> string_ref(std::basic_string<char_t, traits_t, allocator_t> const &str) : _ptr(str.data()), _len(str.length())
     {
     }
@@ -390,45 +402,25 @@ public:
     typedef char_t char_type;
     typedef traits_t traits_type;
     typedef string_t string_type;
+    typedef typename string_type::size_type size_type;
     
-    split_iterator_finder_char() : _find(), _clear()
+    split_iterator_finder_char() : _find()
     {
     }
     split_iterator_finder_char(split_iterator_finder_char const &) = default;
-    split_iterator_finder_char(char_t find) : _find(find), _clear()
+    split_iterator_finder_char(char_t find) : _find(find)
     {
     }
-    typename string_type::size_type run(string_type ref) const
+    size_type run(string_type ref, size_type pos) const
     {
-        return ref.find(_find);
+        return ref.find(_find, pos);
     }
-    typename string_type::size_type size() const
+    size_type size() const
     {
         return 1;
     }
-    bool operator == (split_iterator_finder_char const &other) const
-    {
-        return _find == other._find && _clear == other._clear;
-    }
-    bool operator != (split_iterator_finder_char const &other) const
-    {
-        return _find != other._find || _clear != other._clear;
-    }
-    void clear()
-    {
-        _clear = true;
-    }
-    operator bool() const
-    {
-        return !_clear;
-    }
-    bool operator!() const
-    {
-        return _clear;
-    }
 private:
     char_t _find;
-    bool _clear;
 };
 template<class char_t, class traits_t = std::char_traits<char_t>, class string_t = string_ref<char_t, traits_t>> struct split_iterator_finder_string
 {
@@ -436,6 +428,7 @@ public:
     typedef char_t char_type;
     typedef traits_t traits_type;
     typedef string_t string_type;
+    typedef typename string_type::size_type size_type;
     
     split_iterator_finder_string() : _find()
     {
@@ -444,33 +437,13 @@ public:
     split_iterator_finder_string(string_type find) : _find(find)
     {
     }
-    typename string_type::size_type run(string_type ref) const
+    size_type run(string_type ref, size_type pos) const
     {
-        return ref.find(_find);
+        return ref.find(_find, pos);
     }
-    typename string_type::size_type size() const
+    size_type size() const
     {
         return _find.size();
-    }
-    bool operator == (split_iterator_finder_string const &other) const
-    {
-        return _find == other._find;
-    }
-    bool operator != (split_iterator_finder_string const &other) const
-    {
-        return _find != other._find;
-    }
-    void clear()
-    {
-        _find.clear();
-    }
-    operator bool() const
-    {
-        return !_find.empty();
-    }
-    bool operator!() const
-    {
-        return _find.empty();
     }
 private:
     string_type _find;
@@ -481,6 +454,7 @@ public:
     typedef char_t char_type;
     typedef traits_t traits_type;
     typedef string_t string_type;
+    typedef typename string_type::size_type size_type;
     
     split_iterator_finder_any_of() : _find()
     {
@@ -489,9 +463,9 @@ public:
     split_iterator_finder_any_of(string_type find) : _find(find)
     {
     }
-    typename string_type::size_type run(string_type ref) const
+    size_type run(string_type ref, size_type pos) const
     {
-        for(typename string_type::size_type pos = 0; pos < ref.size(); ++pos)
+        for(; pos < ref.size(); ++pos)
         {
             if(std::find(_find.cbegin(), _find.cend(), ref[pos]) != _find.cend())
             {
@@ -500,204 +474,215 @@ public:
         }
         return string_type::npos;
     }
-    typename string_type::size_type size() const
+    size_type size() const
     {
         return 1;
-    }
-    bool operator == (split_iterator_finder_any_of const &other) const
-    {
-        return _find == other._find;
-    }
-    bool operator != (split_iterator_finder_any_of const &other) const
-    {
-        return _find != other._find;
-    }
-    void clear()
-    {
-        _find.clear();
-    }
-    operator bool() const
-    {
-        return !_find.empty();
-    }
-    bool operator!() const
-    {
-        return _find.empty();
     }
 private:
     string_type _find;
 };
-template<class finder_t> class split_iterator
+template<class finder_t> class split_container
 {
 public:
-    typedef std::input_iterator_tag iterator_category;
     typedef typename finder_t::string_type value_type, string_type;
+    typedef std::size_t size_type;
     typedef std::ptrdiff_t difference_type;
     typedef value_type const &reference;
-    typedef value_type const *pointer;
     typedef value_type const &const_reference;
+    typedef value_type const *pointer;
     typedef value_type const *const_pointer;
-    
-    split_iterator(finder_t const &finder) : _current(), _ref(), _finder(finder)
+
+    class iterator
     {
-        _finder.clear();
-    }
-    split_iterator(split_iterator const &) = default;
-    split_iterator(split_iterator &&) = default;
-    template<class iterator_t> split_iterator(iterator_t begin, iterator_t end, finder_t &&finder) : _current(), _ref(&*begin, end - begin), _finder(std::move(finder))
-    {
-        _current = _ref.substr(0, _finder.run(_ref));
-        _ref.remove_prefix(_current.size());
-    }
-    split_iterator &operator = (split_iterator const &) = default;
-    split_iterator &operator = (split_iterator &&) = default;
-    
-    split_iterator &operator++()
-    {
-        if(_ref.empty())
+    public:
+        typedef std::forward_iterator_tag iterator_category;
+        typedef typename split_container::value_type value_type;
+        typedef typename split_container::difference_type difference_type;
+        typedef typename split_container::reference reference;
+        typedef typename split_container::pointer pointer;
+    public:
+        iterator(split_container const *_self) : self(_self)
         {
-            _finder.clear();
-            _current.clear();
+            self->find_first(this);
+        }
+        iterator() : self(), pos(), current()
+        {
+        }
+        iterator(iterator const &) = default;
+        iterator &operator++()
+        {
+            self->find_next(this);
+            return *this;
+        }
+        iterator operator++(int)
+        {
+            iterator save(*this);
+            ++*this;
+            return save;
+        }
+        reference operator *() const
+        {
+            return current;
+        }
+        pointer operator->() const
+        {
+            return &current;
+        }
+        bool operator == (iterator const &other) const
+        {
+            return self == other.self && pos == other.pos && current == other.current;
+        }
+        bool operator != (iterator const &other) const
+        {
+            return !(*this == other);
+        }
+    private:
+        friend class split_container;
+        split_container const *self;
+        size_type pos;
+        string_type current;
+    };
+    typedef iterator const_iterator;
+
+    typedef std::pair<string_type, string_type> pair_ss_t;
+    
+    split_container(split_container const &) = default;
+    split_container(string_type ref, finder_t &&finder) : _size(), _ref(ref), _finder(std::move(finder))
+    {
+    }
+    split_container &operator = (split_container const &) = default;
+    
+    void find_first(iterator *it) const
+    {
+        it->current = _ref.substr(0, _finder.run(_ref, 0));
+        it->pos = it->current.size();
+    }
+    void find_next(iterator *it) const
+    {
+        if(it->pos == _ref.size())
+        {
+            it->self = nullptr;
+            it->pos = 0;
+            it->current.clear();
         }
         else
         {
-            _ref.remove_prefix(_finder.size());
-            _current = _ref.substr(0, _finder.run(_ref));
-            _ref.remove_prefix(_current.size());
+            it->pos += _finder.size();
+            it->current = _ref.substr(it->pos, _finder.run(_ref, it->pos) - it->pos);
+            it->pos += it->current.size();
         }
-        return *this;
     }
-    split_iterator operator++(int)
+    
+    iterator begin() const
     {
-        split_iterator save(*this);
-        ++*this;
-        return save;
+        return iterator(this);
     }
-    const_reference operator *() const
+    iterator end() const
     {
-        return _current;
+        return iterator();
     }
-    const_pointer operator->() const
+    iterator cbegin() const
     {
-        return &_current;
+        return iterator(this);
     }
-    bool operator == (split_iterator const &other) const
+    iterator cend() const
     {
-        if(*this ^ other)
+        return iterator();
+    }
+
+    pair_ss_t split2() const
+    {
+        size_type pos = _finder.run(_ref, 0);
+        return
         {
-            return false;
-        }
-        if(!*this && !other)
+            _ref.substr(0, pos), _ref.substr(pos + _finder.size())
+        };
+    }
+    size_type size() const
+    {
+        if(_size == 0)
         {
-            return true;
+            size_type pos = _finder.run(_ref, 0);
+            while(pos < _ref.size())
+            {
+                ++_size;
+                pos = _finder.run(_ref, pos + _finder.size());
+            }
+            ++_size;
         }
-        return _current == other._current && _ref == other._ref && _finder == other._finder;
+        return _size;
     }
-    bool operator != (split_iterator const &other) const
+    string_type operator[](size_type index)
     {
-        return !(*this == other);
-    }
-    
-    split_iterator begin() const
-    {
-        return *this;
-    }
-    split_iterator end() const
-    {
-        return split_iterator(_finder);
-    }
-    
-    operator bool() const
-    {
-        return _finder;
-    }
-    bool operator!() const
-    {
-        return !_finder;
-    }
-    
-    bool eof() const
-    {
-        return !*this;
-    }
-    bool next()
-    {
-        return ++*this;
-    }
-    string_type other() const
-    {
-        return _ref.substr(_finder.size());
+        if(index == 0)
+        {
+            return _ref.substr(0, _finder.run(_ref, 0));
+        }
+        size_type count = 0, pos = _finder.run(_ref, 0);
+        while(pos < _ref.size())
+        {
+            ++count;
+            if(count == index)
+            {
+                pos += _finder.size();
+                return _ref.substr(pos, _finder.run(_ref, pos) - pos);
+            }
+            else
+            {
+                pos = _finder.run(_ref, pos + _finder.size());
+            }
+        }
+        return string_type();
     }
     
 private:
-    string_type _current;
+    mutable size_type _size;
     string_type _ref;
     finder_t _finder;
 };
 
-template<class iterator_t> split_iterator<split_iterator_finder_char<typename std::iterator_traits<iterator_t>::value_type>> make_split(iterator_t begin, iterator_t end, typename std::iterator_traits<iterator_t>::value_type find)
+template<class char_t, class traits_t, class allocator_t> split_container<split_iterator_finder_char<char_t, traits_t>> make_split(std::basic_string<char_t, traits_t, allocator_t> const &str, char_t find)
 {
-    return split_iterator<split_iterator_finder_char<typename std::iterator_traits<iterator_t>::value_type>>(begin, end, {find});
+    return split_container<split_iterator_finder_char<char_t, traits_t>>(str, {find});
 };
-template<class char_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_char<char_t, traits_t>> make_split(std::basic_string<char_t, traits_t, allocator_t> const &str, char_t find)
+template<class char_t, class traits_t> split_container<split_iterator_finder_char<char_t, traits_t>> make_split(string_ref<char_t, traits_t> str, char_t find)
 {
-    return split_iterator<split_iterator_finder_char<char_t, traits_t>>(str.begin(), str.end(), {find});
-};
-template<class char_t, class traits_t> split_iterator<split_iterator_finder_char<char_t, traits_t>> make_split(string_ref<char_t, traits_t> str, char_t find)
-{
-    return split_iterator<split_iterator_finder_char<char_t, traits_t>>(str.begin(), str.end(), {find});
+    return split_container<split_iterator_finder_char<char_t, traits_t>>(str, {find});
 };
 
-
-template<class iterator_t> split_iterator<split_iterator_finder_string<typename std::iterator_traits<iterator_t>::value_type>> make_split(iterator_t begin, iterator_t end, typename std::iterator_traits<iterator_t>::value_type const *find)
+template<class char_t, class traits_t, class allocator_t> split_container<split_iterator_finder_string<char_t, traits_t>> make_split(std::basic_string<char_t, traits_t, allocator_t> const &str, char_t const *find)
 {
-    return split_iterator<split_iterator_finder_string<typename std::iterator_traits<iterator_t>::value_type>>(begin, end, {find});
+    return split_container<split_iterator_finder_string<char_t, traits_t>>(str, {find});
 };
-template<class char_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_string<char_t, traits_t>> make_split(std::basic_string<char_t, traits_t, allocator_t> const &str, char_t const *find)
+template<class char_t, class traits_t> split_container<split_iterator_finder_string<char_t, traits_t>> make_split(string_ref<char_t, traits_t> str, char_t const *find)
 {
-    return split_iterator<split_iterator_finder_string<char_t, traits_t>>(str.begin(), str.end(), {find});
-};
-template<class char_t, class traits_t> split_iterator<split_iterator_finder_string<char_t, traits_t>> make_split(string_ref<char_t, traits_t> str, char_t const *find)
-{
-    return split_iterator<split_iterator_finder_string<char_t, traits_t>>(str.begin(), str.end(), {find});
+    return split_container<split_iterator_finder_string<char_t, traits_t>>(str, {find});
 };
 
-template<class iterator_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_string<typename std::iterator_traits<iterator_t>::value_type, traits_t>> make_split(iterator_t begin, iterator_t end, std::basic_string<typename std::iterator_traits<iterator_t>::value_type, traits_t, allocator_t> const &find)
+template<class char_t, class traits_t, class allocator_t> split_container<split_iterator_finder_string<char_t, traits_t>> make_split(std::basic_string<char_t, traits_t, allocator_t> const &str, std::basic_string<char_t, traits_t, allocator_t> const &find)
 {
-    return split_iterator<split_iterator_finder_string<typename std::iterator_traits<iterator_t>::value_type>>(begin, end, {find});
+    return split_container<split_iterator_finder_string<char_t, traits_t>>(str, {find});
 };
-template<class char_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_string<char_t, traits_t>> make_split(std::basic_string<char_t, traits_t, allocator_t> const &str, std::basic_string<char_t, traits_t, allocator_t> const &find)
+template<class char_t, class traits_t, class allocator_t> split_container<split_iterator_finder_string<char_t, traits_t>> make_split(string_ref<char_t, traits_t> str, std::basic_string<char_t, traits_t, allocator_t> const &find)
 {
-    return split_iterator<split_iterator_finder_string<char_t, traits_t>>(str.begin(), str.end(), {find});
-};
-template<class char_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_string<char_t, traits_t>> make_split(string_ref<char_t, traits_t> str, std::basic_string<char_t, traits_t, allocator_t> const &find)
-{
-    return split_iterator<split_iterator_finder_string<char_t, traits_t>>(str.begin(), str.end(), {find});
+    return split_container<split_iterator_finder_string<char_t, traits_t>>(str, {find});
 };
 
-template<class iterator_t> split_iterator<split_iterator_finder_any_of<typename std::iterator_traits<iterator_t>::value_type>> make_split_any_of(iterator_t begin, iterator_t end, typename std::iterator_traits<iterator_t>::value_type const *find)
+template<class char_t, class traits_t, class allocator_t> split_container<split_iterator_finder_any_of<char_t, traits_t>> make_split_any_of(std::basic_string<char_t, traits_t, allocator_t> const &str, char_t const *find)
 {
-    return split_iterator<split_iterator_finder_any_of<typename std::iterator_traits<iterator_t>::value_type>>(begin, end, {find});
+    return split_container<split_iterator_finder_any_of<char_t, traits_t>>(str, {find});
 };
-template<class char_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_any_of<char_t, traits_t>> make_split_any_of(std::basic_string<char_t, traits_t, allocator_t> const &str, char_t const *find)
+template<class char_t, class traits_t> split_container<split_iterator_finder_any_of<char_t, traits_t>> make_split_any_of(string_ref<char_t, traits_t> str, char_t const *find)
 {
-    return split_iterator<split_iterator_finder_any_of<char_t, traits_t>>(str.begin(), str.end(), {find});
-};
-template<class char_t, class traits_t> split_iterator<split_iterator_finder_any_of<char_t, traits_t>> make_split_any_of(string_ref<char_t, traits_t> str, char_t const *find)
-{
-    return split_iterator<split_iterator_finder_any_of<char_t, traits_t>>(str.begin(), str.end(), {find});
+    return split_container<split_iterator_finder_any_of<char_t, traits_t>>(str, {find});
 };
 
-template<class iterator_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_any_of<typename std::iterator_traits<iterator_t>::value_type, traits_t>> make_split_any_of(iterator_t begin, iterator_t end, std::basic_string<typename std::iterator_traits<iterator_t>::value_type, traits_t, allocator_t> const &find)
+template<class char_t, class traits_t, class allocator_t> split_container<split_iterator_finder_any_of<char_t, traits_t>> make_split_any_of(std::basic_string<char_t, traits_t, allocator_t> const &str, std::basic_string<char_t, traits_t, allocator_t> const &find)
 {
-    return split_iterator<split_iterator_finder_any_of<typename std::iterator_traits<iterator_t>::value_type>>(begin, end, {find});
+    return split_container<split_iterator_finder_any_of<char_t, traits_t>>(str, {find});
 };
-template<class char_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_any_of<char_t, traits_t>> make_split_any_of(std::basic_string<char_t, traits_t, allocator_t> const &str, std::basic_string<char_t, traits_t, allocator_t> const &find)
+template<class char_t, class traits_t, class allocator_t> split_container<split_iterator_finder_any_of<char_t, traits_t>> make_split_any_of(string_ref<char_t, traits_t> str, std::basic_string<char_t, traits_t, allocator_t> const &find)
 {
-    return split_iterator<split_iterator_finder_any_of<char_t, traits_t>>(str.begin(), str.end(), {find});
-};
-template<class char_t, class traits_t, class allocator_t> split_iterator<split_iterator_finder_any_of<char_t, traits_t>> make_split_any_of(string_ref<char_t, traits_t> str, std::basic_string<char_t, traits_t, allocator_t> const &find)
-{
-    return split_iterator<split_iterator_finder_any_of<char_t, traits_t>>(str.begin(), str.end(), {find});
+    return split_container<split_iterator_finder_any_of<char_t, traits_t>>(str, {find});
 };
 
