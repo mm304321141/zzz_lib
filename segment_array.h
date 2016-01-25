@@ -39,7 +39,7 @@ namespace segment_array_detail
     {
     };
 
-    class move_scalar_tag
+    class move_trivial_tag
     {
     };
     class move_assign_tag
@@ -47,7 +47,7 @@ namespace segment_array_detail
     };
     template<class iterator_t> struct get_tag
     {
-        typedef typename std::conditional<std::is_scalar<typename std::iterator_traits<iterator_t>::value_type>::value, move_scalar_tag, move_assign_tag>::type type;
+        typedef typename std::conditional<std::is_trivial<typename std::iterator_traits<iterator_t>::value_type>::value, move_trivial_tag, move_assign_tag>::type type;
     };
 
     template<class iterator_t, class in_value_t, class tag_t> void construct_one(iterator_t where, in_value_t &&value, tag_t)
@@ -56,7 +56,7 @@ namespace segment_array_detail
         ::new(std::addressof(*where)) iterator_value_t(std::forward<in_value_t>(value));
     }
 
-    template<class iterator_t> void destroy_one(iterator_t where, move_scalar_tag)
+    template<class iterator_t> void destroy_one(iterator_t where, move_trivial_tag)
     {
     }
     template<class iterator_t> void destroy_one(iterator_t where, move_assign_tag)
@@ -65,7 +65,7 @@ namespace segment_array_detail
         where->~iterator_value_t();
     }
 
-    template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_scalar_tag)
+    template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_trivial_tag)
     {
     }
     template<class iterator_t> void destroy_range(iterator_t destroy_begin, iterator_t destroy_end, move_assign_tag)
@@ -76,7 +76,7 @@ namespace segment_array_detail
         }
     }
 
-    template<class iterator_from_t, class iterator_to_t> void move_forward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
+    template<class iterator_from_t, class iterator_to_t> void move_forward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
@@ -86,7 +86,7 @@ namespace segment_array_detail
         std::move(move_begin, move_end, to_begin);
     }
 
-    template<class iterator_from_t, class iterator_to_t> void move_backward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
+    template<class iterator_from_t, class iterator_to_t> void move_backward(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
@@ -96,7 +96,7 @@ namespace segment_array_detail
         std::move_backward(move_begin, move_end, to_begin + (move_end - move_begin));
     }
 
-    template<class iterator_from_t, class iterator_to_t> void move_construct(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
+    template<class iterator_from_t, class iterator_to_t> void move_construct(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
@@ -106,7 +106,7 @@ namespace segment_array_detail
         std::uninitialized_copy(std::make_move_iterator(move_begin), std::make_move_iterator(move_end), to_begin);
     }
 
-    template<class iterator_t> void move_next_to_and_construct(iterator_t move_begin, iterator_t move_end, iterator_t to_begin, move_scalar_tag)
+    template<class iterator_t> void move_next_to_and_construct(iterator_t move_begin, iterator_t move_end, iterator_t to_begin, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
@@ -127,7 +127,7 @@ namespace segment_array_detail
         }
     }
 
-    template<class iterator_from_t, class iterator_to_t> void move_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
+    template<class iterator_from_t, class iterator_to_t> void move_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
@@ -141,7 +141,7 @@ namespace segment_array_detail
         }
     }
 
-    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
+    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
@@ -155,7 +155,7 @@ namespace segment_array_detail
         }
     }
 
-    template<class iterator_t, class in_value_t> void move_next_and_insert_one(iterator_t move_begin, iterator_t move_end, in_value_t &&value, move_scalar_tag)
+    template<class iterator_t, class in_value_t> void move_next_and_insert_one(iterator_t move_begin, iterator_t move_end, in_value_t &&value, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*(move_begin + 1), &*move_begin, count * sizeof(*move_begin));
@@ -176,7 +176,7 @@ namespace segment_array_detail
         }
     }
 
-    template<class iterator_t> void move_prev_and_destroy_one(iterator_t move_begin, iterator_t move_end, move_scalar_tag)
+    template<class iterator_t> void move_prev_and_destroy_one(iterator_t move_begin, iterator_t move_end, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*(move_begin - 1), &*move_begin, count * sizeof(*move_begin));

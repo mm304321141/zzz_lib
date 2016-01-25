@@ -11,21 +11,21 @@
 
 namespace contiguous_hash_detail
 {
-    class move_scalar_tag
+    class move_trivial_tag
     {
     };
     class move_assign_tag
     {
     };
-    template<class T> struct is_scalar_expand : public std::is_scalar<T>
+    template<class T> struct is_trivial_expand : public std::is_trivial<T>
     {
     };
-    template<class K, class V> struct is_scalar_expand<std::pair<K, V>> : public std::conditional<std::is_scalar<K>::value && std::is_scalar<V>::value, std::true_type, std::false_type>::type
+    template<class K, class V> struct is_trivial_expand<std::pair<K, V>> : public std::conditional<std::is_trivial<K>::value && std::is_trivial<V>::value, std::true_type, std::false_type>::type
     {
     };
     template<class iterator_t> struct get_tag
     {
-        typedef typename std::conditional<is_scalar_expand<typename std::iterator_traits<iterator_t>::value_type>::value, move_scalar_tag, move_assign_tag>::type type;
+        typedef typename std::conditional<is_trivial_expand<typename std::iterator_traits<iterator_t>::value_type>::value, move_trivial_tag, move_assign_tag>::type type;
     };
 
     template<class iterator_t, class tag_t, class ...args_t> void construct_one(iterator_t where, tag_t, args_t &&...args)
@@ -34,7 +34,7 @@ namespace contiguous_hash_detail
         ::new(std::addressof(*where)) iterator_value_t(std::forward<args_t>(args)...);
     }
 
-    template<class iterator_t> void destroy_one(iterator_t where, move_scalar_tag)
+    template<class iterator_t> void destroy_one(iterator_t where, move_trivial_tag)
     {
     }
     template<class iterator_t> void destroy_one(iterator_t where, move_assign_tag)
@@ -43,7 +43,7 @@ namespace contiguous_hash_detail
         where->~iterator_value_t();
     }
 
-    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_scalar_tag)
+    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
         std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
