@@ -465,15 +465,15 @@ public:
         copy_all_<true>(&other.root_);
     }
     //initializer list
-    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : contiguous_hash(il.begin(), il.end(), bucket_count, hash, equal, alloc)
+    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count = 8, hasher const &hash = hasher(), key_equal const &equal = key_equal(), allocator_type const &alloc = allocator_type()) : contiguous_hash(il.begin(), il.end(), std::distance(il.begin(), il.end()), hash, equal, alloc)
     {
     }
     //initializer list
-    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : contiguous_hash(il.begin(), il.end(), bucket_count, alloc)
+    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count, allocator_type const &alloc) : contiguous_hash(il.begin(), il.end(), std::distance(il.begin(), il.end()), alloc)
     {
     }
     //initializer list
-    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : contiguous_hash(il.begin(), il.end(), bucket_count, hash, alloc)
+    contiguous_hash(std::initializer_list<value_type> il, size_type bucket_count, hasher const &hash, allocator_type const &alloc) : contiguous_hash(il.begin(), il.end(), std::distance(il.begin(), il.end()), hash, alloc)
     {
     }
     //destructor
@@ -848,7 +848,7 @@ public:
     }
     void rehash(size_type count)
     {
-        rehash_(std::max<size_type>({8, count, size_type(std::ceil(size() / root_.setting_load_factor))}));
+        rehash_(config_t::unique_type(), std::max<size_type>({8, count, size_type(std::ceil(size() / root_.setting_load_factor))}));
     }
 
     void max_load_factor(float ml)
@@ -860,7 +860,7 @@ public:
         root_.setting_load_factor = ml;
         if(root_.size != 0)
         {
-            rehash_(size_type(std::ceil(size() / root_.setting_load_factor)));
+            rehash_(config_t::unique_type(), size_type(std::ceil(size() / root_.setting_load_factor)));
         }
     }
     float max_load_factor() const
@@ -944,12 +944,11 @@ protected:
     size_type local_find_equal_(size_type i) const
     {
         hash_t hash = root_.index[i].hash;
-        size_type next;
-        do
+        size_type next = root_.index[i].next;
+        while(next != offset_empty && root_.index[next].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(*root_.value[next].value())))
         {
-            next = root_.index[i].next;
+            next = root_.index[next].next;
         }
-        while(next != offset_empty && root_.index[next].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(*root_.value[next].value())));
         return next;
     }
 
@@ -982,7 +981,7 @@ protected:
 
     void dealloc_all_()
     {
-        for(size_type i = 0; i < root_.size; i++)
+        for(size_type i = 0; i < root_.size; ++i)
         {
             if(root_.index[i].hash)
             {
@@ -1095,7 +1094,7 @@ protected:
         return size;
     }
 
-    void rehash_(size_type size)
+    void rehash_(std::true_type, size_type size)
     {
         size = std::min(get_prime_(size), max_size());
         if(root_.bucket_count != 0)
@@ -1105,7 +1104,7 @@ protected:
         root_.bucket = get_bucket_allocator_().allocate(size);
         std::memset(root_.bucket, 0xFFFFFFFF, sizeof(offset_type) * size);
 
-        for(size_type i = 0; i < root_.size; i++)
+        for(size_type i = 0; i < root_.size; ++i)
         {
             if(root_.index[i].hash)
             {
@@ -1120,6 +1119,41 @@ protected:
             }
         }
         root_.bucket_count = size;
+    }
+
+    void rehash_(std::false_type, size_type size)
+    {
+        size = std::min(get_prime_(size), max_size());
+        offset_type *new_bucket = get_bucket_allocator_().allocate(size);
+        std::memset(new_bucket, 0xFFFFFFFF, sizeof(offset_type) * size);
+
+        if(root_.bucket_count != 0)
+        {
+            for(size_type i = 0; i < root_.bucket_count; ++i)
+            {
+                if(root_.bucket[i] != offset_empty)
+                {
+                    size_type j = root_.bucket[i], nj;
+                    do
+                    {
+                        nj = root_.index[j].next;
+                        size_type bucket = root_.index[j].hash % size;
+                        if(new_bucket[bucket] != offset_empty)
+                        {
+                            root_.index[new_bucket[bucket]].prev = offset_type(j);
+                        }
+                        root_.index[j].prev = offset_empty;
+                        root_.index[j].next = new_bucket[bucket];
+                        new_bucket[bucket] = offset_type(j);
+                        j = nj;
+                    }
+                    while(j != offset_empty);
+                }
+            }
+            get_bucket_allocator_().deallocate(root_.bucket, root_.bucket_count);
+        }
+        root_.bucket_count = size;
+        root_.bucket = new_bucket;
     }
 
     void realloc_(size_type size)
@@ -1162,7 +1196,7 @@ protected:
             {
                 throw std::length_error("contiguous_hash too long");
             }
-            rehash_(size_type(std::ceil(root_.bucket_count * config_t::grow_proportion(root_.bucket_count))));
+            rehash_(config_t::unique_type(), size_type(std::ceil(root_.bucket_count * config_t::grow_proportion(root_.bucket_count))));
         }
         if(new_size > root_.capacity)
         {

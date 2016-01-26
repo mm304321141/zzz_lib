@@ -39,6 +39,15 @@ auto assert_proc = [](bool no_error, char const *query, char const *file, size_t
 
 int main()
 {
+    [&]
+    {
+        chash_multiset<int> ch =
+        {
+            1, 2, 3, 5, 3, 3, 4, 5, 6, 7, 1, 2, 3, 4
+        };
+        auto range = ch.equal_range(3);
+        assert(std::distance(range.first, range.second) == 4);
+    }();
     std::unordered_map<int, int> xh;
     chash_map<int, int> ch;
 
