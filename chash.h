@@ -6,6 +6,7 @@
 #include <memory>
 #include <cstring>
 #include <stdexcept>
+#include <cmath>
 #include <type_traits>
 
 
@@ -848,7 +849,7 @@ public:
     }
     void rehash(size_type count)
     {
-        rehash_(config_t::unique_type(), std::max<size_type>({8, count, size_type(std::ceil(size() / root_.setting_load_factor))}));
+        rehash_(typename config_t::unique_type(), std::max<size_type>({8, count, size_type(std::ceil(size() / root_.setting_load_factor))}));
     }
 
     void max_load_factor(float ml)
@@ -860,7 +861,7 @@ public:
         root_.setting_load_factor = ml;
         if(root_.size != 0)
         {
-            rehash_(config_t::unique_type(), size_type(std::ceil(size() / root_.setting_load_factor)));
+            rehash_(typename config_t::unique_type(), size_type(std::ceil(size() / root_.setting_load_factor)));
         }
     }
     float max_load_factor() const
@@ -1196,7 +1197,7 @@ protected:
             {
                 throw std::length_error("contiguous_hash too long");
             }
-            rehash_(config_t::unique_type(), size_type(std::ceil(root_.bucket_count * config_t::grow_proportion(root_.bucket_count))));
+            rehash_(typename config_t::unique_type(), size_type(std::ceil(root_.bucket_count * config_t::grow_proportion(root_.bucket_count))));
         }
         if(new_size > root_.capacity)
         {
