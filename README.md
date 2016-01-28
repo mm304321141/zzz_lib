@@ -80,13 +80,16 @@ string_ref实现**不完整**,提供了to_value<>替换ato?接口<br/>
 <br/>
 
 #性能测试
-
 各种容器的测试
 
-OSX 10.11.3 (15D21)
-XCode 7.1.1 (7B1005)
-2.5 GHz Intel Core i7
-16 GB 1600 MHz DDR3
+<br/>
+
+OSX 10.11.3 (15D21)<br/>
+XCode 7.1.1 (7B1005)<br/>
+2.5 GHz Intel Core i7<br/>
+16 GB 1600 MHz DDR3<br/>
+
+<br/>
 
 * 测试才用与预先随机好的随机数5组,测试结果取平均值
 * 横轴为容器元素数量
@@ -94,23 +97,23 @@ XCode 7.1.1 (7B1005)
 
 <br/>
 
-* insert_o -> 顺序插入<br/>
-* insert_r -> 随机插入<br/>
-* foreach -> 遍历<br/>
-* find -> 查找<br/>
-* erase -> 删除<br/>
+* insert_o -> 顺序插入
+* insert_r -> 随机插入
+* foreach -> 遍历
+* find -> 查找
+* erase -> 删除
 
 <br/>
 
-* std::set                -> std_set     <br/>
-* std::unordered_set      -> std_hash    <br/>
-* chash_set               -> chash_set   <br/>
-* bpptree_set             -> bpptree_set <br/>
-* std::multiset           -> std_mset    <br/>
-* std::unordered_multiset -> std_mhash   <br/>
-* chash_multiset          -> chash_mset  <br/>
-* sbtree_multiset         -> sbtree_mset <br/>
-* bpptree_multiset        -> bpptree_mset<br/>
+* std::set                -> std_set     
+* std::unordered_set      -> std_hash    
+* chash_set               -> chash_set   
+* bpptree_set             -> bpptree_set 
+* std::multiset           -> std_mset    
+* std::unordered_multiset -> std_mhash   
+* chash_multiset          -> chash_mset  
+* sbtree_multiset         -> sbtree_mset 
+* bpptree_multiset        -> bpptree_mset
 
 <br/>
 
