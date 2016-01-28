@@ -176,29 +176,10 @@ public:
             }
             return 0;
         });
-        empty_call = [](C &c, T const *d, size_t e)
-        {
-            return 0;
-        };
     }
 
     void exec()
     {
-        auto test_empty_call = [&]
-        {
-            C c;
-            auto begin = std::chrono::high_resolution_clock::now();
-            empty_call(c, data[0], 0);
-            auto end = std::chrono::high_resolution_clock::now();
-            return end - begin;
-        };
-        std::chrono::high_resolution_clock::duration waste = std::chrono::high_resolution_clock::duration();
-        for(size_t i = 1; i < 100; ++i)
-        {
-            waste += test_empty_call();
-        }
-        waste /= 100;
-
         for(auto &item : test)
         {
             std::cout << info << ", ";
@@ -211,7 +192,7 @@ public:
             {
                 for(size_t j = 0; j < item.time[i].size(); ++j)
                 {
-                    time_avg[j] += std::max(std::chrono::high_resolution_clock::duration(), (item.time[i][j].end - item.time[i][j].begin) - waste);
+                    time_avg[j] += item.time[i][j].end - item.time[i][j].begin;
                 }
             }
             for(size_t i = 0; i < time_avg.size(); ++i)
@@ -223,8 +204,6 @@ public:
     }
 
     std::vector<test_core<T, C, N>> test;
-    std::function<size_t(C &, T const *, size_t)> empty_call;
-
 private:
     std::string info;
     T const **data;
