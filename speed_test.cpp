@@ -46,12 +46,12 @@ template<size_t N> struct std::hash<key<N>>
     }
 };
 
-std::vector<size_t> make_test(size_t size)
+std::vector<size_t> make_test(size_t size, size_t split)
 {
     std::vector<size_t> ret;
-    for(size_t i = 5; i < 22; ++i)
+    for(size_t i = 5; i < 5 + split; ++i)
     {
-        ret.push_back(size_t(std::pow(size, 1.0 / 22 * (i + 1))));
+        ret.push_back(size_t(std::pow(size, 1.0 / (5 + split) * (i + 1))));
     }
     return ret;
 }
@@ -75,9 +75,9 @@ struct test_core
     };
     std::vector<time_point_t> time[N];
 
-    void exec()
+    void exec(size_t split)
     {
-        auto count = make_test(length);
+        auto count = make_test(length, split);
         for(size_t i = 0; i < N; ++i)
         {
             for(size_t max : count)
@@ -176,34 +176,57 @@ public:
             }
             return 0;
         });
+        foo = [](int *ptr)
+        {
+            delete[] ptr;
+        };
     }
 
-    void exec()
+    void exec(size_t split)
     {
         for(auto &item : test)
         {
+            foo(new int[1024]);
             std::cout << info << ", ";
             std::cout << item.info << ", ";
-            item.exec();
-            std::vector<std::chrono::high_resolution_clock::duration> time_avg;
-            auto count = make_test(length);
-            time_avg.resize(count.size());
-            for(size_t i = 1; i < N; ++i)
+            item.exec(split);
+            auto count = make_test(length, split);
+            for(size_t j = 0; j < count.size(); ++j)
             {
-                for(size_t j = 0; j < item.time[i].size(); ++j)
+                std::vector<std::chrono::high_resolution_clock::duration> value;
+                double s = 0, v = 0;
+                for(size_t i = 0; i < N; ++i)
                 {
-                    time_avg[j] += item.time[i][j].end - item.time[i][j].begin;
+                    value.push_back(item.time[i][j].end - item.time[i][j].begin);
+                    s += value.back().count();
                 }
-            }
-            for(size_t i = 0; i < time_avg.size(); ++i)
-            {
-                std::cout << std::chrono::duration_cast<std::chrono::duration<float, std::nano>>(time_avg[i]).count() / count[i] / N << ", ";
+                s /= N;
+                for(size_t i = 0; i < N; ++i)
+                {
+                    v += std::pow(s - value[i].count(), 2);
+                }
+                v = std::sqrt(v);
+                std::sort(value.begin(), value.end(), [&](std::chrono::high_resolution_clock::duration const left, std::chrono::high_resolution_clock::duration const &right)
+                {
+                    return std::abs(left.count() - s) < std::abs(right.count() - s);
+                });
+                if(s < v)
+                {
+                    value.pop_back();
+                }
+                std::chrono::high_resolution_clock::duration d = std::chrono::high_resolution_clock::duration();
+                for(auto v : value)
+                {
+                    d += v;
+                }
+                std::cout << std::chrono::duration_cast<std::chrono::duration<float, std::nano>>(d).count() / value.size() / count[j] << ", ";
             }
             std::cout << std::endl;
         }
     }
 
     std::vector<test_core<T, C, N>> test;
+    std::function<void(int *)> foo;
 private:
     std::string info;
     T const **data;
@@ -263,8 +286,9 @@ int main()
 
     std::mt19937 mt(0);
     auto mtr = std::uniform_int_distribution<int>(-200000000, 200000000);
-    size_t count = 409600;
+    static constexpr size_t count = 409600;
     static constexpr size_t times = 5;
+    static constexpr size_t split = 17;
     std::vector<int> v_arr[times];
 
     for(auto &v : v_arr)
@@ -282,56 +306,56 @@ int main()
     }
 
     std::cout << "container      , method, ";
-    for(auto item : make_test(count))
+    for(auto item : make_test(count, split))
     {
         std::cout << item << ", ";
     }
     std::cout << std::endl;
 
-    test_all<int, std_set_4      , times>("std_set_4      ", v, count).exec();
-    test_all<int, std_hash_4     , times>("std_hash_4     ", v, count).exec();
-    test_all<int, chash_set_4    , times>("chash_set_4    ", v, count).exec();
-    test_all<int, bpptree_set_4  , times>("bpptree_set_4  ", v, count).exec();
-    test_all<int, std_set_32     , times>("std_set_32     ", v, count).exec();
-    test_all<int, std_hash_32    , times>("std_hash_32    ", v, count).exec();
-    test_all<int, chash_set_32   , times>("chash_set_32   ", v, count).exec();
-    test_all<int, bpptree_set_32 , times>("bpptree_set_32 ", v, count).exec();
-    test_all<int, std_set_64     , times>("std_set_64     ", v, count).exec();
-    test_all<int, std_hash_64    , times>("std_hash_64    ", v, count).exec();
-    test_all<int, chash_set_64   , times>("chash_set_64   ", v, count).exec();
-    test_all<int, bpptree_set_64 , times>("bpptree_set_64 ", v, count).exec();
-    test_all<int, std_set_128    , times>("std_set_128    ", v, count).exec();
-    test_all<int, std_hash_128   , times>("std_hash_128   ", v, count).exec();
-    test_all<int, chash_set_128  , times>("chash_set_128  ", v, count).exec();
-    test_all<int, bpptree_set_128, times>("bpptree_set_128", v, count).exec();
-    test_all<int, std_set_200    , times>("std_set_200    ", v, count).exec();
-    test_all<int, std_hash_200   , times>("std_hash_200   ", v, count).exec();
-    test_all<int, chash_set_200  , times>("chash_set_200  ", v, count).exec();
-    test_all<int, bpptree_set_200, times>("bpptree_set_200", v, count).exec();
+    test_all<int, std_set_4      , times>("std_set_4      ", v, count).exec(split);
+    test_all<int, std_hash_4     , times>("std_hash_4     ", v, count).exec(split);
+    test_all<int, chash_set_4    , times>("chash_set_4    ", v, count).exec(split);
+    test_all<int, bpptree_set_4  , times>("bpptree_set_4  ", v, count).exec(split);
+    test_all<int, std_set_32     , times>("std_set_32     ", v, count).exec(split);
+    test_all<int, std_hash_32    , times>("std_hash_32    ", v, count).exec(split);
+    test_all<int, chash_set_32   , times>("chash_set_32   ", v, count).exec(split);
+    test_all<int, bpptree_set_32 , times>("bpptree_set_32 ", v, count).exec(split);
+    test_all<int, std_set_64     , times>("std_set_64     ", v, count).exec(split);
+    test_all<int, std_hash_64    , times>("std_hash_64    ", v, count).exec(split);
+    test_all<int, chash_set_64   , times>("chash_set_64   ", v, count).exec(split);
+    test_all<int, bpptree_set_64 , times>("bpptree_set_64 ", v, count).exec(split);
+    test_all<int, std_set_128    , times>("std_set_128    ", v, count).exec(split);
+    test_all<int, std_hash_128   , times>("std_hash_128   ", v, count).exec(split);
+    test_all<int, chash_set_128  , times>("chash_set_128  ", v, count).exec(split);
+    test_all<int, bpptree_set_128, times>("bpptree_set_128", v, count).exec(split);
+    test_all<int, std_set_200    , times>("std_set_200    ", v, count).exec(split);
+    test_all<int, std_hash_200   , times>("std_hash_200   ", v, count).exec(split);
+    test_all<int, chash_set_200  , times>("chash_set_200  ", v, count).exec(split);
+    test_all<int, bpptree_set_200, times>("bpptree_set_200", v, count).exec(split);
 
-    test_all<int, std_mset_4      , times>("std_mset_4      ", v, count).exec();
-    test_all<int, std_mhash_4     , times>("std_mhash_4     ", v, count).exec();
-    test_all<int, chash_mset_4    , times>("chash_mset_4    ", v, count).exec();
-    test_all<int, sbtree_mset_4   , times>("sbtree_mset_4   ", v, count).exec();
-    test_all<int, bpptree_mset_4  , times>("bpptree_mset_4  ", v, count).exec();
-    test_all<int, std_mset_32     , times>("std_mset_32     ", v, count).exec();
-    test_all<int, std_mhash_32    , times>("std_mhash_32    ", v, count).exec();
-    test_all<int, chash_mset_32   , times>("chash_mset_32   ", v, count).exec();
-    test_all<int, sbtree_mset_32  , times>("sbtree_mset_32  ", v, count).exec();
-    test_all<int, bpptree_mset_32 , times>("bpptree_mset_32 ", v, count).exec();
-    test_all<int, std_mset_64     , times>("std_mset_64     ", v, count).exec();
-    test_all<int, std_mhash_64    , times>("std_mhash_64    ", v, count).exec();
-    test_all<int, chash_mset_64   , times>("chash_mset_64   ", v, count).exec();
-    test_all<int, sbtree_mset_64  , times>("sbtree_mset_64  ", v, count).exec();
-    test_all<int, bpptree_mset_64 , times>("bpptree_mset_64 ", v, count).exec();
-    test_all<int, std_mset_128    , times>("std_mset_128    ", v, count).exec();
-    test_all<int, std_mhash_128   , times>("std_mhash_128   ", v, count).exec();
-    test_all<int, chash_mset_128  , times>("chash_mset_128  ", v, count).exec();
-    test_all<int, sbtree_mset_128 , times>("sbtree_mset_128 ", v, count).exec();
-    test_all<int, bpptree_mset_128, times>("bpptree_mset_128", v, count).exec();
-    test_all<int, std_mset_200    , times>("std_mset_200    ", v, count).exec();
-    test_all<int, std_mhash_200   , times>("std_mhash_200   ", v, count).exec();
-    test_all<int, chash_mset_200  , times>("chash_mset_200  ", v, count).exec();
-    test_all<int, sbtree_mset_200 , times>("sbtree_mset_200 ", v, count).exec();
-    test_all<int, bpptree_mset_200, times>("bpptree_mset_200", v, count).exec();
+    test_all<int, std_mset_4      , times>("std_mset_4      ", v, count).exec(split);
+    test_all<int, std_mhash_4     , times>("std_mhash_4     ", v, count).exec(split);
+    test_all<int, chash_mset_4    , times>("chash_mset_4    ", v, count).exec(split);
+    test_all<int, sbtree_mset_4   , times>("sbtree_mset_4   ", v, count).exec(split);
+    test_all<int, bpptree_mset_4  , times>("bpptree_mset_4  ", v, count).exec(split);
+    test_all<int, std_mset_32     , times>("std_mset_32     ", v, count).exec(split);
+    test_all<int, std_mhash_32    , times>("std_mhash_32    ", v, count).exec(split);
+    test_all<int, chash_mset_32   , times>("chash_mset_32   ", v, count).exec(split);
+    test_all<int, sbtree_mset_32  , times>("sbtree_mset_32  ", v, count).exec(split);
+    test_all<int, bpptree_mset_32 , times>("bpptree_mset_32 ", v, count).exec(split);
+    test_all<int, std_mset_64     , times>("std_mset_64     ", v, count).exec(split);
+    test_all<int, std_mhash_64    , times>("std_mhash_64    ", v, count).exec(split);
+    test_all<int, chash_mset_64   , times>("chash_mset_64   ", v, count).exec(split);
+    test_all<int, sbtree_mset_64  , times>("sbtree_mset_64  ", v, count).exec(split);
+    test_all<int, bpptree_mset_64 , times>("bpptree_mset_64 ", v, count).exec(split);
+    test_all<int, std_mset_128    , times>("std_mset_128    ", v, count).exec(split);
+    test_all<int, std_mhash_128   , times>("std_mhash_128   ", v, count).exec(split);
+    test_all<int, chash_mset_128  , times>("chash_mset_128  ", v, count).exec(split);
+    test_all<int, sbtree_mset_128 , times>("sbtree_mset_128 ", v, count).exec(split);
+    test_all<int, bpptree_mset_128, times>("bpptree_mset_128", v, count).exec(split);
+    test_all<int, std_mset_200    , times>("std_mset_200    ", v, count).exec(split);
+    test_all<int, std_mhash_200   , times>("std_mhash_200   ", v, count).exec(split);
+    test_all<int, chash_mset_200  , times>("chash_mset_200  ", v, count).exec(split);
+    test_all<int, sbtree_mset_200 , times>("sbtree_mset_200 ", v, count).exec(split);
+    test_all<int, bpptree_mset_200, times>("bpptree_mset_200", v, count).exec(split);
 }
