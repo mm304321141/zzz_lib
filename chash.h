@@ -6,6 +6,7 @@
 #include <memory>
 #include <cstring>
 #include <stdexcept>
+#include <functional>
 #include <cmath>
 #include <type_traits>
 
