@@ -76,3 +76,37 @@ string_ref实现**不完整**,提供了to_value<>替换ato?接口<br/>
 * sparse_array.h
 
 稀松数组...不成熟的玩意...<br/>
+
+<br/>
+
+#性能测试
+
+各种容器的测试
+
+* 测试才用与预先随机好的随机数5组,测试结果取平均值
+* 横轴为容器元素数量
+* 纵轴为平均每个元素耗费时间(纳秒)
+
+<br/>
+
+* insert_o -> 顺序插入<br/>
+* insert_r -> 随机插入<br/>
+* foreach -> 遍历<br/>
+* find -> 查找<br/>
+* erase -> 删除<br/>
+
+<br/>
+
+* std::set                -> std_set     <br/>
+* std::unordered_set      -> std_hash    <br/>
+* chash_set               -> chash_set   <br/>
+* bpptree_set             -> bpptree_set <br/>
+* std::multiset           -> std_mset    <br/>
+* std::unordered_multiset -> std_mhash   <br/>
+* chash_multiset          -> chash_mset  <br/>
+* sbtree_multiset         -> sbtree_mset <br/>
+* bpptree_multiset        -> bpptree_mset<br/>
+
+<br/>
+
+![profile.png](/profile/profile.png)
