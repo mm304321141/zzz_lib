@@ -120,8 +120,8 @@ XCode 7.1.1 (7B1005)<br/>
 
 更详细的表格:
 
-* [Mac](/profile/profile1.xlsx)
-* [iPhone](/profile/profile2.xlsx)
+* [Mac](/profile/profile1.xlsx?raw=true)
+* [iPhone](/profile/profile2.xlsx?raw=true)
 
 <br/>
 
