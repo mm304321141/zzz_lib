@@ -94,6 +94,7 @@ XCode 7.1.1 (7B1005)<br/>
 * 测试才用与预先随机好的随机数5组,测试结果取平均值
 * 横轴为容器元素数量
 * 纵轴为平均每个元素耗费时间(纳秒)
+* 后面的数字表示key打大小(字节)
 
 <br/>
 
@@ -114,6 +115,13 @@ XCode 7.1.1 (7B1005)<br/>
 * chash_multiset          -> chash_mset  
 * sbtree_multiset         -> sbtree_mset 
 * bpptree_multiset        -> bpptree_mset
+
+<br/>
+
+更详细的表格:
+
+* [Mac](/profile/profile1.xlsx)
+* [iPhone](/profile/profile2.xlsx)
 
 <br/>
 
