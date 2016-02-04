@@ -79,6 +79,11 @@ string_ref实现**不完整**,提供了to_value<>替换ato?接口<br/>
 
 <br/>
 
+
+#特性比较
+![features.png](/profile/features.png)
+
+
 #性能测试
 各种容器的测试
 
