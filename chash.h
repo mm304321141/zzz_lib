@@ -1003,15 +1003,24 @@ protected:
 
     void clear_all_()
     {
-        dealloc_all_();
-        root_.bucket_count = 0;
-        root_.capacity = 0;
+        for(size_type i = 0; i < root_.size; ++i)
+        {
+            if(root_.index[i].hash)
+            {
+                destroy_one_(root_.value[i].value());
+            }
+        }
+        if(root_.bucket_count != 0)
+        {
+            std::memset(root_.bucket, 0xFFFFFFFF, sizeof(offset_type) * root_.bucket_count);
+        }
+        if(root_.capacity != 0)
+        {
+            std::memset(root_.index, 0xFFFFFFFF, sizeof(index_t) * root_.capacity);
+        }
         root_.size = 0;
         root_.free_count = 0;
         root_.free_list = offset_empty;
-        root_.bucket = nullptr;
-        root_.index = nullptr;
-        root_.value = nullptr;
     }
 
     template<bool move> void copy_all_(root_t const *other)
