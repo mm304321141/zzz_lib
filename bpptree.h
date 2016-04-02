@@ -1462,6 +1462,18 @@ public:
         return root_;
     }
 
+    //WARNING : DON'T CALL THIS FUNCTION !
+    void adjust(difference_type offset)
+    {
+        adjust_pointer_(root_.parent, offset);
+        adjust_pointer_(root_.left, offset);
+        adjust_pointer_(root_.right, offset);
+        if(root_.parent->size > 0)
+        {
+            adjust_node_(root_.parent, offset);
+        }
+    }
+
 protected:
     root_node_t root_;
 
@@ -1497,6 +1509,32 @@ protected:
             static_cast<leaf_node_t *>(root_.left)->prev = &root_;
             static_cast<leaf_node_t *>(root_.right)->next = &root_;
         }
+    }
+
+    void adjust_node_(node_t *node, difference_type offset)
+    {
+        adjust_pointer_(node->parent, offset);
+        if(node->level == 0)
+        {
+            leaf_node_t *leaf_node = static_cast<leaf_node_t *>(node);
+            adjust_pointer_(leaf_node->prev, offset);
+            adjust_pointer_(leaf_node->next, offset);
+        }
+        else
+        {
+            inner_node_t *inner_node = static_cast<inner_node_t *>(node);
+            for(size_t i = 0; i < inner_node->bound(); ++i)
+            {
+                adjust_pointer_(inner_node->children[i], offset);
+                adjust_node_(inner_node->children[i], offset);
+            }
+            adjust_pointer_(inner_node->children[inner_node->bound()], offset);
+            adjust_node_(inner_node->children[inner_node->bound()], offset);
+        }
+    }
+    template<class T> void adjust_pointer_(T *&ptr, difference_type offset)
+    {
+        ptr = reinterpret_cast<T *>(reinterpret_cast<uint8_t *>(ptr) + offset);
     }
 
     inner_node_t *alloc_inner_node_(node_t *parent, size_type level)

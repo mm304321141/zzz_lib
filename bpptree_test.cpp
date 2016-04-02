@@ -262,6 +262,7 @@ int main()
                 ++count;
             }
         }
+        foo.adjust(0);
         assert(foo.size() == count);
         assert(foo.rank(foo.back()) == foo.size() - 1);
         assert(foo.erase("2") == 1);
