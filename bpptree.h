@@ -546,7 +546,7 @@ protected:
     typedef get_key_select_t<key_type, storage_type> get_key_t;
     enum
     {
-        binary_search_limit = 1024
+        binary_search_limit = 16 * 1024
     };
 public:
     class iterator
@@ -1157,12 +1157,12 @@ public:
         return result_<typename config_t::unique_type>(insert_hint_(hint.node->size == 0 ? nullptr : static_cast<leaf_node_t *>(hint.node), hint.where, std::move(storage_type(std::forward<args_t>(args)...))));
     }
 
-    iterator find(key_type const &key)
+    template<class in_key_type> iterator find(in_key_type const &key)
     {
         pair_pos_t pos = lower_bound_(key);
         return (pos.first == nullptr || pos.second >= pos.first->bound() || get_comparator_()(key, get_key_t()(pos.first->item[pos.second]))) ? iterator(&root_, 0) : iterator(pos.first, pos.second);
     }
-    const_iterator find(key_type const &key) const
+    template<class in_key_type> const_iterator find(in_key_type const &key) const
     {
         pair_pos_t pos = lower_bound_(key);
         return (pos.first == nullptr || pos.second >= pos.first->bound() || get_comparator_()(key, get_key_t()(pos.first->item[pos.second]))) ? iterator(root_.parent->parent, 0) : iterator(pos.first, pos.second);
@@ -1231,7 +1231,7 @@ public:
         }
     }
 
-    size_type count(key_type const &key) const
+    template<class in_key_type> size_type count(in_key_type const &key) const
     {
         if(config_t::unique_type::value)
         {
@@ -1307,28 +1307,28 @@ public:
         return pair_cici_t(at(slice_begin), at(slice_end));
     }
 
-    iterator lower_bound(key_type const &key)
+    template<class in_key_type> iterator lower_bound(in_key_type const &key)
     {
         return iterator(lower_bound_(key), this);
     }
-    const_iterator lower_bound(key_type const &key) const
+    template<class in_key_type> const_iterator lower_bound(in_key_type const &key) const
     {
         return const_iterator(lower_bound_(key), this);
     }
-    iterator upper_bound(key_type const &key)
+    template<class in_key_type> iterator upper_bound(in_key_type const &key)
     {
         return iterator(upper_bound_(key), this);
     }
-    const_iterator upper_bound(key_type const &key) const
+    template<class in_key_type> const_iterator upper_bound(in_key_type const &key) const
     {
         return const_iterator(upper_bound_(key), this);
     }
 
-    pair_ii_t equal_range(key_type const &key)
+    template<class in_key_type> pair_ii_t equal_range(in_key_type const &key)
     {
         return pair_ii_t(iterator(lower_bound_(key), this), iterator(upper_bound_(key), this));
     }
-    pair_cici_t equal_range(key_type const &key) const
+    template<class in_key_type> pair_cici_t equal_range(in_key_type const &key) const
     {
         return pair_cici_t(const_iterator(lower_bound_(key), this), const_iterator(upper_bound_(key), this));
     }
@@ -1852,9 +1852,9 @@ protected:
         return std::make_pair(static_cast<leaf_node_t *>(node), index);
     }
 
-    template<typename node_type> size_type lower_bound_(node_type *node, key_type const &key) const
+    template<class node_type, class in_key_key> size_type lower_bound_(node_type *node, in_key_key const &key) const
     {
-        if(std::is_scalar<key_type>::value && size_type(node_type::max) < size_type(binary_search_limit))
+        if(std::is_scalar<key_type>::value && size_type(node_type::max * sizeof(typename node_type::item_type)) <= size_type(binary_search_limit))
         {
             return std::find_if(node->item, node->item + node->bound(), [&](typename node_type::item_type const &item)->bool
             {
@@ -1863,15 +1863,15 @@ protected:
         }
         else
         {
-            return std::lower_bound(node->item, node->item + node->bound(), key, [&](typename node_type::item_type const &left, key_type const &right)->bool
+            return std::lower_bound(node->item, node->item + node->bound(), key, [&](typename node_type::item_type const &left, in_key_key const &right)->bool
             {
                 return get_comparator_()(get_key_t()(left), right);
             }) - node->item;
         }
     }
-    template<typename node_type> size_type upper_bound_(node_type *node, key_type const &key) const
+    template<class node_type, class in_key_key> size_type upper_bound_(node_type *node, in_key_key const &key) const
     {
-        if(std::is_scalar<key_type>::value && size_type(node_type::max) < size_type(binary_search_limit))
+        if(std::is_scalar<key_type>::value && size_type(node_type::max * sizeof(typename node_type::item_type)) <= size_type(binary_search_limit))
         {
             return std::find_if(node->item, node->item + node->bound(), [&](typename node_type::item_type const &item)->bool
             {
@@ -1880,14 +1880,14 @@ protected:
         }
         else
         {
-            return std::upper_bound(node->item, node->item + node->bound(), key, [&](key_type const &left, typename node_type::item_type const &right)->bool
+            return std::upper_bound(node->item, node->item + node->bound(), key, [&](in_key_key const &left, typename node_type::item_type const &right)->bool
             {
                 return get_comparator_()(left, get_key_t()(right));
             }) - node->item;
         }
     }
 
-    pair_pos_t lower_bound_(key_type const &key) const
+    template<class in_key_key> pair_pos_t lower_bound_(in_key_key const &key) const
     {
         node_t *node = root_.parent;
         if(node->size == 0)
@@ -1911,7 +1911,7 @@ protected:
             return std::make_pair(leaf_node, where);
         }
     }
-    pair_pos_t upper_bound_(key_type const &key) const
+    template<class in_key_key> pair_pos_t upper_bound_(in_key_key const &key) const
     {
         node_t *node = root_.parent;
         if(node->size == 0)
