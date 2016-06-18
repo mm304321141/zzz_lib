@@ -490,7 +490,7 @@ public:
         {
             return *this;
         }
-        clear();
+        dealloc_all_();
         get_hasher() = other.get_hasher();
         get_key_equal() = other.get_key_equal();
         get_bucket_allocator_() = other.get_bucket_allocator_();
@@ -513,6 +513,7 @@ public:
     contiguous_hash &operator = (std::initializer_list<value_type> il)
     {
         clear();
+        rehash(std::distance(il.begin(), il.end()));
         insert(il.begin(), il.end());
         return *this;
     }
