@@ -1040,11 +1040,12 @@ protected:
         {
             rehash_(std::true_type(), size);
             realloc_(size);
-            for(size_type i = 0, other_i = 0; other_i < other->size; ++other_i)
+            for(size_type other_i = 0; other_i < other->size; ++other_i)
             {
                 if(other->index[other_i].hash)
                 {
-                    size_type bucket = other->index[other_i].hash % root_.capacity;
+                    auto i = root_.size;
+                    size_type bucket = other->index[other_i].hash % root_.bucket_count;
                     if(root_.bucket[bucket] != offset_empty)
                     {
                         root_.index[root_.bucket[bucket]].prev = offset_type(i);
@@ -1061,7 +1062,7 @@ protected:
                     {
                         construct_one_(root_.value[i].value(), *other->value[other_i].value());
                     }
-                    ++i;
+                    ++root_.size;
                 }
             }
         }
