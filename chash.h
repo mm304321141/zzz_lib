@@ -1026,38 +1026,43 @@ protected:
 
     template<bool move> void copy_all_(root_t const *other)
     {
-        root_.capacity = root_.size = other->size - other->free_count;
-        root_.setting_load_factor = other->setting_load_factor;
-        root_.bucket_count = size_type(std::ceil(root_.size / root_.setting_load_factor));
+        root_.bucket_count = 0;
+        root_.capacity = 0;
+        root_.size = 0;
         root_.free_count = 0;
         root_.free_list = offset_empty;
-        root_.bucket = get_bucket_allocator_().allocate(root_.bucket_count);
-        root_.index = get_index_allocator_().allocate(root_.capacity);
-        root_.value = get_value_allocator_().allocate(root_.capacity);
-        std::memset(root_.bucket, 0xFFFFFFFF, sizeof(offset_type) * root_.bucket_count);
-        std::memset(root_.index, 0xFFFFFFFF, sizeof(index_t) * root_.capacity);
-        for(size_type i = 0, other_i = 0; other_i < other->size; ++other_i)
+        root_.setting_load_factor = other->setting_load_factor;
+        root_.bucket = nullptr;
+        root_.index = nullptr;
+        root_.value = nullptr;
+        size_type size = other->size - other->free_count;
+        if(size > 0)
         {
-            if(other->index[other_i].hash)
+            rehash_(std::true_type(), size);
+            realloc_(size);
+            for(size_type i = 0, other_i = 0; other_i < other->size; ++other_i)
             {
-                size_type bucket = other->index[other_i].hash % root_.capacity;
-                if(root_.bucket[bucket] != offset_empty)
+                if(other->index[other_i].hash)
                 {
-                    root_.index[root_.bucket[bucket]].prev = offset_type(i);
+                    size_type bucket = other->index[other_i].hash % root_.capacity;
+                    if(root_.bucket[bucket] != offset_empty)
+                    {
+                        root_.index[root_.bucket[bucket]].prev = offset_type(i);
+                    }
+                    root_.index[i].prev = offset_empty;
+                    root_.index[i].next = root_.bucket[bucket];
+                    root_.index[i].hash = other->index[other_i].hash;
+                    root_.bucket[bucket] = offset_type(i);
+                    if(move)
+                    {
+                        construct_one_(root_.value[i].value(), std::move(*other->value[other_i].value()));
+                    }
+                    else
+                    {
+                        construct_one_(root_.value[i].value(), *other->value[other_i].value());
+                    }
+                    ++i;
                 }
-                root_.index[i].prev = offset_empty;
-                root_.index[i].next = root_.bucket[bucket];
-                root_.index[i].hash = other->index[other_i].hash;
-                root_.bucket[bucket] = offset_type(i);
-                if(move)
-                {
-                    construct_one_(root_.value[i].value(), std::move(*other->value[other_i].value()));
-                }
-                else
-                {
-                    construct_one_(root_.value[i].value(), *other->value[other_i].value());
-                }
-                ++i;
             }
         }
     }
