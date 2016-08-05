@@ -586,7 +586,7 @@ public:
         return result_<typename config_t::unique_type>(insert_value_(std::forward<args_t>(args)...));
     }
 
-    iterator find(key_type const &key)
+    template<class in_key_t> iterator find(in_key_t const &key)
     {
         if(root_.size == 0)
         {
@@ -594,7 +594,7 @@ public:
         }
         return iterator(find_value_(key), this);
     }
-    const_iterator find(key_type const &key) const
+    template<class in_key_t> const_iterator find(in_key_t const &key) const
     {
         if(root_.size == 0)
         {
@@ -1345,14 +1345,14 @@ protected:
         return std::make_pair(offset, true);
     }
 
-    size_type find_value_(key_type const &key) const
+    template<class in_key_t> size_type find_value_(in_key_t const &key) const
     {
         hash_t hash = get_hasher()(key);
         size_type bucket = hash % root_.bucket_count;
 
         for(size_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
         {
-            if(root_.index[i].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), get_key_t()(key)))
+            if(root_.index[i].hash == hash && get_key_equal()(get_key_t()(*root_.value[i].value()), key))
             {
                 return i;
             }

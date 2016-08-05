@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
 #include <algorithm>
@@ -327,6 +327,8 @@ protected:
         {
             static_assert(inner_node_t::max >= 4, "low memory_block_size");
             static_assert(leaf_node_t::max >= 4, "low memory_block_size");
+            static_assert(sizeof(inner_node_t) <= config_t::memory_block_size, "bad memory size");
+            static_assert(sizeof(leaf_node_t) <= config_t::memory_block_size, "bad memory size");
             node_t::parent = left = right = this;
             node_t::size = 0;
             node_t::level = 0;

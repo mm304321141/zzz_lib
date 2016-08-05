@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <cstring>
 #include <string>
+#include <cmath>
 #include <iterator>
 
 template<class char_t, class integer_t> integer_t string_to_integer(char_t const *s, size_t l)
@@ -300,7 +301,7 @@ public:
         {
             return npos;
         }
-        for(auto f = std::find(cbegin() + pos, cend(), v.front()); size_type(cend() - f) > v.size(); f = std::find(std::next(f), cend(), v.front()))
+        for(auto f = std::find(cbegin() + pos, cend(), v.front()); size_type(cend() - f) >= v.size(); f = std::find(std::next(f), cend(), v.front()))
         {
             if(string_ref(f, v.size()).compare(v) == 0)
             {
@@ -551,7 +552,7 @@ private:
         {
             if(it.self != nullptr)
             {
-                value = it->to_value<T>();
+                value = it->template to_value<T>();
                 ++it;
             }
             else
@@ -597,6 +598,9 @@ public:
 
     typedef std::pair<string_type, string_type> pair_ss_t;
     
+    split_container() : _size(1), _ref(), _finder()
+    {
+    }
     split_container(split_container const &) = default;
     split_container(string_type ref, finder_t &&finder) : _size(), _ref(ref), _finder(std::move(finder))
     {
@@ -660,7 +664,7 @@ public:
 
     size_type size() const
     {
-        if(_size == 0)
+        if(_size == 0 && !_ref.empty())
         {
             size_type pos = _finder.run(_ref, 0);
             while(pos < _ref.size())
