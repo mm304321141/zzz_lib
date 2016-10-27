@@ -338,7 +338,7 @@ protected:
     };
     struct key_stack_t
     {
-        typename std::aligned_storage<sizeof(key_type), alignof(key_type)>::type key_pod;
+        typename std::aligned_storage<sizeof(key_type), std::alignment_of<key_type>::value>::type key_pod;
         key_stack_t()
         {
         }
@@ -439,22 +439,6 @@ protected:
         {
             return (flags & f) != 0;
         }
-        result_t &operator |= (result_t const &other)
-        {
-            if(has(btree_update_lastkey))
-            {
-                if(has(btree_update_lastkey))
-                {
-                    last_key.key() = other.last_key.key();
-                }
-                else
-                {
-                    ::new(&last_key) key_type(other.last_key.key());
-                }
-            }
-            flags = result_flags_t(flags | other.flags);
-            return *this;
-        }
         result_t &operator |= (result_t &&other)
         {
             if(other.has(btree_update_lastkey))
@@ -469,29 +453,6 @@ protected:
                 }
             }
             flags = result_flags_t(flags | other.flags);
-            return *this;
-        }
-        result_t &operator = (result_t const &other)
-        {
-            if(other.has(btree_update_lastkey))
-            {
-                if(has(btree_update_lastkey))
-                {
-                    last_key.key() = other.last_key.key();
-                }
-                else
-                {
-                    ::new(&last_key) key_type(other.last_key.key());
-                }
-            }
-            else
-            {
-                if(has(btree_update_lastkey))
-                {
-                    last_key.key().~key_type();
-                }
-            }
-            flags = other.flags;
             return *this;
         }
         result_t &operator = (result_t &&other)

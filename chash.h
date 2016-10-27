@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
 #include <algorithm>
@@ -126,7 +126,7 @@ protected:
     };
     struct value_t
     {
-        typename std::aligned_storage<sizeof(value_type), alignof(value_type)>::type value_pod;
+        typename std::aligned_storage<sizeof(value_type), std::alignment_of<value_type>::value>::type value_pod;
 
         value_type *value()
         {
@@ -848,6 +848,10 @@ public:
     void reserve(size_type count)
     {
         rehash(size_type(std::ceil(count / root_.setting_load_factor)));
+        if(count > root_.capacity && root_.capacity <= max_size())
+        {
+            realloc_(size_type(std::ceil(std::max<float>(float(count), root_.bucket_count * root_.setting_load_factor))));
+        }
     }
     void rehash(size_type count)
     {
