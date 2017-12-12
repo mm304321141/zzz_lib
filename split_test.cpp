@@ -1,5 +1,6 @@
 ﻿
 #define _SCL_SECURE_NO_WARNINGS
+#define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
 
 #include "split_iterator.h"
 #include "chash_set.h"
@@ -48,8 +49,14 @@ int main()
     };
 
     test_to_real("1234567890.1234567890");
-    test_to_real("1234567890.1234567890e3");
-    test_to_real("-1234567890.1234567890e-3");
+    test_to_real("-1234567890.1234567890e3");
+    test_to_real("1234567890.1234567890e-3");
+    test_to_real("1234567890123456789012345678901234567890.1234567890");
+    test_to_real("-1234567890123456789012345678901234567890.1234567890e3");
+    test_to_real("1234567890123456789012345678901234567890.1234567890e-3");
+    test_to_real("0.000000000000000000000000000000000000123456789012345678901234567890");
+    test_to_real("-0.000000000000000000000000000000000000123456789012345678901234567890e3");
+    test_to_real("0.000000000000000000000000000000000000123456789012345678901234567890e-3");
 
     []
     {
@@ -88,17 +95,17 @@ int main()
     }();
     []
     {
-        std::string str = "aaa,111,ccc";
+        auto str = "aaa,111,ccc";
         std::string v1;
         int v2;
         string_ref<> v3;
-        make_split(str, ',').fill(v1, v2, v3);
+        make_split(string_ref<>(str), ',').fill(v1, v2, v3);
     }();
     []
     {
         std::wstring str = L"aaa,111,ccc";
         std::wstring v1;
-        int v2;
+        float v2;
         string_ref<wchar_t> v3;
         make_split(str, L',').fill(v1, v2, v3);
     }();

@@ -11,6 +11,8 @@
 #include <string>
 #include <cmath>
 #include <iterator>
+#include <memory>
+//#include <charconv>
 
 template<class char_t, class integer_t> integer_t string_to_integer(char_t const *s, size_t l)
 {
@@ -105,7 +107,9 @@ template<class char_t, class real_t> real_t string_to_real(char_t const *s, size
             case -17: result += (s[i] - '0') * 0.00000000000000001; break;
             case -18: result += (s[i] - '0') * 0.000000000000000001; break;
             case -19: result += (s[i] - '0') * 0.0000000000000000001; break;
-            default: break;
+            default:
+                result += (s[i] - '0') * std::pow(10, nc - i > 0 ? nc - i - 1 : nc - i);
+                break;
         }
     }
     if(size_t(i) != l && s[i] == 'e')
@@ -128,58 +132,58 @@ public:
     typedef std::reverse_iterator<char_t const *> reverse_iterator, const_reverse_iterator;
     typedef std::size_t size_type;
     typedef std::ptrdiff_t difference_type;
-    
+
 public:
-    constexpr string_ref() : _ptr(), _len()
+    constexpr string_ref() noexcept : _ptr(), _len()
     {
     }
-    constexpr string_ref(string_ref const &) = default;
+    constexpr string_ref(string_ref const &) noexcept = default;
     template<class allocator_t> string_ref(std::basic_string<char_t, traits_t, allocator_t> const &str) : _ptr(str.data()), _len(str.length())
     {
     }
-    constexpr string_ref(char_t const *s, size_type count) : _ptr(s), _len(count)
+    constexpr string_ref(char_t const *s, size_type count) noexcept : _ptr(s), _len(count)
     {
     }
-    constexpr string_ref(char_t const *s) : _ptr(s), _len(traits_type::length(s))
+    constexpr string_ref(char_t const *s) noexcept : _ptr(s), _len(traits_type::length(s))
     {
     }
+
+    string_ref &operator = (string_ref const &) noexcept = default;
     
-    string_ref &operator = (string_ref const &) = default;
-    
-    constexpr const_iterator begin() const
+    constexpr const_iterator begin() const noexcept
     {
         return _ptr;
     }
-    constexpr const_iterator end() const
+    constexpr const_iterator end() const noexcept
     {
         return _ptr + _len;
     }
-    constexpr const_iterator cbegin() const
+    constexpr const_iterator cbegin() const noexcept
     {
         return _ptr;
     }
-    constexpr const_iterator cend() const
+    constexpr const_iterator cend() const noexcept
     {
         return _ptr + _len;
     }
-    constexpr const_reverse_iterator rbegin() const
+    constexpr const_reverse_iterator rbegin() const noexcept
     {
         return const_reverse_iterator(_ptr);
     }
-    constexpr const_reverse_iterator rend() const
+    constexpr const_reverse_iterator rend() const noexcept
     {
         return const_reverse_iterator(_ptr + _len);
     }
-    constexpr const_reverse_iterator crbegin() const
+    constexpr const_reverse_iterator crbegin() const noexcept
     {
         return const_reverse_iterator(_ptr);
     }
-    constexpr const_reverse_iterator crend() const
+    constexpr const_reverse_iterator crend() const noexcept
     {
         return const_reverse_iterator(_ptr + _len);
     }
     
-    constexpr const_reference operator[](size_type index) const
+    constexpr const_reference operator[](size_type index) const noexcept
     {
         return _ptr[index];
     }
@@ -188,76 +192,76 @@ public:
         return index >= size() ? throw std::out_of_range("string_ref out of range") : _ptr[index];
     }
     
-    constexpr const_reference front() const
+    constexpr const_reference front() const noexcept
     {
         return *_ptr;
     }
-    constexpr const_reference back() const
+    constexpr const_reference back() const noexcept
     {
         return *(_ptr + _len - 1);
     }
-    
-    const_pointer data() const
+
+    constexpr const_pointer data() const noexcept
     {
         return _ptr;
     }
-    
-    constexpr size_type size() const
+
+    constexpr size_type size() const noexcept
     {
         return _len;
     }
-    constexpr size_type length() const
+    constexpr size_type length() const noexcept
     {
         return _len;
     }
-    constexpr size_type max_size() const
+    constexpr size_type max_size() const noexcept
     {
         return _len;
     }
-    
-    void clear()
+
+    void clear() noexcept
     {
         _len = 0;
     }
-    constexpr bool empty() const
+    constexpr bool empty() const noexcept
     {
         return _len == 0;
     }
-    
-    void remove_prefix(size_type n)
+
+    void remove_prefix(size_type n) noexcept
     {
         n = std::min(n, size());
         _ptr += n;
         _len -= n;
     }
-    void remove_suffix(size_type n)
+    void remove_suffix(size_type n) noexcept
     {
         n = std::min(n, size());
         _len -= n;
     }
-    void swap(string_ref &other)
+    void swap(string_ref &other) noexcept
     {
         std::swap(*this, other);
     }
-    
-    template<class allocator_t = std::allocator<value_type>> std::basic_string<char_t, traits_t, allocator_t> to_string(allocator_t const &a = allocator_t()) const
+
+    template<class allocator_t = std::allocator<value_type>> std::basic_string<char_t, traits_t, allocator_t> to_string(allocator_t const &a = allocator_t()) const noexcept
     {
         return std::basic_string<char_t, traits_t, allocator_t>(data(), length(), a);
     }
-    template<class allocator_t> operator std::basic_string<char_t, traits_t, allocator_t>() const
+    template<class allocator_t> operator std::basic_string<char_t, traits_t, allocator_t>() const noexcept
     {
         return std::basic_string<char_t, traits_t, allocator_t>(data(), length());
     }
-    template<class to_t> typename std::enable_if<std::is_integral<to_t>::value, to_t>::type to_value() const
+    template<class to_t> typename std::enable_if<std::is_integral<to_t>::value, to_t>::type to_value() const noexcept
     {
         return string_to_integer<value_type, to_t>(_ptr, _len);
     }
-    template<class to_t> typename std::enable_if<std::is_floating_point<to_t>::value, to_t>::type to_value() const
+    template<class to_t> typename std::enable_if<std::is_floating_point<to_t>::value, to_t>::type to_value() const noexcept
     {
         return string_to_real<value_type, to_t>(_ptr, _len);
     }
-    
-    size_type copy(value_type *dest, size_type count, size_type pos = 0) const
+
+    size_type copy(value_type *dest, size_type count, size_type pos = 0) const noexcept
     {
         if(pos >= size())
         {
@@ -269,33 +273,37 @@ public:
     {
         return pos > size() ? throw std::out_of_range("string_ref out of range") : string_ref(_ptr + pos, std::min(count, size() - pos));
     }
-    
-    constexpr int compare(string_ref v) const
+    constexpr string_ref concat(string_ref v) const noexcept
+    {
+        return concat_helper(v, std::make_index_sequence<_len + v._len>());
+    }
+
+    constexpr int compare(string_ref v) const noexcept
     {
         return compare_helper(traits_t::compare(data(), v.data(), std::min(size(), v.size())), size(), v.size());
     }
-    constexpr int compare(size_type pos1, size_type count1, string_ref v) const
+    constexpr int compare(size_type pos1, size_type count1, string_ref v) const noexcept
     {
         return substr(pos1, count1).compare(v);
     }
-    constexpr int compare(size_type pos1, size_type count1, string_ref const &v, size_type pos2, size_type count2) const
+    constexpr int compare(size_type pos1, size_type count1, string_ref const &v, size_type pos2, size_type count2) const noexcept
     {
         return substr(pos1, count1).compare(v.substr(pos2, count2));
     }
-    constexpr int compare(value_type const *s) const
+    constexpr int compare(value_type const *s) const noexcept
     {
         return compare(string_ref(s));
     }
-    constexpr int compare(size_type pos1, size_type count1, value_type const *s) const
+    constexpr int compare(size_type pos1, size_type count1, value_type const *s) const noexcept
     {
         return substr(pos1, count1).compare(string_ref(s));
     }
-    constexpr int compare(size_type pos1, size_type count1, value_type const *s, size_type count2) const
+    constexpr int compare(size_type pos1, size_type count1, value_type const *s, size_type count2) const noexcept
     {
         return substr(pos1, count1).compare(string_ref(s, count2));
     }
-    
-    size_type find(string_ref v, size_type pos = 0) const
+
+    size_type find(string_ref v, size_type pos = 0) const noexcept
     {
         if(pos + v.size() > size() || v.empty())
         {
@@ -310,7 +318,7 @@ public:
         }
         return npos;
     }
-    size_type find(value_type c, size_type pos = 0) const
+    size_type find(value_type c, size_type pos = 0) const noexcept
     {
         if(pos >= size())
         {
@@ -319,83 +327,83 @@ public:
         auto f = std::find(cbegin() + pos, cend(), c);
         return f == cend() ? npos : f - cbegin();
     }
-    size_type find(value_type const *s, size_type pos, size_type count) const
+    constexpr size_type find(value_type const *s, size_type pos, size_type count) const noexcept
     {
         return find(string_ref(s, count), pos);
     }
-    size_type find(value_type const *s, size_type pos = 0) const
+    constexpr size_type find(value_type const *s, size_type pos = 0) const noexcept
     {
         return find(string_ref(s), pos);
     }
-    
-    //constexpr size_type rfind(string_ref const &v, size_type pos = 0) const;
-    //constexpr size_type rfind(value_type c, size_type pos = 0) const;
-    //constexpr size_type rfind(value_type const *s, size_type pos, size_type count) const;
-    //constexpr size_type rfind(value_type const *s, size_type pos = 0) const;
-    
-    //constexpr size_type find_first_of(string_ref const &v, size_type pos = 0) const;
-    //constexpr size_type find_first_of(value_type c, size_type pos = 0) const;
-    //constexpr size_type find_first_of(value_type const *s, size_type pos, size_type count) const;
-    //constexpr size_type find_first_of(value_type const *s, size_type pos = 0) const;
-    
-    //constexpr size_type find_last_of(string_ref const &v, size_type pos = 0) const;
-    //constexpr size_type find_last_of(value_type c, size_type pos = 0) const;
-    //constexpr size_type find_last_of(value_type const *s, size_type pos, size_type count) const;
-    //constexpr size_type find_last_of(value_type const *s, size_type pos = 0) const;
-    
-    //constexpr size_type find_first_not_of(string_ref const &v, size_type pos = 0) const;
-    //constexpr size_type find_first_not_of(value_type c, size_type pos = 0) const;
-    //constexpr size_type find_first_not_of(value_type const *s, size_type pos, size_type count) const;
-    //constexpr size_type find_first_not_of(value_type const *s, size_type pos = 0) const;
-    
-    //constexpr size_type find_last_not_of(string_ref const &v, size_type pos = 0) const;
-    //constexpr size_type find_last_not_of(value_type c, size_type pos = 0) const;
-    //constexpr size_type find_last_not_of(value_type const *s, size_type pos, size_type count) const;
-    //constexpr size_type find_last_not_of(value_type const *s, size_type pos = 0) const;
-    
+
+    //constexpr size_type rfind(string_ref const &v, size_type pos = 0) const noexcept;
+    //constexpr size_type rfind(value_type c, size_type pos = 0) const noexcept;
+    //constexpr size_type rfind(value_type const *s, size_type pos, size_type count) const noexcept;
+    //constexpr size_type rfind(value_type const *s, size_type pos = 0) const noexcept;
+
+    //constexpr size_type find_first_of(string_ref const &v, size_type pos = 0) const  noexcept;
+    //constexpr size_type find_first_of(value_type c, size_type pos = 0) const  noexcept;
+    //constexpr size_type find_first_of(value_type const *s, size_type pos, size_type count) const  noexcept;
+    //constexpr size_type find_first_of(value_type const *s, size_type pos = 0) const  noexcept;
+
+    //constexpr size_type find_last_of(string_ref const &v, size_type pos = 0) const  noexcept;
+    //constexpr size_type find_last_of(value_type c, size_type pos = 0) const  noexcept;
+    //constexpr size_type find_last_of(value_type const *s, size_type pos, size_type count) const  noexcept;
+    //constexpr size_type find_last_of(value_type const *s, size_type pos = 0) const  noexcept;
+
+    //constexpr size_type find_first_not_of(string_ref const &v, size_type pos = 0) const  noexcept;
+    //constexpr size_type find_first_not_of(value_type c, size_type pos = 0) const  noexcept;
+    //constexpr size_type find_first_not_of(value_type const *s, size_type pos, size_type count) const  noexcept;
+    //constexpr size_type find_first_not_of(value_type const *s, size_type pos = 0) const  noexcept;
+
+    //constexpr size_type find_last_not_of(string_ref const &v, size_type pos = 0) const  noexcept;
+    //constexpr size_type find_last_not_of(value_type c, size_type pos = 0) const  noexcept;
+    //constexpr size_type find_last_not_of(value_type const *s, size_type pos, size_type count) const  noexcept;
+    //constexpr size_type find_last_not_of(value_type const *s, size_type pos = 0) const  noexcept;
+
     static constexpr size_type npos = size_type(-1);
-    
+
 private:
-    static constexpr int compare_helper(int c, size_type l, size_type r)
+    static constexpr int compare_helper(int c, size_type l, size_type r) noexcept
     {
         return c != 0 ? c : l == r ? 0 : l < r ? -1 : 1;
     }
-    
+
 private:
     value_type const *_ptr;
     size_type _len;
 };
 
-template<class char_t, class traits_t> constexpr bool operator == (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right){ return left.compare(right) == 0; }
-template<class char_t, class traits_t> constexpr bool operator != (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right){ return left.compare(right) != 0; }
-template<class char_t, class traits_t> constexpr bool operator <  (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right){ return left.compare(right) <  0; }
-template<class char_t, class traits_t> constexpr bool operator >  (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right){ return left.compare(right) >  0; }
-template<class char_t, class traits_t> constexpr bool operator <= (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right){ return left.compare(right) <= 0; }
-template<class char_t, class traits_t> constexpr bool operator >= (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right){ return left.compare(right) >= 0; }
-template<class char_t, class traits_t> constexpr bool operator == (char_t const *left, string_ref<char_t, traits_t> right){ return right.compare(left) == 0; }
-template<class char_t, class traits_t> constexpr bool operator != (char_t const *left, string_ref<char_t, traits_t> right){ return right.compare(left) != 0; }
-template<class char_t, class traits_t> constexpr bool operator <  (char_t const *left, string_ref<char_t, traits_t> right){ return right.compare(left) >  0; }
-template<class char_t, class traits_t> constexpr bool operator >  (char_t const *left, string_ref<char_t, traits_t> right){ return right.compare(left) <  0; }
-template<class char_t, class traits_t> constexpr bool operator <= (char_t const *left, string_ref<char_t, traits_t> right){ return right.compare(left) >= 0; }
-template<class char_t, class traits_t> constexpr bool operator >= (char_t const *left, string_ref<char_t, traits_t> right){ return right.compare(left) <= 0; }
-template<class char_t, class traits_t> constexpr bool operator == (string_ref<char_t, traits_t> left, char_t const *right){ return left.compare(right) == 0; }
-template<class char_t, class traits_t> constexpr bool operator != (string_ref<char_t, traits_t> left, char_t const *right){ return left.compare(right) != 0; }
-template<class char_t, class traits_t> constexpr bool operator <  (string_ref<char_t, traits_t> left, char_t const *right){ return left.compare(right) <  0; }
-template<class char_t, class traits_t> constexpr bool operator >  (string_ref<char_t, traits_t> left, char_t const *right){ return left.compare(right) >  0; }
-template<class char_t, class traits_t> constexpr bool operator <= (string_ref<char_t, traits_t> left, char_t const *right){ return left.compare(right) <= 0; }
-template<class char_t, class traits_t> constexpr bool operator >= (string_ref<char_t, traits_t> left, char_t const *right){ return left.compare(right) >= 0; }
-template<class char_t, class traits_t, class allocator_t> bool operator == (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right){ return right.compare(string_ref<char_t, traits_t>(left)) == 0; }
-template<class char_t, class traits_t, class allocator_t> bool operator != (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right){ return right.compare(string_ref<char_t, traits_t>(left)) != 0; }
-template<class char_t, class traits_t, class allocator_t> bool operator <  (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right){ return right.compare(string_ref<char_t, traits_t>(left)) >  0; }
-template<class char_t, class traits_t, class allocator_t> bool operator >  (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right){ return right.compare(string_ref<char_t, traits_t>(left)) <  0; }
-template<class char_t, class traits_t, class allocator_t> bool operator <= (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right){ return right.compare(string_ref<char_t, traits_t>(left)) >= 0; }
-template<class char_t, class traits_t, class allocator_t> bool operator >= (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right){ return right.compare(string_ref<char_t, traits_t>(left)) <= 0; }
-template<class char_t, class traits_t, class allocator_t> bool operator == (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right){ return left.compare(string_ref<char_t, traits_t>(right)) == 0; }
-template<class char_t, class traits_t, class allocator_t> bool operator != (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right){ return left.compare(string_ref<char_t, traits_t>(right)) != 0; }
-template<class char_t, class traits_t, class allocator_t> bool operator <  (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right){ return left.compare(string_ref<char_t, traits_t>(right)) <  0; }
-template<class char_t, class traits_t, class allocator_t> bool operator >  (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right){ return left.compare(string_ref<char_t, traits_t>(right)) >  0; }
-template<class char_t, class traits_t, class allocator_t> bool operator <= (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right){ return left.compare(string_ref<char_t, traits_t>(right)) <= 0; }
-template<class char_t, class traits_t, class allocator_t> bool operator >= (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right){ return left.compare(string_ref<char_t, traits_t>(right)) >= 0; }
+template<class char_t, class traits_t> constexpr bool operator == (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right) noexcept { return left.compare(right) == 0; }
+template<class char_t, class traits_t> constexpr bool operator != (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right) noexcept { return left.compare(right) != 0; }
+template<class char_t, class traits_t> constexpr bool operator <  (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right) noexcept { return left.compare(right) <  0; }
+template<class char_t, class traits_t> constexpr bool operator >  (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right) noexcept { return left.compare(right) >  0; }
+template<class char_t, class traits_t> constexpr bool operator <= (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right) noexcept { return left.compare(right) <= 0; }
+template<class char_t, class traits_t> constexpr bool operator >= (string_ref<char_t, traits_t> left, string_ref<char_t, traits_t> right) noexcept { return left.compare(right) >= 0; }
+template<class char_t, class traits_t> constexpr bool operator == (char_t const *left, string_ref<char_t, traits_t> right) noexcept { return right.compare(left) == 0; }
+template<class char_t, class traits_t> constexpr bool operator != (char_t const *left, string_ref<char_t, traits_t> right) noexcept { return right.compare(left) != 0; }
+template<class char_t, class traits_t> constexpr bool operator <  (char_t const *left, string_ref<char_t, traits_t> right) noexcept { return right.compare(left) >  0; }
+template<class char_t, class traits_t> constexpr bool operator >  (char_t const *left, string_ref<char_t, traits_t> right) noexcept { return right.compare(left) <  0; }
+template<class char_t, class traits_t> constexpr bool operator <= (char_t const *left, string_ref<char_t, traits_t> right) noexcept { return right.compare(left) >= 0; }
+template<class char_t, class traits_t> constexpr bool operator >= (char_t const *left, string_ref<char_t, traits_t> right) noexcept { return right.compare(left) <= 0; }
+template<class char_t, class traits_t> constexpr bool operator == (string_ref<char_t, traits_t> left, char_t const *right) noexcept { return left.compare(right) == 0; }
+template<class char_t, class traits_t> constexpr bool operator != (string_ref<char_t, traits_t> left, char_t const *right) noexcept { return left.compare(right) != 0; }
+template<class char_t, class traits_t> constexpr bool operator <  (string_ref<char_t, traits_t> left, char_t const *right) noexcept { return left.compare(right) <  0; }
+template<class char_t, class traits_t> constexpr bool operator >  (string_ref<char_t, traits_t> left, char_t const *right) noexcept { return left.compare(right) >  0; }
+template<class char_t, class traits_t> constexpr bool operator <= (string_ref<char_t, traits_t> left, char_t const *right) noexcept { return left.compare(right) <= 0; }
+template<class char_t, class traits_t> constexpr bool operator >= (string_ref<char_t, traits_t> left, char_t const *right) noexcept { return left.compare(right) >= 0; }
+template<class char_t, class traits_t, class allocator_t> bool operator == (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right) noexcept { return right.compare(string_ref<char_t, traits_t>(left)) == 0; }
+template<class char_t, class traits_t, class allocator_t> bool operator != (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right) noexcept { return right.compare(string_ref<char_t, traits_t>(left)) != 0; }
+template<class char_t, class traits_t, class allocator_t> bool operator <  (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right) noexcept { return right.compare(string_ref<char_t, traits_t>(left)) >  0; }
+template<class char_t, class traits_t, class allocator_t> bool operator >  (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right) noexcept { return right.compare(string_ref<char_t, traits_t>(left)) <  0; }
+template<class char_t, class traits_t, class allocator_t> bool operator <= (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right) noexcept { return right.compare(string_ref<char_t, traits_t>(left)) >= 0; }
+template<class char_t, class traits_t, class allocator_t> bool operator >= (std::basic_string<char_t, traits_t, allocator_t> const &left, string_ref<char_t, traits_t> right) noexcept { return right.compare(string_ref<char_t, traits_t>(left)) <= 0; }
+template<class char_t, class traits_t, class allocator_t> bool operator == (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right) noexcept { return left.compare(string_ref<char_t, traits_t>(right)) == 0; }
+template<class char_t, class traits_t, class allocator_t> bool operator != (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right) noexcept { return left.compare(string_ref<char_t, traits_t>(right)) != 0; }
+template<class char_t, class traits_t, class allocator_t> bool operator <  (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right) noexcept { return left.compare(string_ref<char_t, traits_t>(right)) <  0; }
+template<class char_t, class traits_t, class allocator_t> bool operator >  (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right) noexcept { return left.compare(string_ref<char_t, traits_t>(right)) >  0; }
+template<class char_t, class traits_t, class allocator_t> bool operator <= (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right) noexcept { return left.compare(string_ref<char_t, traits_t>(right)) <= 0; }
+template<class char_t, class traits_t, class allocator_t> bool operator >= (string_ref<char_t, traits_t> left, std::basic_string<char_t, traits_t, allocator_t> const &right) noexcept { return left.compare(string_ref<char_t, traits_t>(right)) >= 0; }
 
 template<class char_t, class traits_t = std::char_traits<char_t>, class string_t = string_ref<char_t, traits_t>> struct split_iterator_finder_char
 {
