@@ -36,19 +36,19 @@ protected:
         value_node_t(value_type const &v) : value(v)
         {
         }
-        template<class ...args_t> value_node_t(args_t &&...args) : value(std::forward<args_t>(args)...)
+        template<class... args_t> value_node_t(args_t &&...args) : value(std::forward<args_t>(args)...)
         {
         }
         value_type value;
     };
-    typedef typename allocator_type::template rebind<value_node_t>::other node_allocator_t;
+    typedef typename std::allocator_traits<allocator_type>::template rebind_alloc<value_node_t> node_allocator_t;
     struct root_node_t : public node_t, public key_compare, public node_allocator_t
     {
         template<class any_key_compare, class any_allocator_t> root_node_t(any_key_compare &&comp, any_allocator_t &&alloc) : key_compare(std::forward<any_key_compare>(comp)), node_allocator_t(std::forward<any_allocator_t>(alloc))
         {
         }
     };
-    typedef typename allocator_type::template rebind<root_node_t>::other root_allocator_t;
+    typedef typename std::allocator_traits<allocator_type>::template rebind_alloc<root_node_t> root_allocator_t;
     struct head_t : public root_allocator_t
     {
         template<class any_allocator_t> head_t(any_allocator_t &&alloc) : root_allocator_t(std::forward<any_allocator_t>(alloc))
@@ -66,30 +66,31 @@ public:
         typedef typename size_balanced_tree::difference_type difference_type;
         typedef typename size_balanced_tree::reference reference;
         typedef typename size_balanced_tree::pointer pointer;
+
     public:
         explicit iterator(node_t *in_node) : node(in_node)
         {
         }
         iterator(iterator const &) = default;
-        iterator &operator += (difference_type diff)
+        iterator &operator+=(difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, diff);
             return *this;
         }
-        iterator &operator -= (difference_type diff)
+        iterator &operator-=(difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, -diff);
             return *this;
         }
-        iterator operator + (difference_type diff) const
+        iterator operator+(difference_type diff) const
         {
             return iterator(size_balanced_tree::sbt_advance_(node, diff));
         }
-        iterator operator - (difference_type diff) const
+        iterator operator-(difference_type diff) const
         {
             return iterator(size_balanced_tree::sbt_advance_(node, -diff));
         }
-        difference_type operator - (iterator const &other) const
+        difference_type operator-(iterator const &other) const
         {
             return static_cast<difference_type>(size_balanced_tree::sbt_rank_(node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node));
         }
@@ -115,7 +116,7 @@ public:
             --*this;
             return save;
         }
-        reference operator *() const
+        reference operator*() const
         {
             return static_cast<value_node_t *>(node)->value;
         }
@@ -127,30 +128,31 @@ public:
         {
             return *(*this + index);
         }
-        bool operator > (iterator const &other) const
+        bool operator>(iterator const &other) const
         {
             return *this - other > 0;
         }
-        bool operator < (iterator const &other) const
+        bool operator<(iterator const &other) const
         {
             return *this - other < 0;
         }
-        bool operator >= (iterator const &other) const
+        bool operator>=(iterator const &other) const
         {
             return *this - other >= 0;
         }
-        bool operator <= (iterator const &other) const
+        bool operator<=(iterator const &other) const
         {
             return *this - other <= 0;
         }
-        bool operator == (iterator const &other) const
+        bool operator==(iterator const &other) const
         {
             return node == other.node;
         }
-        bool operator != (iterator const &other) const
+        bool operator!=(iterator const &other) const
         {
             return node != other.node;
         }
+
     private:
         friend class size_balanced_tree;
         node_t *node;
@@ -165,6 +167,7 @@ public:
         typedef typename size_balanced_tree::const_reference const_reference;
         typedef typename size_balanced_tree::pointer pointer;
         typedef typename size_balanced_tree::const_pointer const_pointer;
+
     public:
         explicit const_iterator(node_t *in_node) : node(in_node)
         {
@@ -173,25 +176,25 @@ public:
         {
         }
         const_iterator(const_iterator const &) = default;
-        const_iterator &operator += (difference_type diff)
+        const_iterator &operator+=(difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, diff);
             return *this;
         }
-        const_iterator &operator -= (difference_type diff)
+        const_iterator &operator-=(difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, -diff);
             return *this;
         }
-        const_iterator operator + (difference_type diff) const
+        const_iterator operator+(difference_type diff) const
         {
             return const_iterator(size_balanced_tree::sbt_advance_(node, diff));
         }
-        const_iterator operator - (difference_type diff) const
+        const_iterator operator-(difference_type diff) const
         {
             return const_iterator(size_balanced_tree::sbt_advance_(node, -diff));
         }
-        difference_type operator - (const_iterator const &other) const
+        difference_type operator-(const_iterator const &other) const
         {
             return static_cast<difference_type>(size_balanced_tree::sbt_rank_(node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node));
         }
@@ -217,7 +220,7 @@ public:
             --*this;
             return save;
         }
-        const_reference operator *() const
+        const_reference operator*() const
         {
             return static_cast<value_node_t *>(node)->value;
         }
@@ -229,30 +232,31 @@ public:
         {
             return *(*this + index);
         }
-        bool operator > (const_iterator const &other) const
+        bool operator>(const_iterator const &other) const
         {
             return *this - other > 0;
         }
-        bool operator < (const_iterator const &other) const
+        bool operator<(const_iterator const &other) const
         {
             return *this - other < 0;
         }
-        bool operator >= (const_iterator const &other) const
+        bool operator>=(const_iterator const &other) const
         {
             return *this - other >= 0;
         }
-        bool operator <= (const_iterator const &other) const
+        bool operator<=(const_iterator const &other) const
         {
             return *this - other <= 0;
         }
-        bool operator == (const_iterator const &other) const
+        bool operator==(const_iterator const &other) const
         {
             return node == other.node;
         }
-        bool operator != (const_iterator const &other) const
+        bool operator!=(const_iterator const &other) const
         {
             return node != other.node;
         }
+
     private:
         friend class size_balanced_tree;
         node_t *node;
@@ -265,6 +269,7 @@ public:
         typedef typename size_balanced_tree::difference_type difference_type;
         typedef typename size_balanced_tree::reference reference;
         typedef typename size_balanced_tree::pointer pointer;
+
     public:
         explicit reverse_iterator(node_t *in_node) : node(in_node)
         {
@@ -274,25 +279,25 @@ public:
             ++*this;
         }
         reverse_iterator(reverse_iterator const &) = default;
-        reverse_iterator &operator += (difference_type diff)
+        reverse_iterator &operator+=(difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, -diff);
             return *this;
         }
-        reverse_iterator &operator -= (difference_type diff)
+        reverse_iterator &operator-=(difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, diff);
             return *this;
         }
-        reverse_iterator operator + (difference_type diff) const
+        reverse_iterator operator+(difference_type diff) const
         {
             return reverse_iterator(size_balanced_tree::sbt_advance_(node, -diff));
         }
-        reverse_iterator operator - (difference_type diff) const
+        reverse_iterator operator-(difference_type diff) const
         {
             return reverse_iterator(size_balanced_tree::sbt_advance_(node, diff));
         }
-        difference_type operator - (reverse_iterator const &other) const
+        difference_type operator-(reverse_iterator const &other) const
         {
             return static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(node));
         }
@@ -318,7 +323,7 @@ public:
             --*this;
             return save;
         }
-        reference operator *() const
+        reference operator*() const
         {
             return static_cast<value_node_t *>(node)->value;
         }
@@ -330,27 +335,27 @@ public:
         {
             return *(*this + index);
         }
-        bool operator > (reverse_iterator const &other) const
+        bool operator>(reverse_iterator const &other) const
         {
             return *this - other > 0;
         }
-        bool operator < (reverse_iterator const &other) const
+        bool operator<(reverse_iterator const &other) const
         {
             return *this - other < 0;
         }
-        bool operator >= (reverse_iterator const &other) const
+        bool operator>=(reverse_iterator const &other) const
         {
             return *this - other >= 0;
         }
-        bool operator <= (reverse_iterator const &other) const
+        bool operator<=(reverse_iterator const &other) const
         {
             return *this - other <= 0;
         }
-        bool operator == (reverse_iterator const &other) const
+        bool operator==(reverse_iterator const &other) const
         {
             return node == other.node;
         }
-        bool operator != (reverse_iterator const &other) const
+        bool operator!=(reverse_iterator const &other) const
         {
             return node != other.node;
         }
@@ -358,6 +363,7 @@ public:
         {
             return ++iterator(node);
         }
+
     private:
         friend class size_balanced_tree;
         node_t *node;
@@ -372,6 +378,7 @@ public:
         typedef typename size_balanced_tree::const_reference const_reference;
         typedef typename size_balanced_tree::pointer pointer;
         typedef typename size_balanced_tree::const_pointer const_pointer;
+
     public:
         explicit const_reverse_iterator(node_t *in_node) : node(in_node)
         {
@@ -384,25 +391,25 @@ public:
         {
         }
         const_reverse_iterator(const_reverse_iterator const &) = default;
-        const_reverse_iterator &operator += (difference_type diff)
+        const_reverse_iterator &operator+=(difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, -diff);
             return *this;
         }
-        const_reverse_iterator &operator -= (difference_type diff)
+        const_reverse_iterator &operator-=(difference_type diff)
         {
             node = size_balanced_tree::sbt_advance_(node, diff);
             return *this;
         }
-        const_reverse_iterator operator + (difference_type diff) const
+        const_reverse_iterator operator+(difference_type diff) const
         {
             return const_reverse_iterator(size_balanced_tree::sbt_advance_(node, -diff));
         }
-        const_reverse_iterator operator - (difference_type diff) const
+        const_reverse_iterator operator-(difference_type diff) const
         {
             return const_reverse_iterator(size_balanced_tree::sbt_advance_(node, diff));
         }
-        difference_type operator - (const_reverse_iterator const &other) const
+        difference_type operator-(const_reverse_iterator const &other) const
         {
             return static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(node));
         }
@@ -428,7 +435,7 @@ public:
             --*this;
             return save;
         }
-        const_reference operator *() const
+        const_reference operator*() const
         {
             return static_cast<value_node_t *>(node)->value;
         }
@@ -440,27 +447,27 @@ public:
         {
             return *(*this + index);
         }
-        bool operator > (const_reverse_iterator const &other) const
+        bool operator>(const_reverse_iterator const &other) const
         {
             return *this - other > 0;
         }
-        bool operator < (const_reverse_iterator const &other) const
+        bool operator<(const_reverse_iterator const &other) const
         {
             return *this - other < 0;
         }
-        bool operator >= (const_reverse_iterator const &other) const
+        bool operator>=(const_reverse_iterator const &other) const
         {
             return *this - other >= 0;
         }
-        bool operator <= (const_reverse_iterator const &other) const
+        bool operator<=(const_reverse_iterator const &other) const
         {
             return *this - other <= 0;
         }
-        bool operator == (const_reverse_iterator const &other) const
+        bool operator==(const_reverse_iterator const &other) const
         {
             return node == other.node;
         }
-        bool operator != (const_reverse_iterator const &other) const
+        bool operator!=(const_reverse_iterator const &other) const
         {
             return node != other.node;
         }
@@ -468,6 +475,7 @@ public:
         {
             return ++iterator(node);
         }
+
     private:
         friend class size_balanced_tree;
         node_t *node;
@@ -478,7 +486,7 @@ protected:
     template<class in_root_allocator_t, class in_node_allocator_t> size_balanced_tree(key_compare const &comp, in_root_allocator_t &&root_alloc, in_node_allocator_t &&node_alloc) : head_(std::forward<in_root_allocator_t>(root_alloc))
     {
         head_.root = get_root_allocator_().allocate(1);
-        get_root_allocator_().construct(head_.root, comp, std::forward<in_node_allocator_t>(node_alloc));
+        std::allocator_traits<root_allocator_t>::construct(get_root_allocator_(), head_.root, comp, std::forward<in_node_allocator_t>(node_alloc));
         set_size_(nil_(), 0);
         set_root_(nil_());
         set_most_left_(nil_());
@@ -499,12 +507,12 @@ public:
     {
     }
     //range
-    template <class iterator_t> size_balanced_tree(iterator_t begin, iterator_t end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(comp, alloc, alloc)
+    template<class iterator_t> size_balanced_tree(iterator_t begin, iterator_t end, key_compare const &comp = key_compare(), allocator_type const &alloc = allocator_type()) : size_balanced_tree(comp, alloc, alloc)
     {
         insert(begin, end);
     }
     //range
-    template <class iterator_t> size_balanced_tree(iterator_t begin, iterator_t end, allocator_type const &alloc = allocator_type()) : size_balanced_tree(key_compare(), alloc, alloc)
+    template<class iterator_t> size_balanced_tree(iterator_t begin, iterator_t end, allocator_type const &alloc = allocator_type()) : size_balanced_tree(key_compare(), alloc, alloc)
     {
         insert(begin, end);
     }
@@ -541,11 +549,11 @@ public:
     ~size_balanced_tree()
     {
         clear();
-        get_root_allocator_().destroy(head_.root);
+        std::allocator_traits<root_allocator_t>::destroy(get_root_allocator_(), head_.root);
         get_root_allocator_().deallocate(head_.root, 1);
     }
     //copy
-    size_balanced_tree &operator = (size_balanced_tree const &other)
+    size_balanced_tree &operator=(size_balanced_tree const &other)
     {
         if(this == &other)
         {
@@ -569,7 +577,7 @@ public:
         return *this;
     }
     //move
-    size_balanced_tree &operator = (size_balanced_tree &&other)
+    size_balanced_tree &operator=(size_balanced_tree &&other) noexcept
     {
         if(this == &other)
         {
@@ -579,7 +587,7 @@ public:
         return *this;
     }
     //initializer list
-    size_balanced_tree &operator = (std::initializer_list<value_type> il)
+    size_balanced_tree &operator=(std::initializer_list<value_type> il)
     {
         size_balanced_tree tree_memory(get_comparator_(), get_root_allocator_(), get_node_allocator_());
         std::swap(head_.root, tree_memory.head_.root);
@@ -592,8 +600,8 @@ public:
             }
             value_node_t *node = static_cast<value_node_t *>(tree_memory.get_root_());
             tree_memory.sbt_erase_<true>(node);
-            get_node_allocator_().destroy(node);
-            get_node_allocator_().construct(node, *it++);
+            std::allocator_traits<node_allocator_t>::destroy(get_node_allocator_(), node);
+            std::allocator_traits<node_allocator_t>::construct(get_node_allocator_(), node, *it++);
             sbt_insert_hint_(nil_(), node);
         }
         insert(it, il.end());
@@ -605,7 +613,7 @@ public:
         return *head_.root;
     }
 
-    void swap(size_balanced_tree &other)
+    void swap(size_balanced_tree &other) noexcept
     {
         std::swap(head_, other.head_);
     }
@@ -652,13 +660,13 @@ public:
     }
 
     //single element
-    template<class ...args_t> iterator emplace(args_t &&...args)
+    template<class... args_t> iterator emplace(args_t &&...args)
     {
         check_max_size_();
         return iterator(sbt_insert_<false>(sbt_create_node_(std::forward<args_t>(args)...)));
     }
     //with hint
-    template<class ...args_t> iterator emplace_hint(const_iterator hint, args_t &&...args)
+    template<class... args_t> iterator emplace_hint(const_iterator hint, args_t &&...args)
     {
         check_max_size_();
         return iterator(sbt_insert_hint_(hint.node, sbt_create_node_(std::forward<args_t>(args)...)));
@@ -885,14 +893,16 @@ public:
     {
         sbt_clear_(get_root_());
         set_root_(nil_());
+        set_most_left_(nil_());
+        set_most_right_(nil_());
     }
     size_type size() const
     {
         return get_size_(get_root_());
     }
-    size_type max_size() const
+    size_type max_size() const noexcept
     {
-        return node_allocator_t(get_node_allocator_()).max_size();
+        return std::allocator_traits<node_allocator_t>::max_size(get_node_allocator_());
     }
 
     //if(index >= size) return end
@@ -1436,10 +1446,10 @@ protected:
         }
     }
 
-    template<class ...args_t> node_t *sbt_create_node_(args_t &&...args)
+    template<class... args_t> node_t *sbt_create_node_(args_t &&...args)
     {
         value_node_t *node = get_node_allocator_().allocate(1);
-        get_node_allocator_().construct(node, std::forward<args_t>(args)...);
+        std::allocator_traits<node_allocator_t>::construct(get_node_allocator_(), node, std::forward<args_t>(args)...);
         return node;
     }
 
@@ -1556,8 +1566,7 @@ protected:
             do
             {
                 set_size_(parent, get_size_(parent) + 1);
-            }
-            while(!is_nil_(parent = get_parent_(parent)));
+            } while(!is_nil_(parent = get_parent_(parent)));
         }
         bst_init_node_(where, node);
         if(is_left)
@@ -1599,7 +1608,7 @@ protected:
     void sbt_destroy_node_(node_t *node)
     {
         value_node_t *value_node = static_cast<value_node_t *>(node);
-        get_node_allocator_().destroy(value_node);
+        std::allocator_traits<node_allocator_t>::destroy(get_node_allocator_(), value_node);
         get_node_allocator_().deallocate(value_node, 1);
     }
 
@@ -1608,7 +1617,6 @@ protected:
         node_t *erase_node = node;
         node_t *fix_node;
         node_t *fix_node_parent;
-        bool is_left;
         if(!is_clear)
         {
             fix_node = node;
@@ -1621,12 +1629,10 @@ protected:
         if(is_nil_(get_left_(node)))
         {
             fix_node = get_right_(node);
-            is_left = true;
         }
         else if(is_nil_(get_right_(node)))
         {
             fix_node = get_left_(node);
-            is_left = false;
         }
         else
         {
@@ -1791,8 +1797,8 @@ protected:
         {
             value_node_t *node = static_cast<value_node_t *>(memory->get_root_());
             memory->sbt_erase_<true>(node);
-            get_node_allocator_().destroy(node);
-            get_node_allocator_().construct(node, std::move(static_cast<value_node_t *>(other)->value));
+            std::allocator_traits<node_allocator_t>::destroy(get_node_allocator_(), node);
+            std::allocator_traits<node_allocator_t>::construct(get_node_allocator_(), node, std::move(static_cast<value_node_t *>(other)->value));
             return node;
         }
         else
@@ -1807,8 +1813,8 @@ protected:
         {
             value_node_t *node = static_cast<value_node_t *>(memory->get_root_());
             memory->sbt_erase_<true>(node);
-            get_node_allocator_().destroy(node);
-            get_node_allocator_().construct(node, static_cast<value_node_t *>(other)->value);
+            std::allocator_traits<node_allocator_t>::destroy(get_node_allocator_(), node);
+            std::allocator_traits<node_allocator_t>::construct(get_node_allocator_(), node, static_cast<value_node_t *>(other)->value);
             return node;
         }
         else

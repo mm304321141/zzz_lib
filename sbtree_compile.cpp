@@ -12,7 +12,7 @@ template<class V, class T> void foo_test(T &bp)
     typename O::key_compare c;
     typename O::allocator_type a;
     V v = V();
-    typename O::key_type k;
+    typename O::key_type k = typename O::key_type();
     O o, oo;
     auto b = bp.cbegin();
     auto e = bp.cend();
@@ -26,9 +26,9 @@ template<class V, class T> void foo_test(T &bp)
     T o07(o, a);
     T o08(std::move(o));
     T o09(std::move(o), a);
-    T o10({v}, c);
-    T o11({v}, a);
-    T o12({v}, c, a);
+    T o10({ v }, c);
+    T o11({ v }, a);
+    T o12({ v }, c, a);
     o = oo;
     o = std::move(oo);
     o = {};
