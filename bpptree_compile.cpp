@@ -12,7 +12,7 @@ template<class T> void foo_test(T &bp)
     typename O::key_compare c;
     typename O::allocator_type a;
     typename O::storage_type v;
-    typename O::key_type k;
+    typename O::key_type k{};
     O o, oo;
     auto b = bp.cbegin();
     auto e = bp.cend();
