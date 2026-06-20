@@ -1,133 +1,115 @@
 # zzz_lib
-zzz's c++ lib  
 
-<br/>
+zzz 的 C++ 工具库，包含容器、迭代器工具等组件，均支持 C++14/17/20。
 
-* sbtree_map.h
-* sbtree_set.h
-* bpptree_map.h
-* bpptree_set.h
-* chash_map.h
-* chash_set.h
-* segment_array.h
+## 文件列表
 
-标准库风格容器<br/>
-standard library style<br/>
+| 文件 | 说明 |
+|---|---|
+| `sbtree.h` / `sbtree_map.h` / `sbtree_set.h` | 基于 size-balanced BST 的有序容器 |
+| `bpptree.h` / `bpptree_map.h` / `bpptree_set.h` | 基于 B+ 树的有序容器 |
+| `chash.h` / `chash_map.h` / `chash_set.h` | 基于开放寻址哈希表的无序容器 |
+| `segment_array.h` | 基于 B+ 树节点管理策略的序列容器 |
+| `sparse_array.h` | 基于 RB 树的稀疏数组 |
+| `split_iterator.h` | 字符串分割迭代器 |
 
-* sbtree系列
+## 容器
 
-基于二叉搜索树实现,使用size平衡<br/>
-可以随机访问,随机访问迭代器<br/>
-有multimap/multiset实现<br/>
+### sbtree
 
-* bpptree系列
+基于二叉搜索树实现，使用节点 size 维持平衡（size-balanced tree）。支持随机访问迭代器，提供 `map`/`set`/`multimap`/`multiset` 变体。
 
-基于B+树实现<br/>
-可以随机访问,随机访问迭代器<br/>
-内存管理使用相同大小内存块<br/>
-相比标准库map,迭代器在插入/删除元素之后会失效<br/>
-sizeof(key)非巨大的情况下,插入/删除/查找速度都超过标准库map<br/>
-sizeof(key)巨大的情况下去,内存占用会偏大,并且性能下降<br/>
-遍历速度任何条件下都很快!比标准库map快得多!<br/>
-有map/set/multimap/multiset实现<br/>
+### bpptree
 
-* chash系列
+基于 B+ 树实现，内存管理使用固定大小内存块。支持随机访问迭代器。迭代器在插入/删除后失效。`sizeof(key)` 较小时，插入/删除/查找速度优于 `std::map`；遍历速度在任何条件下都显著快于 `std::map`。提供 `map`/`set`/`multimap`/`multiset` 变体。
 
-基于哈希表实现<br/>
-内存集中分配,尽可能利用缓存加速<br/>
-插入元素可能导致扩容,产生搬运数据操作<br/>
-遍历速度飞快!<br/>
-在允许重复key时候,equal_range返回local_iterator,仅支持erase操作<br/>
-有map/set/multimap/multiset实现<br/>
+### chash
 
-* segment_array系列
+基于哈希表实现，内存集中分配以利用缓存。插入时可能触发扩容和数据搬运。遍历速度快。允许重复 key 时，`equal_range` 返回 `local_iterator`，仅支持 `erase` 操作。提供 `map`/`set`/`multimap`/`multiset` 变体。
 
-基于B+树的节点管理策略实现<br/>
-内存管理使用相同大小内存块<br/>
-任意位置插入/删除成本都很低<br/>
+### segment_array
 
-<br/>
-<br/>
+基于 B+ 树节点管理策略实现，内存管理使用固定大小内存块。任意位置插入/删除成本均较低。
 
-* sbtree.natvis
-* bpptree.natvis
-* chash.natvis
-* segment_array.natvis
+### sparse_array
 
-加入到工程,调试时候有更友好的视图<br/>
-custom views of native<br/>
+稀疏数组，仅存储非零区间，未设置的位置隐式为零值。内部使用自定义 `handle` 抽象的内存管理，以 RB 树管理非零区间。适合存储下标范围大、稀疏度高的数据集合。支持自定义内存分配器（`config_t`）。
 
-<br/>
-<br/>
-<br/>
+## 工具
 
-* split_iterator
+### split_iterator
 
-迭代器方式进行split<br/>
-适配std::string<br/>
-不需要额外的内存存储split后的数据<br/>
-提供了size(),惰性计算,不推荐使用<br/>
-提供了operator\[index\],从头扫描实现,不推荐使用<br/>
-**请保证**传入的字符串的有效期,split过程中不会拷贝字符串<br/>
-string_ref实现**不完整**,提供了to_value<>替换ato?接口<br/>
+以迭代器方式进行字符串分割，不需要额外内存存储分割后的数据。注意：传入字符串在 split 过程中不会被拷贝，调用方需保证字符串的有效期。
 
-<br/>
+提供 `size()`（惰性计算，不推荐）和 `operator[]`（从头扫描，不推荐）。
 
-* sparse_array.h
+C++17 起 `string_ref` 使用 `std::string_view`，C++14 下为自有轻量实现。提供 `to_value<T>()` 自由函数替换 `atoi`/`atof` 系列接口。C++17 起 `string_to_integer`/`string_to_real` 使用 `std::from_chars`，无 locale 依赖。
 
-稀松数组...不成熟的玩意...<br/>
+## 调试视图
 
-<br/>
+| 组件 | Natvis | GDB pretty-printer |
+|---|---|---|
+| `sbtree` | `sbtree.natvis` | `sbtree_printer.py` |
+| `bpptree` | `bpptree.natvis` | `bpptree_printer.py` |
+| `chash` | `chash.natvis` | `chash_printer.py` |
+| `segment_array` | `segment_array.natvis` | `segment_array_printer.py` |
+| `sparse_array` | `sparse_array.natvis` | `sparse_array_printer.py` |
 
+Natvis 文件加入工程即可在 MSVC / CLion 中生效；GDB pretty-printer 在 GDB 中 `source <file>.py` 加载。
 
-#特性比较
+## C++ Standard Support
+
+| Component | C++14 | C++17 | C++20 |
+|---|---|---|---|
+| `bpptree.h` | ✅ | ✅ | ✅ |
+| `segment_array.h` | ✅ | ✅ | ✅ |
+| `chash.h` / `chash_map.h` / `chash_set.h` | ✅ | ✅ | ✅ |
+| `sbtree.h` | ✅ | ✅ | ✅ |
+| `sparse_array.h` | ✅ | ✅ | ✅ |
+| `split_iterator.h` | ✅ | ✅ | ✅ |
+
+## 特性比较
+
 ![features.png](/profile/features.png)
 
+## 性能测试
 
-#性能测试
-各种容器的测试
+各种容器的测试。
 
-<br/>
+OSX 10.11.3 (15D21)、Xcode 7.1.1 (7B1005)、2.5 GHz Intel Core i7、16 GB 1600 MHz DDR3。
 
-OSX 10.11.3 (15D21)<br/>
-XCode 7.1.1 (7B1005)<br/>
-2.5 GHz Intel Core i7<br/>
-16 GB 1600 MHz DDR3<br/>
+- 测试采用预先随机好的随机数 5 组，测试结果取平均值
+- 横轴为容器元素数量
+- 纵轴为平均每个元素耗费时间（纳秒）
+- 后面的数字表示 key 大小（字节）
 
-<br/>
+操作说明：
 
-* 测试采用与预先随机好的随机数5组,测试结果取平均值
-* 横轴为容器元素数量
-* 纵轴为平均每个元素耗费时间(纳秒)
-* 后面的数字表示key大小(字节)
+| 缩写 | 含义 |
+|---|---|
+| `insert_o` | 顺序插入 |
+| `insert_r` | 随机插入 |
+| `foreach` | 遍历 |
+| `find` | 查找 |
+| `erase` | 删除 |
 
-<br/>
+容器缩写对照：
 
-* insert_o -> 顺序插入
-* insert_r -> 随机插入
-* foreach -> 遍历
-* find -> 查找
-* erase -> 删除
+| 实现 | 缩写 |
+|---|---|
+| `std::set` | `std_set` |
+| `std::unordered_set` | `std_hash` |
+| `chash_set` | `chash_set` |
+| `bpptree_set` | `bpptree_set` |
+| `std::multiset` | `std_mset` |
+| `std::unordered_multiset` | `std_mhash` |
+| `chash_multiset` | `chash_mset` |
+| `sbtree_multiset` | `sbtree_mset` |
+| `bpptree_multiset` | `bpptree_mset` |
 
-<br/>
+更详细的表格：
 
-* std::set                -> std_set     
-* std::unordered_set      -> std_hash    
-* chash_set               -> chash_set   
-* bpptree_set             -> bpptree_set 
-* std::multiset           -> std_mset    
-* std::unordered_multiset -> std_mhash   
-* chash_multiset          -> chash_mset  
-* sbtree_multiset         -> sbtree_mset 
-* bpptree_multiset        -> bpptree_mset
-
-<br/>
-
-更详细的表格:
-
-* [Mac](/profile/profile1.xlsx?raw=true)
-* [iPhone](/profile/profile2.xlsx?raw=true)
-
-<br/>
+- [Mac](/profile/profile1.xlsx?raw=true)
+- [iPhone](/profile/profile2.xlsx?raw=true)
 
 ![profile.png](/profile/profile.png)

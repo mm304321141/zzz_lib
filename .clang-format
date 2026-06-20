@@ -1,0 +1,39 @@
+---
+Language: Cpp
+BasedOnStyle: Microsoft
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+BreakBeforeBraces: Allman
+ColumnLimit: 0
+PointerAlignment: Right
+ReferenceAlignment: Right
+NamespaceIndentation: All
+IndentAccessModifiers: false
+AccessModifierOffset: -4
+SortIncludes: Never
+FixNamespaceComments: false
+SpaceBeforeParens: Never
+SpaceBeforeAssignmentOperators: true
+SpacesInAngles: Never
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceAfterTemplateKeyword: false
+SpaceAroundPointerQualifiers: Default
+Cpp11BracedListStyle: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: true
+BinPackParameters: true
+AlwaysBreakTemplateDeclarations: No
+PenaltyExcessCharacter: 1000000
+SpaceBeforeCpp11BracedList: false
+SpacesInContainerLiterals: false
+KeepEmptyLines:
+  AtStartOfFile: true
+  AtStartOfBlock: true
+  AtEndOfFile: false
+CommentPragmas: '^ ?(full|empty|range|copy|move|initializer list|destructor|single element|with hint|reverse index|if\(|rank\()'
+...

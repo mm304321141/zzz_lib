@@ -14,27 +14,16 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 
-# =========================
 # Operating System Files
-# =========================
-
-# OSX
-# =========================
-
 .DS_Store
 .AppleDouble
 .LSOverride
-
-# Icon must ends with two \r.
-Icon
-
-# Thumbnails
+Icon?
 ._*
-
-# Files that might appear on external disk
 .Spotlight-V100
 .Trashes
 
+# Visual Studio
 *.sdf
 *.suo
 *.user
@@ -53,3 +42,26 @@ Icon
 *.ilk
 *.iobj
 *.ipdb
+
+# Build outputs
+build/
+build-*/
+*.o
+*.a
+*.so
+*.dylib
+
+# IDE
+.idea/
+.vscode/
+*.xcodeproj/
+*.xcworkspace/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Misc
+*.DS_Store
