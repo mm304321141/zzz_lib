@@ -2,7 +2,6 @@
 
 #include "chash.h"
 
-
 template<class key_t, class unique_t, class hasher_t, class key_equal_t, class allocator_t>
 struct chash_set_config_t
 {
@@ -13,7 +12,11 @@ struct chash_set_config_t
     typedef key_equal_t key_equal;
     typedef allocator_t allocator_type;
     typedef std::uintptr_t offset_type;
+#if __cplusplus >= 201703L
+    typedef typename std::invoke_result<hasher, key_type>::type hash_value_type;
+#else
     typedef typename std::result_of<hasher(key_type)>::type hash_value_type;
+#endif
     typedef unique_t unique_type;
     static float grow_proportion(std::size_t)
     {

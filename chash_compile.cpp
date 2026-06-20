@@ -12,7 +12,7 @@ template<class T> void foo_test(T &hs)
     typename O::hasher h;
     typename O::key_equal ke;
     typename O::allocator_type a;
-    typename O::key_type k;
+    typename O::key_type k{};
     typename O::value_type v;
     O o, oo;
     auto b = hs.cbegin();
