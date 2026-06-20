@@ -1,23 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
   <Type Name="segment_array_implement&lt;*&gt;">
-    <DisplayString>{{ size={root_.parent-&gt;size} }}</DisplayString>
+    <DisplayString>{{ size={root_.size} }}</DisplayString>
     <Expand>
       <Item Name="[allocator]" ExcludeView="simple">(node_allocator_t &amp;)root_</Item>
       <Item Name="[raw]">root_</Item>
-      <CustomListItems Condition="root_.parent-&gt;size != 0">
-        <Variable InitialValue="root_.left" Name="node"/>
+      <CustomListItems Condition="root_.size != 0" Size="root_.size">
+        <Variable InitialValue="(leaf_node_t *)root_.left" Name="leaf"/>
         <Variable InitialValue="0" Name="where"/>
         <Variable InitialValue="0" Name="index"/>
+        <Variable InitialValue="0" Name="inner_index"/>
+        <Variable InitialValue="(((leaf_node_t *)root_.left)-&gt;parent == (node_t *)&amp;root_) ? root_.size : ((inner_node_t *)((leaf_node_t *)root_.left)-&gt;parent)-&gt;children[0].size" Name="leaf_size"/>
         <Loop>
-          <If Condition="where &gt;= node-&gt;size">
-            <Exec>node = ((leaf_node_t *)node)-&gt;next</Exec>
-            <Exec>where = 0</Exec>
-          </If>
-          <If Condition="node-&gt;size == 0">
+          <If Condition="index &gt;= root_.size">
             <Break/>
           </If>
-          <Item Name="[{index}]">((leaf_node_t *)node)-&gt;item[where]</Item>
+          <If Condition="where &gt;= leaf_size">
+            <If Condition="leaf-&gt;next-&gt;parent == leaf-&gt;parent">
+              <Exec>++inner_index</Exec>
+            </If>
+            <Else>
+              <Exec>inner_index = 0</Exec>
+            </Else>
+            <Exec>leaf = (leaf_node_t *)leaf-&gt;next</Exec>
+            <If Condition="leaf-&gt;parent == (node_t *)leaf">
+              <Break/>
+            </If>
+            <Exec>where = 0</Exec>
+            <Exec>leaf_size = (leaf-&gt;parent == (node_t *)&amp;root_) ? root_.size : ((inner_node_t *)leaf-&gt;parent)-&gt;children[inner_index].size</Exec>
+          </If>
+          <Item Name="[{index}]">leaf-&gt;item[where]</Item>
           <Exec>++where</Exec>
           <Exec>++index</Exec>
         </Loop>
@@ -28,48 +40,42 @@
     <AlternativeType Name="segment_array_implement&lt;*&gt;::const_iterator" />
     <AlternativeType Name="segment_array_implement&lt;*&gt;::reverse_iterator" />
     <AlternativeType Name="segment_array_implement&lt;*&gt;::const_reverse_iterator" />
-    <DisplayString Condition="node-&gt;size != 0">{((leaf_node_t *)node)-&gt;item[where]}</DisplayString>
-    <DisplayString Condition="node-&gt;size == 0">end</DisplayString>
+    <DisplayString Condition="node-&gt;parent != node">{((leaf_node_t *)node)-&gt;item[where]}</DisplayString>
+    <DisplayString Condition="node-&gt;parent == node">end</DisplayString>
     <Expand>
-      <Item Condition="node-&gt;size != 0" Name="[ptr]">((leaf_node_t *)node)-&gt;item[where]</Item>
+      <Item Condition="node-&gt;parent != node" Name="[ptr]">((leaf_node_t *)node)-&gt;item[where]</Item>
+      <Item Condition="node-&gt;parent != node" Name="[leaf_bound_]">leaf_bound_</Item>
+      <Item Condition="node-&gt;parent != node" Name="[inner_index_]">inner_index_</Item>
     </Expand>
   </Type>
-  <Type Name="segment_array_implement&lt;*&gt;::key_stack_t">
-    <DisplayString Condition="true">{*(key_type *)&amp;key_pod}</DisplayString>
-  </Type>
   <Type Name="segment_array_implement&lt;*&gt;::node_t">
-    <DisplayString Condition="size == 0">{{ root:size={parent-&gt;size} }}</DisplayString>
-    <DisplayString Condition="level != 0 &amp;&amp; size != 0">{{ inner:size={size},used={((inner_node_t *)this)-&gt;used} }}</DisplayString>
-    <DisplayString Condition="level == 0 &amp;&amp; size != 0 ">{{ leaf:size={size} }}</DisplayString>
+    <DisplayString Condition="parent == this">{{ root:size={((root_node_t *)this)-&gt;size} }}</DisplayString>
+    <DisplayString Condition="level != 0 &amp;&amp; parent != this">{{ inner:level={level} }}</DisplayString>
+    <DisplayString Condition="level == 0 &amp;&amp; parent != this">{{ leaf:level=0 }}</DisplayString>
     <Expand>
-      <Item Name="[size]">size</Item>
-      <Item Name="[root]" Condition="size == 0 &amp;&amp; parent-&gt;size > 0">((root_node_t *)this)-&gt;parent</Item>
-      <Item Name="[most left]" Condition="size == 0 &amp;&amp; parent-&gt;size > 0">((root_node_t *)this)-&gt;left</Item>
-      <Item Name="[most right]" Condition="size == 0 &amp;&amp; parent-&gt;size > 0">((root_node_t *)this)-&gt;right</Item>
-      <Item Name="[bound]" Condition="level != 0 &amp;&amp; size != 0">((inner_node_t *)this)-&gt;used</Item>
-      <Item Name="[bound]" Condition="level == 0 &amp;&amp; size != 0">size</Item>
-      <Item Name="[prev]" Condition="level == 0 &amp;&amp; size != 0">((leaf_node_t *)this)-&gt;prev</Item>
-      <Item Name="[next]" Condition="level == 0 &amp;&amp; size != 0">((leaf_node_t *)this)-&gt;next</Item>
-      <CustomListItems Condition="level != 0 &amp;&amp; size != 0">
-        <Variable InitialValue="0" Name="index"/>
+      <Item Name="[size]" Condition="parent == this">((root_node_t *)this)-&gt;size</Item>
+      <Item Name="[left]" Condition="parent == this">((root_node_t *)this)-&gt;left</Item>
+      <Item Name="[right]" Condition="parent == this">((root_node_t *)this)-&gt;right</Item>
+      <Item Name="[root_tree]" Condition="parent == this">parent</Item>
+      <Item Name="[level]" Condition="level != 0 &amp;&amp; parent != this">level</Item>
+      <CustomListItems Condition="level != 0 &amp;&amp; parent != this">
+        <Variable InitialValue="0" Name="i"/>
+        <Variable InitialValue="sizeof(((inner_node_t *)this)-&gt;children) / sizeof(((inner_node_t *)this)-&gt;children[0])" Name="cap"/>
         <Loop>
-          <If Condition="index &gt; ((inner_node_t *)this)-&gt;used">
+          <If Condition="i &gt;= cap">
             <Break/>
           </If>
-          <Item Name="[{index}]">((inner_node_t *)this)-&gt;children[index]</Item>
-          <Exec>++index</Exec>
-        </Loop>
-      </CustomListItems>
-      <CustomListItems Condition="level == 0 &amp;&amp; size != 0">
-        <Variable InitialValue="0" Name="index"/>
-        <Loop>
-          <If Condition="index &gt;= ((leaf_node_t *)this)-&gt;size">
+          <If Condition="((inner_node_t *)this)-&gt;children[i].ptr == 0">
             <Break/>
           </If>
-          <Item Name="[{index}]">((leaf_node_t *)this)-&gt;item[index]</Item>
-          <Exec>++index</Exec>
+          <Item Name="[child {i}]">((inner_node_t *)this)-&gt;children[i].ptr</Item>
+          <Item Name="[child_size {i}]">((inner_node_t *)this)-&gt;children[i].size</Item>
+          <Exec>++i</Exec>
         </Loop>
       </CustomListItems>
+      <Item Name="[level]" Condition="level == 0 &amp;&amp; parent != this">0</Item>
+      <Item Name="[prev]" Condition="level == 0 &amp;&amp; parent != this">((leaf_node_t *)this)-&gt;prev</Item>
+      <Item Name="[next]" Condition="level == 0 &amp;&amp; parent != this">((leaf_node_t *)this)-&gt;next</Item>
     </Expand>
   </Type>
 </AutoVisualizer>
