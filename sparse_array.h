@@ -4,27 +4,31 @@
 #include <algorithm>
 #include <cstring>
 #include <cassert>
+#include <cstdlib>
+#include <new>
+#include <type_traits>
+#include <utility>
 
 struct sparse_array_default_config
 {
     typedef void *handle_t;
     enum
     {
-        memory_size = 512,  //内存是按块分配,这里定义每个内存块大小(类型不同,最小值也不同,过小编译报错)
-        atomic_length = 4,  //最小连续数据长度(类型不同,最小值也不同,过小编译报错)
-        invalid_handle = 0, //非法内存句柄(可以认为是nil)
+        memory_size = 512,  // 内存是按块分配,这里定义每个内存块大小(类型不同,最小值也不同,过小编译报错)
+        atomic_length = 4,  // 最小连续数据长度(类型不同,最小值也不同,过小编译报错)
+        invalid_handle = 0, // 非法内存句柄(可以认为是nil)
     };
-    //分配一块memory_size长度的内存
+    // 分配一块memory_size长度的内存
     handle_t alloc()
     {
         return ::malloc(memory_size);
     }
-    //回收一块已分配的内存
+    // 回收一块已分配的内存
     void dealloc(handle_t handle)
     {
         ::free(handle);
     }
-    //从内存句柄得到内存地址
+    // 从内存句柄得到内存地址
     void *get(handle_t handle)
     {
         return handle;
@@ -43,7 +47,7 @@ public:
         atomic_length = config_t::atomic_length,
         invalid_handle = config_t::invalid_handle,
     };
-    //内存片段
+    // 内存片段
     struct sparse_range
     {
         uint32_t index;
@@ -51,7 +55,7 @@ public:
         uint16_t offset;
         handle_t handle;
     };
-    //红黑树节点
+    // 红黑树节点
     struct sparse_range_set_base
     {
         handle_t parent_handle;
@@ -61,7 +65,7 @@ public:
         uint32_t nil : 1;
         uint32_t length : 30;
     };
-    //数据
+    // 数据
     struct dump_data
     {
         handle_t parent_handle;
@@ -73,7 +77,7 @@ public:
         uint16_t free_offset;
         uint16_t free_cross;
     };
-    //红黑树根节点+内存适配器
+    // 红黑树根节点+内存适配器
     class sparse_range_tree
     {
     public:
@@ -105,26 +109,27 @@ public:
         {
             return root_.get(handle);
         }
+
     private:
         struct sparse_range_root : public sparse_range_set_base, public config_t
         {
         };
         mutable sparse_range_root root_;
     };
-    //红黑树数据节点,内存片段集合(数据是有序的)
+    // 红黑树数据节点,内存片段集合(数据是有序的)
     struct sparse_range_set : public sparse_range_set_base
     {
         uint32_t end;
         sparse_range begin[1];
     };
-    //空闲内存链表
+    // 空闲内存链表
     struct memory_blcok_free
     {
         handle_t handle;
         uint16_t offset;
         uint16_t cross;
     };
-    //数据块元素(数据/空闲链表节点)
+    // 数据块元素(数据/空闲链表节点)
     struct memory_block_data
     {
         union
@@ -133,7 +138,7 @@ public:
             memory_blcok_free free;
         };
     };
-    //数据块
+    // 数据块
     struct memory_block
     {
         handle_t next_handle;
@@ -153,12 +158,12 @@ public:
     };
     enum
     {
-        //每个片段集合有多少个片段
+        // 每个片段集合有多少个片段
         range_length = (memory_size - sizeof(sparse_range_set)) / sizeof(sparse_range) + 1,
-        //每个数据块有多少个元素
+        // 每个数据块有多少个元素
         block_length = (memory_size - sizeof(memory_block)) / sizeof(memory_block_data) + 1,
     };
-    //operator[]代理
+    // operator[]代理
     class index_proxy
     {
     public:
@@ -166,12 +171,12 @@ public:
         {
             return self_.get(index_);
         }
-        index_proxy const &operator = (value_t const &value) const
+        index_proxy const &operator=(value_t const &value) const
         {
             self_.set(index_, value);
             return *this;
         }
-        index_proxy const &operator = (index_proxy const &other) const
+        index_proxy const &operator=(index_proxy const &other) const
         {
             self_.set(index_, other.self_.get(other.index_));
             return *this;
@@ -179,6 +184,8 @@ public:
         index_proxy(uint32_t index, self_t &self) : index_(index), self_(self)
         {
         }
+        index_proxy(index_proxy const &) = default;
+
     private:
         uint32_t index_;
         self_t &self_;
@@ -193,8 +200,8 @@ public:
         static_assert(sizeof(value_t) * atomic_length >= sizeof(memory_blcok_free), "low atomic_length");
         block_handle_ = handle_t(invalid_handle);
         free_.handle = handle_t(invalid_handle);
-        //free_.offset = 0;
-        //free_.cross = 0;
+        // free_.offset = 0;
+        // free_.cross = 0;
         index_tree_.root()->length = 0;
         rb_set_nil_(rb_nil_(), true);
         rb_set_root_(rb_nil_());
@@ -203,16 +210,16 @@ public:
     }
     ~sparse_array()
     {
-        for(handle_t rb_it = rb_get_most_left_(); rb_it != rb_nil_(); )
+        for(handle_t rb_it = rb_get_most_left_(); rb_it != rb_nil_();)
         {
-            //非POD对象,没必要析构
-            if(!std::is_pod<value_t>::value)
+            // 平凡析构类型,没必要逐个析构
+            if(!std::is_trivially_destructible<value_t>::value)
             {
                 sparse_range_set *range_set = deref_<sparse_range_set>(rb_it);
                 for(sparse_range *range = range_set->begin, *range_end = range + range_set->end; range != range_end; ++range)
                 {
                     memory_block_data *data = deref_<memory_block>(range->handle)->data + range->offset;
-                    for(value_t *it = data->data, *end = it + atomic_length; it != end; ++it)
+                    for(value_t *it = data->data, *end = it + range->length; it != end; ++it)
                     {
                         it->~value_t();
                     }
@@ -231,17 +238,50 @@ public:
         }
     }
 
-    //内存适配器
+    // 禁止拷贝(隐式浅拷贝会导致 double-free)
+    sparse_array(self_t const &) = delete;
+    self_t &operator=(self_t const &) = delete;
+
+    //move构造(转移所有成员,源对象置为合法空状态)
+    sparse_array(self_t &&other) noexcept
+        : index_tree_()
+    {
+        // 转移allocator(config_t部分)
+        index_tree_.allocator() = std::move(other.index_tree_.allocator());
+        // 转移红黑树头状态(root/most_left/most_right/length/nil等)
+        *index_tree_.root() = *other.index_tree_.root();
+        block_handle_ = other.block_handle_;
+        free_ = other.free_;
+        // 将源对象恢复到与默认构造后完全一致的状态
+        other.block_handle_ = handle_t(invalid_handle);
+        other.free_.handle = handle_t(invalid_handle);
+        other.rb_clear_();
+        other.index_tree_.root()->length = 0;
+        other.index_tree_.root()->nil = 1;
+    }
+
+    //move赋值(先释放自身资源再接管,确保不泄漏不双重释放)
+    self_t &operator=(self_t &&other) noexcept
+    {
+        if(this != &other)
+        {
+            self_t::~sparse_array();
+            ::new(this) self_t(std::move(other));
+        }
+        return *this;
+    }
+
+    // 内存适配器
     config_t const &allocator() const
     {
         return index_tree_.allocator();
     }
-    //内存适配器
+    // 内存适配器
     config_t &allocator()
     {
         return index_tree_.allocator();
     }
-    //dump(配合allocator,请自己保存allocator状态)
+    // dump(配合allocator,请自己保存allocator状态)
     dump_data dump() const
     {
         dump_data d;
@@ -255,7 +295,7 @@ public:
         d.free_cross = free_.cross;
         return d;
     }
-    //load_dump(配合allocator,load后恢复allocator状态)
+    // load_dump(配合allocator,load后恢复allocator状态)
     void load_dump(dump_data const &d)
     {
         clear();
@@ -268,7 +308,7 @@ public:
         free_.offset = d.free_offset;
         free_.cross = d.free_cross;
     }
-    //元素数量(这里不是真正数量,实际没有什么上限,这里只是对齐后的最大下标
+    // 元素数量(这里不是真正数量,实际没有什么上限,这里只是对齐后的最大下标
     uint32_t size() const
     {
         if(rb_is_nil_(rb_get_root_()))
@@ -277,10 +317,12 @@ public:
         }
         else
         {
-            return deref_<sparse_range_set>(rb_get_most_right_())->max_index;
+            sparse_range_set *rs = deref_<sparse_range_set>(rb_get_most_right_());
+            sparse_range *last = rs->begin + rs->end - 1;
+            return last->index + last->length;
         }
     }
-    //获取元素
+    // 获取元素
     value_t get(uint32_t index) const
     {
         sparse_range *range = find_index_(index, NULL);
@@ -290,7 +332,7 @@ public:
         }
         return deref_<memory_block>(range->handle)->data[range->offset].data[index - range->index];
     }
-    //添加元素
+    // 添加元素
     void set(uint32_t index, value_t const &value)
     {
         handle_t find;
@@ -304,11 +346,10 @@ public:
             create_new_range_(find, index, &value, 1);
         }
     }
-    //批量获取元素
+    // 批量获取元素
     void get_multi(uint32_t index, value_t *out_arr, uint32_t length) const
     {
         assert(length == 0 || out_arr != NULL);
-        assert(length >= 0);
         if(length == 0)
         {
             return;
@@ -337,11 +378,10 @@ public:
             out_arr += copy_length;
         }
     }
-    //批量设置元素
+    // 批量设置元素
     void set_multi(uint32_t index, value_t const *in_arr, uint32_t length)
     {
         assert(length == 0 || in_arr != NULL);
-        assert(length >= 0);
         if(length == 0)
         {
             return;
@@ -408,30 +448,30 @@ public:
             }
         }
     }
-    //清空
+    // 清空
     void clear()
     {
         self_t::~sparse_array();
         ::new(this) self_t();
     }
-    //擦除部分区间
+    // 擦除部分区间
     void clear(uint32_t index, uint32_t length)
     {
         erase_index_range_(index, length);
     }
-    //下标方式访问
+    // 下标方式访问
     value_t operator[](uint32_t index) const
     {
         return get(index);
     }
-    //下标方式访问
+    // 下标方式访问
     index_proxy operator[](uint32_t index)
     {
         return index_proxy(index, *this);
     }
 
 private:
-    //从片段集合树中找到片段
+    // 从片段集合树中找到片段
     sparse_range *find_index_(uint32_t index, handle_t *out_handle) const
     {
         handle_t find = rb_special_bound_(index);
@@ -457,7 +497,7 @@ private:
         }
         return range;
     }
-    //分配一个数据块
+    // 分配一个数据块
     handle_t alloc_block_(memory_block **out_block)
     {
         handle_t new_handle = index_tree_.alloc();
@@ -475,7 +515,7 @@ private:
         }
         return block_handle_;
     }
-    //回收一个数据块
+    // 回收一个数据块
     void dealloc_block_(handle_t handle)
     {
         memory_block *block = deref_<memory_block>(handle);
@@ -493,7 +533,7 @@ private:
         }
         index_tree_.dealloc(handle);
     }
-    //分配一块内存(优先匹配合适大小,找不到就拆分大内存,再找不到就开辟新内存块)
+    // 分配一块内存(优先匹配合适大小,找不到就拆分大内存,再找不到就开辟新内存块)
     void alloc_(uint32_t cross, handle_t &out_handle, uint16_t &out_offset)
     {
         assert(cross >= 1);
@@ -548,7 +588,7 @@ private:
             index_tree_.root()->length -= cross;
         }
     }
-    //回收一块内存(优先合并到相邻内存)
+    // 回收一块内存(优先合并到相邻内存)
     void dealloc_(handle_t handle, uint16_t offset, uint32_t cross)
     {
         assert(cross >= 1);
@@ -589,7 +629,7 @@ private:
         free_.offset = offset;
         free_.cross = cross;
     }
-    //真正的批量设置元素(前面的set_multi会过滤掉为默认值的元素)
+    // 真正的批量设置元素(前面的set_multi会过滤掉为默认值的元素)
     void set_multi_without_check_(uint32_t index, value_t const *in_arr, uint32_t length)
     {
         handle_t find;
@@ -617,7 +657,7 @@ private:
             in_arr += copy_length;
         }
     }
-    //擦除一段数据(恢复到默认值)
+    // 擦除一段数据(恢复到默认值)
     void erase_index_range_(uint32_t index, uint32_t length)
     {
         handle_t find;
@@ -672,8 +712,8 @@ private:
         }
         return where;
     }
-    
-    //创建一个新的片段
+
+    // 创建一个新的片段
     void create_new_range_(handle_t where, uint32_t index, value_t const *arr, uint32_t length)
     {
         assert(index % atomic_length + length <= atomic_length);
@@ -681,19 +721,18 @@ private:
         {
             return;
         }
-        sparse_range range_insert =
-        {
-            index - index % atomic_length, atomic_length
+        sparse_range range_insert = {
+            index - index % atomic_length, atomic_length, 0, handle_t(invalid_handle)
         };
         alloc_(1, range_insert.handle, range_insert.offset);
         memory_block_data *data = deref_<memory_block>(range_insert.handle)->data + range_insert.offset;
         init_range_data_(data->data + (index - range_insert.index), data->data, data->data + atomic_length, arr, length);
         insert_range_(where, &range_insert);
     }
-    //初始化片段数据
+    // 初始化片段数据
     void init_range_data_(value_t *ptr, value_t *begin, value_t *end, value_t const *arr, uint32_t length)
     {
-        for(value_t *it = begin; it != end; )
+        for(value_t *it = begin; it != end;)
         {
             if(it == ptr)
             {
@@ -709,8 +748,8 @@ private:
             }
         }
     }
-    //调整片段头部大小
-    void adjust_range_head_(handle_t handle, sparse_range *range, int32_t change)
+    // 调整片段头部大小
+    void adjust_range_head_(handle_t, sparse_range *range, int32_t change)
     {
         assert(change != 0);
         assert(range->length / atomic_length + change >= 1);
@@ -747,8 +786,8 @@ private:
         adjust.length += change * atomic_length;
         *range = adjust;
     }
-    //调整片段尾部大小
-    void adjust_range_tail_(handle_t handle, sparse_range *range, int32_t change)
+    // 调整片段尾部大小
+    void adjust_range_tail_(handle_t, sparse_range *range, int32_t change)
     {
         assert(change != 0);
         assert(range->length / atomic_length + change >= 1);
@@ -784,7 +823,7 @@ private:
         adjust.length += change * atomic_length;
         *range = adjust;
     }
-    //尝试合并数据到相邻的片段
+    // 尝试合并数据到相邻的片段
     bool merge_range_(uint32_t index, value_t const *arr, uint32_t length)
     {
         uint32_t fix_index = index - index % atomic_length;
@@ -800,7 +839,7 @@ private:
             find_before = handle_t(invalid_handle);
         }
         range_after = find_index_(fix_index + atomic_length, &find_after);
-        if(range_before != NULL && range_after != NULL && range_before->length + atomic_length + range_after->length <= block_length * atomic_length)
+        if(range_before != NULL && range_after != NULL && range_before->length + atomic_length + range_after->length <= int(block_length) * atomic_length)
         {
             sparse_range before = *range_before;
             adjust_range_tail_(find_before, range_before, (atomic_length + range_after->length) / atomic_length);
@@ -816,7 +855,7 @@ private:
             remove_range_(find_after, range_after);
             return true;
         }
-        if(range_before != NULL && range_before->length + atomic_length <= block_length * atomic_length)
+        if(range_before != NULL && range_before->length + atomic_length <= int(block_length) * atomic_length)
         {
             sparse_range before = *range_before;
             adjust_range_tail_(find_before, range_before, 1);
@@ -824,7 +863,7 @@ private:
             init_range_data_(to + (index - fix_index), to, to + atomic_length, arr, length);
             return true;
         }
-        if(range_after != NULL && range_after->length + atomic_length <= block_length * atomic_length)
+        if(range_after != NULL && range_after->length + atomic_length <= int(block_length) * atomic_length)
         {
             adjust_range_head_(find_after, range_after, 1);
             value_t *to = deref_<memory_block>(range_after->handle)->data[range_after->offset].data;
@@ -833,7 +872,7 @@ private:
         }
         return false;
     }
-    //拆分片段集合,2/3
+    // 拆分片段集合,2/3
     void split_range_set_(handle_t where_left, handle_t where_right)
     {
         sparse_range_set *range_set_left = deref_<sparse_range_set>(where_left);
@@ -852,7 +891,7 @@ private:
         std::memmove(range_set_right->begin, range_set_right->begin + move_size, range_set_right->end * sizeof(sparse_range));
         rb_insert_(handle);
     }
-    //拆分片段集合,1/2
+    // 拆分片段集合,1/2
     void split_range_set_(handle_t where)
     {
         sparse_range_set *range_set_left = deref_<sparse_range_set>(where);
@@ -867,7 +906,7 @@ private:
         range_set->end = move_size;
         rb_insert_(handle);
     }
-    //插入一块片段
+    // 插入一块片段
     void insert_range_(handle_t where, sparse_range *range)
     {
         if(rb_is_nil_(rb_get_root_()))
@@ -947,7 +986,7 @@ private:
         }
         set_insert_range_(range_set, range);
     }
-    //强制插入片段
+    // 强制插入片段
     void set_insert_range_(sparse_range_set *range_set, sparse_range *range)
     {
         sparse_range *const end = range_set->begin + range_set->end;
@@ -959,7 +998,7 @@ private:
         *where = *range;
         ++range_set->end;
     }
-    //合并片段集合
+    // 合并片段集合
     void merge_range_set_(handle_t left, handle_t right)
     {
         sparse_range_set *range_set_left = deref_<sparse_range_set>(left);
@@ -969,7 +1008,7 @@ private:
         rb_erase_(right);
         index_tree_.dealloc(right);
     }
-    //移除一个片段
+    // 移除一个片段
     void remove_range_(handle_t where, sparse_range *range)
     {
         dealloc_(range->handle, range->offset, range->length / atomic_length);
@@ -992,7 +1031,7 @@ private:
             if(left != rb_nil_())
             {
                 range_set_left = deref_<sparse_range_set>(left);
-                if(range_set_left->end >range_length / 2)
+                if(range_set_left->end > range_length / 2)
                 {
                     sparse_range *back_range = range_set_left->begin + range_set_left->end - 1;
                     set_insert_range_(range_set, back_range);
@@ -1060,13 +1099,13 @@ private:
         }
         --range_set->end;
     }
-    //从句柄得到对象
+    // 从句柄得到对象
     template<typename T> T *deref_(handle_t handle) const
     {
         assert(handle != handle_t(invalid_handle));
         return static_cast<T *>(index_tree_.deref(handle));
     }
-    //红黑树节点
+    // 红黑树节点
     sparse_range_set_base const *rb_deref_(handle_t handle) const
     {
         return handle == handle_t(invalid_handle) ? (sparse_range_set_base const *)&index_tree_ : (sparse_range_set_base const *)deref_<sparse_range_set>(handle);
@@ -1557,10 +1596,10 @@ private:
     }
 
 private:
-    //索引树
+    // 索引树
     sparse_range_tree index_tree_;
-    //数据链表(纯粹为了析构)
+    // 数据链表(纯粹为了析构)
     handle_t block_handle_;
-    //空闲数据链表
+    // 空闲数据链表
     memory_blcok_free free_;
 };

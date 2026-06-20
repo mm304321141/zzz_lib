@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <!--
+    sparse_array<value_t, config_t>
+
+    Layout used by this visualizer (default handle_t == void *):
+      - index_tree_.root_ is the red-black "nil" sentinel; its handle is
+        invalid_handle (0). It stores:
+          * parent_handle = tree root   (0 when the tree is empty)
+          * left_handle   = most-left   (in-order first range_set)
+          * right_handle  = most-right  (in-order last  range_set)
+      - each real tree node is a sparse_range_set: a sorted array
+        begin[0 .. end-1] of sparse_range.
+      - a sparse_range covers [index, index + length); its data lives in a
+        memory_block at `handle`, starting at slot `offset`. Consecutive
+        memory_block_data slots are contiguous, so the first slot's
+        data[] array can be indexed as a flat value_t[length].
+    The Children list performs an in-order walk of the range_set tree and,
+    for every range, expands element-by-element to value level keyed by the
+    absolute index, giving a {index: value} style map.
+  -->
+  <Type Name="sparse_array&lt;*&gt;">
+    <DisplayString Condition="index_tree_.root_.right_handle == 0">{{ sparse_array, size=0 }}</DisplayString>
+    <DisplayString>{{ sparse_array, size={((sparse_range_set *)index_tree_.root_.right_handle)-&gt;begin[((sparse_range_set *)index_tree_.root_.right_handle)-&gt;end - 1].index + ((sparse_range_set *)index_tree_.root_.right_handle)-&gt;begin[((sparse_range_set *)index_tree_.root_.right_handle)-&gt;end - 1].length} }}</DisplayString>
+    <Expand>
+      <Item Name="[allocator]" ExcludeView="simple">(config_t &amp;)index_tree_.root_</Item>
+      <Item Name="[free_length]" ExcludeView="simple">index_tree_.root_.length</Item>
+      <CustomListItems Condition="index_tree_.root_.parent_handle != 0">
+        <Variable Name="node" InitialValue="index_tree_.root_.left_handle"/>
+        <Variable Name="parent" InitialValue="index_tree_.root_.left_handle"/>
+        <Variable Name="set" InitialValue="(sparse_range_set *)0"/>
+        <Variable Name="rng" InitialValue="(sparse_range *)0"/>
+        <Variable Name="ri" InitialValue="0"/>
+        <Variable Name="vi" InitialValue="0"/>
+        <Loop>
+          <Break Condition="node == 0"/>
+          <Exec>set = (sparse_range_set *)node</Exec>
+          <Exec>ri = 0</Exec>
+          <Loop>
+            <Break Condition="ri &gt;= (int)set-&gt;end"/>
+            <Exec>rng = set-&gt;begin + ri</Exec>
+            <Exec>vi = 0</Exec>
+            <Loop>
+              <Break Condition="vi &gt;= (int)rng-&gt;length"/>
+              <Item Name="[{rng-&gt;index + vi}]">((memory_block *)rng-&gt;handle)-&gt;data[rng-&gt;offset].data[vi]</Item>
+              <Exec>vi = vi + 1</Exec>
+            </Loop>
+            <Exec>ri = ri + 1</Exec>
+          </Loop>
+          <!-- in-order successor over the red-black tree (nil == handle 0) -->
+          <If Condition="((sparse_range_set *)node)-&gt;right_handle != 0">
+            <Exec>node = ((sparse_range_set *)node)-&gt;right_handle</Exec>
+            <Loop>
+              <Break Condition="((sparse_range_set *)node)-&gt;left_handle == 0"/>
+              <Exec>node = ((sparse_range_set *)node)-&gt;left_handle</Exec>
+            </Loop>
+          </If>
+          <Else>
+            <Exec>parent = ((sparse_range_set *)node)-&gt;parent_handle</Exec>
+            <Loop>
+              <Break Condition="parent == 0"/>
+              <Break Condition="((sparse_range_set *)parent)-&gt;left_handle == node"/>
+              <Exec>node = parent</Exec>
+              <Exec>parent = ((sparse_range_set *)node)-&gt;parent_handle</Exec>
+            </Loop>
+            <Exec>node = parent</Exec>
+          </Else>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+  <Type Name="sparse_array&lt;*&gt;::sparse_range">
+    <DisplayString>{{ index={index}, length={length}, offset={offset} }}</DisplayString>
+    <Expand>
+      <Item Name="[index]">index</Item>
+      <Item Name="[length]">length</Item>
+      <Item Name="[offset]">offset</Item>
+      <Item Name="[handle]">handle</Item>
+    </Expand>
+  </Type>
+  <Type Name="sparse_array&lt;*&gt;::sparse_range_set">
+    <DisplayString>{{ ranges={end} }}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>end</Size>
+        <ValuePointer>begin</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>
