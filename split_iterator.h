@@ -1,6 +1,14 @@
 
 #pragma once
 
+#ifndef ZZZ_LIB_NODISCARD
+#if __cplusplus >= 201703L
+#define ZZZ_LIB_NODISCARD [[nodiscard]]
+#else
+#define ZZZ_LIB_NODISCARD
+#endif
+#endif
+
 #include <cstdint>
 #include <algorithm>
 #include <utility>
@@ -11,246 +19,299 @@
 #include <cmath>
 #include <iterator>
 #include <memory>
+#include <system_error>
 #if __cplusplus >= 201703L && defined(__cpp_lib_charconv)
 #include <charconv>
 #endif
 
-template<class char_t, class integer_t> integer_t string_to_integer(char_t const *s, size_t l)
+// Parses an optional leading '-' followed by a run of decimal digits and
+// returns its value.  Parsing stops at the first character that is not part of
+// the number, so a trailing remainder is allowed (matching std::from_chars).
+// On overflow or when no digit can be parsed the result is value-initialised
+// (0), mirroring how std::from_chars leaves its output untouched on failure.
+// When `status` is non-null it receives std::errc() on success,
+// std::errc::result_out_of_range on overflow and std::errc::invalid_argument
+// when no digit was consumed.
+//
+// For unsigned target types the leading '-' is *accepted* and triggers
+// modular wrap-around (the same semantics std::stoul exposes): the absolute
+// value is parsed as unsigned and then negated in modular arithmetic, so
+// "-5" yields UINT_MAX - 4 instead of an invalid_argument error.  The
+// std::from_chars implementation does not provide this behaviour for unsigned
+// types out of the box, so the C++17 path emulates it explicitly to keep
+// observable behaviour identical between the two code paths.
+//
+// The two code paths below intentionally share the exact same observable
+// contract (return value plus reported status):
+//   * C++17 and newer use std::from_chars (only for char; other character
+//     types fall through to the hand-written path even under C++17).
+//   * C++11/14 use a hand-written parser with explicit overflow detection.
+template<class char_t, class integer_t> integer_t string_to_integer(char_t const *s, size_t l, std::errc *status = nullptr)
 {
 #if __cplusplus >= 201703L && defined(__cpp_lib_charconv)
     if constexpr(std::is_same<char_t, char>::value)
     {
+        if constexpr(std::is_unsigned<integer_t>::value)
+        {
+            // std::from_chars rejects a leading '-' for unsigned targets, so
+            // emulate std::stoul by parsing the absolute value as unsigned and
+            // wrapping around (negation in modular arithmetic).
+            if(l != 0 && s[0] == '-')
+            {
+                integer_t fc_result{};
+                auto fc = std::from_chars(s + 1, s + l, fc_result);
+                if(status != nullptr)
+                {
+                    *status = fc.ec;
+                }
+                if(fc.ec != std::errc())
+                {
+                    return integer_t();
+                }
+                return integer_t(integer_t(0) - fc_result);
+            }
+        }
         integer_t fc_result{};
-        std::from_chars(s, s + l, fc_result);
+        auto fc = std::from_chars(s, s + l, fc_result);
+        if(status != nullptr)
+        {
+            *status = fc.ec;
+        }
         return fc_result;
     }
 #endif
-    integer_t result = 0;
-    if(l == 0)
+    // C++11/14 hand-written fallback.
+    // For both signed and unsigned targets we accept a leading '-': signed
+    // types negate the parsed magnitude as usual, while unsigned types perform
+    // modular wrap-around (matching std::stoul).
+    size_t neg = (l != 0 && s[0] == char_t('-')) ? 1 : 0;
+    size_t nc = neg;
+    while(nc != l && s[nc] >= char_t('0') && s[nc] <= char_t('9'))
     {
-        return result;
+        ++nc;
     }
-    size_t nc, neg = s[0] == '-' ? 1 : 0;
-    for(nc = neg; nc != l && isdigit((unsigned char)s[nc]); ++nc)
-        ;
+    if(nc == neg)
+    {
+        // No digit consumed: align with std::from_chars invalid_argument.
+        if(status != nullptr)
+        {
+            *status = std::errc::invalid_argument;
+        }
+        return integer_t();
+    }
+    typedef typename std::make_unsigned<integer_t>::type uinteger_t;
+    uinteger_t umax = uinteger_t(-1);
+    // Largest representable magnitude: the unsigned maximum for unsigned
+    // targets (wrap-around accepts the full range regardless of sign),
+    // INT_MAX for non-negative signed values and INT_MAX + 1 for negatives.
+    uinteger_t limit = std::is_unsigned<integer_t>::value ? umax : uinteger_t(uinteger_t(umax >> 1) + (neg ? uinteger_t(1) : uinteger_t(0)));
+    uinteger_t acc = 0;
     for(size_t i = neg; i != nc; ++i)
     {
-        switch(nc - i)
+        uinteger_t digit = uinteger_t(s[i] - char_t('0'));
+        if(acc > (limit - digit) / 10)
         {
-        case 19:
-            result += (s[i] - '0') * integer_t(1000000000000000000LL);
-            break;
-        case 18:
-            result += (s[i] - '0') * integer_t(100000000000000000LL);
-            break;
-        case 17:
-            result += (s[i] - '0') * integer_t(10000000000000000LL);
-            break;
-        case 16:
-            result += (s[i] - '0') * integer_t(1000000000000000LL);
-            break;
-        case 15:
-            result += (s[i] - '0') * integer_t(100000000000000LL);
-            break;
-        case 14:
-            result += (s[i] - '0') * integer_t(10000000000000LL);
-            break;
-        case 13:
-            result += (s[i] - '0') * integer_t(1000000000000LL);
-            break;
-        case 12:
-            result += (s[i] - '0') * integer_t(100000000000LL);
-            break;
-        case 11:
-            result += (s[i] - '0') * integer_t(10000000000LL);
-            break;
-        case 10:
-            result += (s[i] - '0') * integer_t(1000000000LL);
-            break;
-        case 9:
-            result += (s[i] - '0') * integer_t(100000000);
-            break;
-        case 8:
-            result += (s[i] - '0') * integer_t(10000000);
-            break;
-        case 7:
-            result += (s[i] - '0') * integer_t(1000000);
-            break;
-        case 6:
-            result += (s[i] - '0') * integer_t(100000);
-            break;
-        case 5:
-            result += (s[i] - '0') * integer_t(10000);
-            break;
-        case 4:
-            result += (s[i] - '0') * integer_t(1000);
-            break;
-        case 3:
-            result += (s[i] - '0') * integer_t(100);
-            break;
-        case 2:
-            result += (s[i] - '0') * integer_t(10);
-            break;
-        case 1:
-            result += (s[i] - '0');
-            break;
-        case 0:
-            break;
-        default:
-            break;
+            // Overflow: align with std::from_chars (output left untouched).
+            if(status != nullptr)
+            {
+                *status = std::errc::result_out_of_range;
+            }
+            return integer_t();
         }
+        acc = acc * 10 + digit;
     }
-    return neg && !std::is_unsigned<integer_t>::value ? result * -1 : result;
+    if(status != nullptr)
+    {
+        *status = std::errc();
+    }
+    return neg ? integer_t(uinteger_t(uinteger_t(0) - acc)) : integer_t(acc);
 }
 
-template<class char_t, class real_t> real_t string_to_real(char_t const *s, size_t l)
+// Parses an optional leading '-' followed by a decimal floating point number
+// ("ddd", "ddd.fff", ".fff", each with an optional 'e'/'E' exponent) and
+// returns its value.  When `status` is non-null it receives std::errc() on
+// success, std::errc::result_out_of_range on overflow/underflow and
+// std::errc::invalid_argument when no digit was consumed, and the parsed value
+// of the leading number is returned even if a trailing remainder follows
+// (matching std::from_chars).  When `status` is null the legacy contract is
+// kept: the value is returned only when the whole input is a valid number,
+// otherwise a value-initialised result (0) is returned.
+//
+// C++17 and newer use std::from_chars (only for char).  The C++11/14 fallback
+// accumulates the significant decimal digits into a 64-bit integer mantissa
+// together with a base-10 exponent and then scales the mantissa by a power of
+// ten.  For the common range (mantissa exactly representable, i.e. <= 2^53, and
+// |exponent| <= 22) the single multiply / divide by an exact power of ten is
+// correctly rounded and therefore matches std::from_chars bit-for-bit.  Outside
+// that range (more than ~15 significant digits or a large exponent) the result
+// may differ from std::from_chars by a small number of ULPs because a bit-exact
+// fallback would require big-integer arithmetic, which the no-heap / hand-written
+// constraint forbids; such inputs exceed the ~17 significant digits a double can
+// represent anyway.
+template<class char_t, class real_t> real_t string_to_real(char_t const *s, size_t l, std::errc *status = nullptr)
 {
-#if __cplusplus >= 201703L && defined(__cpp_lib_to_chars)
+#if __cplusplus >= 201703L && defined(__cpp_lib_from_chars)
     if constexpr(std::is_same<char_t, char>::value)
     {
         real_t fc_result{};
-        std::from_chars(s, s + l, fc_result);
-        return fc_result;
+        auto fc = std::from_chars(s, s + l, fc_result);
+        if(status != nullptr)
+        {
+            *status = fc.ec;
+            return fc_result;
+        }
+        if(fc.ec == std::errc() && fc.ptr == s + l)
+        {
+            return fc_result;
+        }
+        return real_t();
     }
 #endif
-    double result = 0.0;
-    if(l == 0)
+    // C++11/14 hand-written fallback.
+    // Exact powers of ten that are representable in a double without rounding.
+    static double const pow10_tab[] = { 1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22 };
+    size_t i = 0;
+    bool neg = false;
+    if(i != l && s[i] == char_t('-'))
     {
-        return real_t(result);
+        neg = true;
+        ++i;
     }
-    std::intptr_t i, nc, neg = s[0] == '-' ? 1 : 0;
-    for(nc = neg; size_t(nc) != l && (isdigit((unsigned char)s[nc]) && s[nc] != '.'); ++nc)
-        ;
-    for(i = neg; size_t(i) != l && (isdigit((unsigned char)s[i]) || s[i] == '.'); ++i)
+    uint64_t mantissa = 0;     // significant digits, at most 19 of them
+    int exp10 = 0;             // base-10 exponent to apply to the mantissa
+    int digits = 0;            // number of significant digits in `mantissa`
+    int const max_digits = 19; // a uint64_t holds up to 19 decimal digits
+    bool any_digit = false;
+    bool seen_dot = false;
+    for(; i != l; ++i)
     {
-        switch(nc - i)
+        char_t c = s[i];
+        if(c == char_t('.'))
         {
-        case 19:
-            result += (s[i] - '0') * 1000000000000000000.0;
-            break;
-        case 18:
-            result += (s[i] - '0') * 100000000000000000.0;
-            break;
-        case 17:
-            result += (s[i] - '0') * 10000000000000000.0;
-            break;
-        case 16:
-            result += (s[i] - '0') * 1000000000000000.0;
-            break;
-        case 15:
-            result += (s[i] - '0') * 100000000000000.0;
-            break;
-        case 14:
-            result += (s[i] - '0') * 10000000000000.0;
-            break;
-        case 13:
-            result += (s[i] - '0') * 1000000000000.0;
-            break;
-        case 12:
-            result += (s[i] - '0') * 100000000000.0;
-            break;
-        case 11:
-            result += (s[i] - '0') * 10000000000.0;
-            break;
-        case 10:
-            result += (s[i] - '0') * 1000000000.0;
-            break;
-        case 9:
-            result += (s[i] - '0') * 100000000.0;
-            break;
-        case 8:
-            result += (s[i] - '0') * 10000000;
-            break;
-        case 7:
-            result += (s[i] - '0') * 1000000;
-            break;
-        case 6:
-            result += (s[i] - '0') * 100000;
-            break;
-        case 5:
-            result += (s[i] - '0') * 10000;
-            break;
-        case 4:
-            result += (s[i] - '0') * 1000;
-            break;
-        case 3:
-            result += (s[i] - '0') * 100;
-            break;
-        case 2:
-            result += (s[i] - '0') * 10;
-            break;
-        case 1:
-            result += (s[i] - '0');
-            break;
-        case 0:
-            break;
-        case -1:
-            result += (s[i] - '0') * 0.1;
-            break;
-        case -2:
-            result += (s[i] - '0') * 0.01;
-            break;
-        case -3:
-            result += (s[i] - '0') * 0.001;
-            break;
-        case -4:
-            result += (s[i] - '0') * 0.0001;
-            break;
-        case -5:
-            result += (s[i] - '0') * 0.00001;
-            break;
-        case -6:
-            result += (s[i] - '0') * 0.000001;
-            break;
-        case -7:
-            result += (s[i] - '0') * 0.0000001;
-            break;
-        case -8:
-            result += (s[i] - '0') * 0.00000001;
-            break;
-        case -9:
-            result += (s[i] - '0') * 0.000000001;
-            break;
-        case -10:
-            result += (s[i] - '0') * 0.0000000001;
-            break;
-        case -11:
-            result += (s[i] - '0') * 0.00000000001;
-            break;
-        case -12:
-            result += (s[i] - '0') * 0.000000000001;
-            break;
-        case -13:
-            result += (s[i] - '0') * 0.0000000000001;
-            break;
-        case -14:
-            result += (s[i] - '0') * 0.00000000000001;
-            break;
-        case -15:
-            result += (s[i] - '0') * 0.000000000000001;
-            break;
-        case -16:
-            result += (s[i] - '0') * 0.0000000000000001;
-            break;
-        case -17:
-            result += (s[i] - '0') * 0.00000000000000001;
-            break;
-        case -18:
-            result += (s[i] - '0') * 0.000000000000000001;
-            break;
-        case -19:
-            result += (s[i] - '0') * 0.0000000000000000001;
-            break;
-        default:
-            result += (s[i] - '0') * std::pow(10, nc - i > 0 ? nc - i - 1 : nc - i);
+            if(seen_dot)
+            {
+                break;
+            }
+            seen_dot = true;
+            continue;
+        }
+        if(!(c >= char_t('0') && c <= char_t('9')))
+        {
             break;
         }
+        any_digit = true;
+        int d = int(c - char_t('0'));
+        if(mantissa == 0 && d == 0)
+        {
+            // Leading zero: it does not occupy a significant digit slot, but a
+            // leading zero in the fraction still shifts the decimal exponent.
+            if(seen_dot)
+            {
+                --exp10;
+            }
+        }
+        else if(digits < max_digits)
+        {
+            mantissa = mantissa * 10 + uint64_t(d);
+            ++digits;
+            if(seen_dot)
+            {
+                --exp10;
+            }
+        }
+        else
+        {
+            // Mantissa is full: integer digits keep scaling the magnitude,
+            // fraction digits are below the precision of the result and dropped.
+            if(!seen_dot)
+            {
+                ++exp10;
+            }
+        }
     }
-    if(size_t(i) != l && s[i] == 'e')
+    if(i != l && (s[i] == char_t('e') || s[i] == char_t('E')))
     {
-        result *= std::pow(10, string_to_integer<char_t, std::intptr_t>(s + i + 1, l - i - 1));
+        size_t j = i + 1;
+        bool eneg = false;
+        if(j != l && (s[j] == char_t('+') || s[j] == char_t('-')))
+        {
+            eneg = s[j] == char_t('-');
+            ++j;
+        }
+        if(j != l && s[j] >= char_t('0') && s[j] <= char_t('9'))
+        {
+            int eacc = 0;
+            for(; j != l && s[j] >= char_t('0') && s[j] <= char_t('9'); ++j)
+            {
+                if(eacc < 1000000)
+                {
+                    eacc = eacc * 10 + int(s[j] - char_t('0'));
+                }
+            }
+            exp10 += eneg ? -eacc : eacc;
+            i = j;
+        }
+        // An 'e' that is not followed by a valid exponent is left unconsumed,
+        // matching std::from_chars (the number ends before the 'e').
     }
-    return real_t(neg ? result * -1.0 : result);
+    std::errc ec = std::errc();
+    double value;
+    if(!any_digit)
+    {
+        ec = std::errc::invalid_argument;
+        value = 0.0;
+    }
+    else if(mantissa == 0)
+    {
+        value = 0.0;
+    }
+    else
+    {
+        double m = double(mantissa);
+        if(exp10 >= 0)
+        {
+            if(mantissa <= (uint64_t(1) << 53) && exp10 <= 22)
+            {
+                value = m * pow10_tab[exp10];
+            }
+            else
+            {
+                value = m * std::pow(10.0, double(exp10));
+            }
+        }
+        else
+        {
+            int e = -exp10;
+            if(mantissa <= (uint64_t(1) << 53) && e <= 22)
+            {
+                value = m / pow10_tab[e];
+            }
+            else
+            {
+                value = m / std::pow(10.0, double(e));
+            }
+        }
+        if(std::isinf(value))
+        {
+            ec = std::errc::result_out_of_range;
+        }
+        else if(value == 0.0)
+        {
+            // Non-zero input that underflowed to zero.
+            ec = std::errc::result_out_of_range;
+        }
+    }
+    value = neg ? -value : value;
+    if(status != nullptr)
+    {
+        *status = ec;
+        return real_t(value);
+    }
+    if(ec == std::errc() && i == l)
+    {
+        return real_t(value);
+    }
+    return real_t();
 }
 
 #if __cplusplus >= 201703L
@@ -617,18 +678,55 @@ template<class char_t, class traits_t, class allocator_t> bool operator>=(string
 }
 #endif // __cplusplus >= 201703L
 
+template<class char_t> bool to_value_is_space_(char_t c)
+{
+    return c == char_t(' ') || c == char_t('\t') || c == char_t('\n') || c == char_t('\r') || c == char_t('\f') || c == char_t('\v');
+}
+// Aligns with std::stoi/std::stod: throws std::invalid_argument when no
+// conversion can be performed and std::out_of_range when the parsed value does
+// not fit into to_t. Leading whitespace and an optional sign are skipped, then
+// the actual parsing is delegated to string_to_integer / string_to_real so the
+// conversion logic lives in a single place.
+template<class to_t, class char_t> typename std::enable_if<std::is_integral<to_t>::value, to_t>::type to_value_checked_(char_t const *s, size_t l)
+{
+    char_t const *p = s;
+    char_t const *end = s + l;
+    while(p != end && to_value_is_space_(*p))
+        ++p;
+    // string_to_integer / std::from_chars accept a leading '-' but reject '+';
+    // strip an optional leading '+' so "+123" keeps working like std::stoi.
+    if(p != end && *p == char_t('+'))
+        ++p;
+    std::errc ec = std::errc();
+    to_t value = string_to_integer<char_t, to_t>(p, size_t(end - p), &ec);
+    if(ec == std::errc::result_out_of_range)
+        throw std::out_of_range("to_value: out of range");
+    if(ec != std::errc())
+        throw std::invalid_argument("to_value: no conversion");
+    return value;
+}
+template<class to_t, class char_t> typename std::enable_if<std::is_floating_point<to_t>::value, to_t>::type to_value_checked_(char_t const *s, size_t l)
+{
+    char_t const *p = s;
+    char_t const *end = s + l;
+    while(p != end && to_value_is_space_(*p))
+        ++p;
+    // string_to_real / std::from_chars accept a leading '-' but reject '+'.
+    if(p != end && *p == char_t('+'))
+        ++p;
+    std::errc ec = std::errc();
+    to_t value = string_to_real<char_t, to_t>(p, size_t(end - p), &ec);
+    if(ec == std::errc::result_out_of_range)
+        throw std::out_of_range("to_value: out of range");
+    if(ec != std::errc())
+        throw std::invalid_argument("to_value: no conversion");
+    return value;
+}
 #if __cplusplus >= 201703L
 template<class to_t, class char_t, class traits_t>
-to_t to_value(std::basic_string_view<char_t, traits_t> sv) noexcept
+to_t to_value(std::basic_string_view<char_t, traits_t> sv)
 {
-    if constexpr(std::is_floating_point_v<to_t>)
-    {
-        return string_to_real<char_t, to_t>(sv.data(), sv.size());
-    }
-    else
-    {
-        return string_to_integer<char_t, to_t>(sv.data(), sv.size());
-    }
+    return to_value_checked_<to_t>(sv.data(), sv.size());
 }
 template<class char_t, class traits_t>
 std::basic_string<char_t, traits_t> to_string(std::basic_string_view<char_t, traits_t> sv)
@@ -638,15 +736,15 @@ std::basic_string<char_t, traits_t> to_string(std::basic_string_view<char_t, tra
 #else
 template<class to_t, class char_t, class traits_t>
 typename std::enable_if<std::is_integral<to_t>::value, to_t>::type
-to_value(string_ref<char_t, traits_t> sv) noexcept
+to_value(string_ref<char_t, traits_t> sv)
 {
-    return string_to_integer<char_t, to_t>(sv.data(), sv.size());
+    return to_value_checked_<to_t>(sv.data(), sv.size());
 }
 template<class to_t, class char_t, class traits_t>
 typename std::enable_if<std::is_floating_point<to_t>::value, to_t>::type
-to_value(string_ref<char_t, traits_t> sv) noexcept
+to_value(string_ref<char_t, traits_t> sv)
 {
-    return string_to_real<char_t, to_t>(sv.data(), sv.size());
+    return to_value_checked_<to_t>(sv.data(), sv.size());
 }
 template<class char_t, class traits_t>
 std::basic_string<char_t, traits_t> to_string(string_ref<char_t, traits_t> sv)
@@ -891,24 +989,24 @@ public:
         }
     }
 
-    iterator begin() const
+    ZZZ_LIB_NODISCARD iterator begin() const
     {
         return iterator(this);
     }
-    iterator end() const
+    ZZZ_LIB_NODISCARD iterator end() const
     {
         return iterator();
     }
-    iterator cbegin() const
+    ZZZ_LIB_NODISCARD iterator cbegin() const
     {
         return iterator(this);
     }
-    iterator cend() const
+    ZZZ_LIB_NODISCARD iterator cend() const
     {
         return iterator();
     }
 
-    pair_ss_t split2() const
+    ZZZ_LIB_NODISCARD pair_ss_t split2() const
     {
         size_type pos = _finder.run(_ref, 0);
         if(pos == string_type::npos)
@@ -928,7 +1026,7 @@ public:
         return !error;
     }
 
-    size_type size() const
+    ZZZ_LIB_NODISCARD size_type size() const
     {
         if(_size == 0 && !_ref.empty())
         {
@@ -943,7 +1041,8 @@ public:
         return _size;
     }
 
-    string_type operator[](size_type index)
+    // Complexity: O(N) in the number of split fields; cache results when using repeated index access.
+    ZZZ_LIB_NODISCARD string_type operator[](size_type index)
     {
         if(index == 0)
         {
