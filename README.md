@@ -1,23 +1,19 @@
 # zzz_lib
 
-zzz 的 C++ 工具库，包含容器、迭代器工具等组件，均支持 C++14/17/20。
+zzz 的 C++ 工具库，包含容器、迭代器工具等组件，均支持 C++11/14/17/20。
 
 ## 文件列表
 
 | 文件 | 说明 |
 |---|---|
-| `sbtree.h` / `sbtree_map.h` / `sbtree_set.h` | 基于 size-balanced BST 的有序容器 |
 | `bpptree.h` / `bpptree_map.h` / `bpptree_set.h` | 基于 B+ 树的有序容器 |
 | `chash.h` / `chash_map.h` / `chash_set.h` | 基于开放寻址哈希表的无序容器 |
+| `sbtree.h` / `sbtree_map.h` / `sbtree_set.h` | 基于 size-balanced BST 的有序容器 |
 | `segment_array.h` | 基于 B+ 树节点管理策略的序列容器 |
 | `sparse_array.h` | 基于 RB 树的稀疏数组 |
 | `split_iterator.h` | 字符串分割迭代器 |
 
 ## 容器
-
-### sbtree
-
-基于二叉搜索树实现，使用节点 size 维持平衡（size-balanced tree）。支持随机访问迭代器，提供 `map`/`set`/`multimap`/`multiset` 变体。
 
 ### bpptree
 
@@ -26,6 +22,10 @@ zzz 的 C++ 工具库，包含容器、迭代器工具等组件，均支持 C++1
 ### chash
 
 基于哈希表实现，内存集中分配以利用缓存。插入时可能触发扩容和数据搬运。遍历速度快。允许重复 key 时，`equal_range` 返回 `local_iterator`，仅支持 `erase` 操作。提供 `map`/`set`/`multimap`/`multiset` 变体。
+
+### sbtree
+
+基于二叉搜索树实现，使用节点 size 维持平衡（size-balanced tree）。支持随机访问迭代器，提供 `map`/`set`/`multimap`/`multiset` 变体。
 
 ### segment_array
 
@@ -49,9 +49,9 @@ C++17 起 `string_ref` 使用 `std::string_view`，C++14 下为自有轻量实�
 
 | 组件 | Natvis | GDB pretty-printer |
 |---|---|---|
-| `sbtree` | `sbtree.natvis` | `sbtree_printer.py` |
 | `bpptree` | `bpptree.natvis` | `bpptree_printer.py` |
 | `chash` | `chash.natvis` | `chash_printer.py` |
+| `sbtree` | `sbtree.natvis` | `sbtree_printer.py` |
 | `segment_array` | `segment_array.natvis` | `segment_array_printer.py` |
 | `sparse_array` | `sparse_array.natvis` | `sparse_array_printer.py` |
 
@@ -59,14 +59,14 @@ Natvis 文件加入工程即可在 MSVC / CLion 中生效；GDB pretty-printer �
 
 ## C++ Standard Support
 
-| Component | C++14 | C++17 | C++20 |
-|---|---|---|---|
-| `bpptree.h` | ✅ | ✅ | ✅ |
-| `segment_array.h` | ✅ | ✅ | ✅ |
-| `chash.h` / `chash_map.h` / `chash_set.h` | ✅ | ✅ | ✅ |
-| `sbtree.h` | ✅ | ✅ | ✅ |
-| `sparse_array.h` | ✅ | ✅ | ✅ |
-| `split_iterator.h` | ✅ | ✅ | ✅ |
+| Component | C++11 | C++14 | C++17 | C++20 |
+|---|---|---|---|---|
+| `bpptree.h` / `bpptree_map.h` / `bpptree_set.h` | ✅ | ✅ | ✅ | ✅ |
+| `chash.h` / `chash_map.h` / `chash_set.h` | ✅ | ✅ | ✅ | ✅ |
+| `sbtree.h` / `sbtree_map.h` / `sbtree_set.h` | ✅ | ✅ | ✅ | ✅ |
+| `segment_array.h` | ✅ | ✅ | ✅ | ✅ |
+| `sparse_array.h` | ✅ | ✅ | ✅ | ✅ |
+| `split_iterator.h` | ✅ | ✅ | ✅ | ✅ |
 
 ## 特性比较
 
