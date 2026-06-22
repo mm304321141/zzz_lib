@@ -11,7 +11,7 @@ struct chash_map_config_t
     typedef hasher_t hasher;
     typedef key_equal_t key_equal;
     typedef allocator_t allocator_type;
-    typedef std::uintptr_t offset_type;
+    typedef std::uint32_t offset_type;
 #if __cplusplus >= 201703L
     typedef typename std::invoke_result<hasher, key_type>::type hash_value_type;
 #else

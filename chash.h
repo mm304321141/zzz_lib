@@ -1,5 +1,27 @@
 ﻿#pragma once
 
+#ifndef ZZZ_LIB_NODISCARD
+#if __cplusplus >= 201703L
+#define ZZZ_LIB_NODISCARD [[nodiscard]]
+#else
+#define ZZZ_LIB_NODISCARD
+#endif
+#endif
+
+// contiguous_hash stores all elements in contiguous value/index/bucket arrays
+// that grow by relocation.
+//
+// Iterator / reference invalidation contract (IMPORTANT - this is WEAKER than
+// std::unordered_map):
+//   - Any operation that reallocates the internal arrays invalidates ALL
+//     iterators, pointers and references into the container. This covers
+//     rehash(), reserve(), shrink_to_fit(), and any insert()/emplace() that
+//     grows the table (see insert / rehash_ / realloc_).
+//   - std::unordered_map keeps pointers and references valid across a rehash
+//     (only iterators are invalidated); this container does NOT, because
+//     elements are physically moved inside the value array when it grows.
+//   - erase() only invalidates iterators and references to the erased element.
+
 #include <cstdint>
 #include <algorithm>
 #include <utility>
@@ -16,7 +38,13 @@ namespace contiguous_hash_detail
     class move_trivial_tag
     {
     };
-    class move_assign_tag
+    class move_base_tag
+    {
+    };
+    class move_assign_tag : public move_base_tag
+    {
+    };
+    class move_noexcept_tag : public move_base_tag
     {
     };
     template<class T> struct is_trivial_expand : public std::is_trivial<T>
@@ -27,7 +55,14 @@ namespace contiguous_hash_detail
     };
     template<class iterator_t> struct get_tag
     {
-        typedef typename std::conditional<is_trivial_expand<typename std::iterator_traits<iterator_t>::value_type>::value, move_trivial_tag, move_assign_tag>::type type;
+        typedef typename std::iterator_traits<iterator_t>::value_type value_type;
+        typedef typename std::conditional<
+            is_trivial_expand<value_type>::value,
+            move_trivial_tag,
+            typename std::conditional<
+                std::is_nothrow_move_constructible<value_type>::value,
+                move_noexcept_tag,
+                move_assign_tag>::type>::type type;
     };
 
     template<class iterator_t, class tag_t, class... args_t> void construct_one(iterator_t where, tag_t, args_t &&...args)
@@ -39,7 +74,7 @@ namespace contiguous_hash_detail
     template<class iterator_t> void destroy_one(iterator_t, move_trivial_tag)
     {
     }
-    template<class iterator_t> void destroy_one(iterator_t where, move_assign_tag)
+    template<class iterator_t> void destroy_one(iterator_t where, move_base_tag)
     {
         typedef typename std::iterator_traits<iterator_t>::value_type iterator_value_t;
         where->~iterator_value_t();
@@ -48,18 +83,34 @@ namespace contiguous_hash_detail
     template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_trivial_tag)
     {
         std::ptrdiff_t count = move_end - move_begin;
-        std::memmove(&*to_begin, &*move_begin, count * sizeof(*move_begin));
+        std::memmove(static_cast<void *>(&*to_begin), &*move_begin, count * sizeof(*move_begin));
     }
     template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_assign_tag)
     {
         for(; move_begin != move_end; ++move_begin)
         {
-            construct_one(to_begin++, move_assign_tag(), std::move(*move_begin));
+            construct_one(to_begin++, move_assign_tag(), *move_begin);
             destroy_one(move_begin, move_assign_tag());
+        }
+    }
+    template<class iterator_from_t, class iterator_to_t> void move_construct_and_destroy(iterator_from_t move_begin, iterator_from_t move_end, iterator_to_t to_begin, move_noexcept_tag)
+    {
+        for(; move_begin != move_end; ++move_begin)
+        {
+            construct_one(to_begin++, move_noexcept_tag(), std::move(*move_begin));
+            destroy_one(move_begin, move_noexcept_tag());
         }
     }
 }
 
+// Iterator/reference invalidation rules:
+//   rehash (including load-factor triggered automatic growth): ALL iterators
+//     and references are invalidated. This is weaker than std::unordered_map
+//     because the underlying storage is reallocated as a whole.
+//   insert/emplace: may trigger rehash; on rehash, see above. Without rehash,
+//     existing iterators and references remain valid.
+//   erase: iterators and references referring to the erased element are
+//     invalidated; all others remain valid.
 template<class config_t>
 class contiguous_hash
 {
@@ -146,11 +197,7 @@ protected:
     struct root_t : public hasher, public key_equal, public bucket_allocator_t, public index_allocator_t, public value_allocator_t
     {
         template<class any_hasher, class any_key_equal, class any_allocator_type> root_t(any_hasher &&hash, any_key_equal &&equal, any_allocator_type &&alloc)
-            : hasher(std::forward<any_hasher>(hash))
-            , key_equal(std::forward<any_key_equal>(equal))
-            , bucket_allocator_t(alloc)
-            , index_allocator_t(alloc)
-            , value_allocator_t(std::forward<any_allocator_type>(alloc))
+            : hasher(std::forward<any_hasher>(hash)), key_equal(std::forward<any_key_equal>(equal)), bucket_allocator_t(alloc), index_allocator_t(alloc), value_allocator_t(std::forward<any_allocator_type>(alloc))
         {
             static_assert(std::is_unsigned<offset_type>::value && std::is_integral<offset_type>::value, "offset_type must be unsighed integer");
             static_assert(sizeof(offset_type) <= sizeof(contiguous_hash::size_type), "offset_type too big");
@@ -204,28 +251,36 @@ protected:
     typedef get_key_select_t<key_type, value_type> get_key_t;
 
 public:
-    class iterator
+    template<bool IsConst> class iterator_impl
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
         typedef typename contiguous_hash::value_type value_type;
         typedef typename contiguous_hash::difference_type difference_type;
-        typedef typename contiguous_hash::reference reference;
-        typedef typename contiguous_hash::pointer pointer;
+        typedef typename std::conditional<IsConst, typename contiguous_hash::const_reference, typename contiguous_hash::reference>::type reference;
+        typedef typename std::conditional<IsConst, typename contiguous_hash::const_pointer, typename contiguous_hash::pointer>::type pointer;
+        typedef typename contiguous_hash::const_reference const_reference;
+        typedef typename contiguous_hash::const_pointer const_pointer;
+
+    private:
+        typedef typename std::conditional<IsConst, contiguous_hash const, contiguous_hash>::type container_type;
 
     public:
-        iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
+        iterator_impl(size_type _offset, container_type *_self) : offset(_offset), self(_self)
         {
         }
-        iterator(iterator const &) = default;
-        iterator &operator++()
+        iterator_impl(iterator_impl const &) = default;
+        template<bool OtherConst, typename std::enable_if<IsConst && !OtherConst, int>::type = 0> iterator_impl(iterator_impl<OtherConst> const &other) : offset(other.offset), self(other.self)
+        {
+        }
+        iterator_impl &operator++()
         {
             offset = self->advance_next_(offset);
             return *this;
         }
-        iterator operator++(int)
+        iterator_impl operator++(int)
         {
-            iterator save(*this);
+            iterator_impl save(*this);
             ++*this;
             return save;
         }
@@ -237,94 +292,53 @@ public:
         {
             return self->root_.value[offset].value();
         }
-        bool operator==(iterator const &other) const
+        bool operator==(iterator_impl const &other) const
         {
             return offset == other.offset && self == other.self;
         }
-        bool operator!=(iterator const &other) const
+        bool operator!=(iterator_impl const &other) const
         {
             return offset != other.offset || self != other.self;
         }
 
     private:
         friend class contiguous_hash;
+        template<bool> friend class iterator_impl;
         size_type offset;
-        contiguous_hash const *self;
+        container_type *self;
     };
-    class const_iterator
+    typedef iterator_impl<false> iterator;
+    typedef iterator_impl<true> const_iterator;
+    template<bool IsConst> class local_iterator_impl
     {
     public:
         typedef std::forward_iterator_tag iterator_category;
         typedef typename contiguous_hash::value_type value_type;
         typedef typename contiguous_hash::difference_type difference_type;
-        typedef typename contiguous_hash::reference reference;
+        typedef typename std::conditional<IsConst, typename contiguous_hash::const_reference, typename contiguous_hash::reference>::type reference;
+        typedef typename std::conditional<IsConst, typename contiguous_hash::const_pointer, typename contiguous_hash::pointer>::type pointer;
         typedef typename contiguous_hash::const_reference const_reference;
-        typedef typename contiguous_hash::pointer pointer;
         typedef typename contiguous_hash::const_pointer const_pointer;
 
-    public:
-        const_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
-        {
-        }
-        const_iterator(const_iterator const &) = default;
-        const_iterator(iterator const &it) : offset(it.offset), self(it.self)
-        {
-        }
-        const_iterator &operator++()
-        {
-            offset = self->advance_next_(offset);
-            return *this;
-        }
-        const_iterator operator++(int)
-        {
-            const_iterator save(*this);
-            ++*this;
-            return save;
-        }
-        const_reference operator*() const
-        {
-            return *self->root_.value[offset].value();
-        }
-        const_pointer operator->() const
-        {
-            return self->root_.value[offset].value();
-        }
-        bool operator==(const_iterator const &other) const
-        {
-            return offset == other.offset && self == other.self;
-        }
-        bool operator!=(const_iterator const &other) const
-        {
-            return offset != other.offset || self != other.self;
-        }
-
     private:
-        friend class contiguous_hash;
-        size_type offset;
-        contiguous_hash const *self;
-    };
-    class local_iterator
-    {
-    public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef typename contiguous_hash::value_type value_type;
-        typedef typename contiguous_hash::difference_type difference_type;
-        typedef typename contiguous_hash::reference reference;
-        typedef typename contiguous_hash::pointer pointer;
+        typedef typename std::conditional<IsConst, contiguous_hash const, contiguous_hash>::type container_type;
 
     public:
-        local_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
+        local_iterator_impl(size_type _offset, container_type *_self) : offset(_offset), self(_self)
         {
         }
-        local_iterator(local_iterator const &) = default;
-        local_iterator &operator++()
+        local_iterator_impl(local_iterator_impl const &) = default;
+        template<bool OtherConst, typename std::enable_if<IsConst && !OtherConst, int>::type = 0> local_iterator_impl(local_iterator_impl<OtherConst> const &other) : offset(other.offset), self(other.self)
+        {
+        }
+        local_iterator_impl &operator++()
         {
             offset = self->local_advance_next_(offset);
             return *this;
         }
-        local_iterator operator++(int)
+        local_iterator_impl operator++(int)
         {
-            local_iterator save(*this);
+            local_iterator_impl save(*this);
             ++*this;
             return save;
         }
@@ -336,72 +350,23 @@ public:
         {
             return self->root_.value[offset].value();
         }
-        bool operator==(local_iterator const &other) const
+        bool operator==(local_iterator_impl const &other) const
         {
             return offset == other.offset && self == other.self;
         }
-        bool operator!=(local_iterator const &other) const
+        bool operator!=(local_iterator_impl const &other) const
         {
             return offset != other.offset || self != other.self;
         }
 
     private:
         friend class contiguous_hash;
+        template<bool> friend class local_iterator_impl;
         size_type offset;
-        contiguous_hash const *self;
+        container_type *self;
     };
-    class const_local_iterator
-    {
-    public:
-        typedef std::forward_iterator_tag iterator_category;
-        typedef typename contiguous_hash::value_type value_type;
-        typedef typename contiguous_hash::difference_type difference_type;
-        typedef typename contiguous_hash::reference reference;
-        typedef typename contiguous_hash::const_reference const_reference;
-        typedef typename contiguous_hash::pointer pointer;
-        typedef typename contiguous_hash::const_pointer const_pointer;
-
-    public:
-        const_local_iterator(size_type _offset, contiguous_hash const *_self) : offset(_offset), self(_self)
-        {
-        }
-        const_local_iterator(const_local_iterator const &) = default;
-        const_local_iterator(local_iterator const &it) : offset(it.offset), self(it.self)
-        {
-        }
-        const_local_iterator &operator++()
-        {
-            offset = self->local_advance_next_(offset);
-            return *this;
-        }
-        const_local_iterator operator++(int)
-        {
-            const_local_iterator save(*this);
-            ++*this;
-            return save;
-        }
-        const_reference operator*() const
-        {
-            return *self->root_.value[offset].value();
-        }
-        const_pointer operator->() const
-        {
-            return self->root_.value[offset].value();
-        }
-        bool operator==(const_local_iterator const &other) const
-        {
-            return offset == other.offset && self == other.self;
-        }
-        bool operator!=(const_local_iterator const &other) const
-        {
-            return offset != other.offset || self != other.self;
-        }
-
-    private:
-        friend class contiguous_hash;
-        size_type offset;
-        contiguous_hash const *self;
-    };
+    typedef local_iterator_impl<false> local_iterator;
+    typedef local_iterator_impl<true> const_local_iterator;
     typedef typename std::conditional<config_t::unique_type::value, std::pair<iterator, bool>, iterator>::type insert_result_t;
     typedef std::pair<iterator, bool> pair_ib_t;
 
@@ -469,7 +434,7 @@ public:
         copy_all_<false>(&other.root_);
     }
     //move
-    contiguous_hash(contiguous_hash &&other) : root_(hasher(), key_equal(), value_allocator_t())
+    contiguous_hash(contiguous_hash &&other) noexcept : root_(hasher(), key_equal(), value_allocator_t())
     {
         swap(other);
     }
@@ -512,7 +477,7 @@ public:
         return *this;
     }
     //move
-    contiguous_hash &operator=(contiguous_hash &&other)
+    contiguous_hash &operator=(contiguous_hash &&other) noexcept
     {
         if(this == &other)
         {
@@ -543,7 +508,7 @@ public:
         return *static_cast<key_equal const *>(&root_);
     }
 
-    void swap(contiguous_hash &other)
+    void swap(contiguous_hash &other) noexcept
     {
         std::swap(root_, other.root_);
     }
@@ -554,6 +519,7 @@ public:
     typedef std::pair<const_local_iterator, const_local_iterator> pair_clicli_t;
 
     //single element
+    // note: a growing insert reallocates and invalidates all iterators/pointers/references (see invalidation contract at top of file)
     insert_result_t insert(value_type const &value)
     {
         return result_<typename config_t::unique_type>(insert_value_(value));
@@ -566,12 +532,12 @@ public:
     //with hint
     iterator insert(const_iterator, value_type const &value)
     {
-        return result_<typename config_t::unique_type>(insert_value_(value));
+        return iterator(insert_value_(value).first, this);
     }
     //with hint
-    template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, insert_result_t>::type insert(const_iterator, in_value_t &&value)
+    template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, iterator>::type insert(const_iterator, in_value_t &&value)
     {
-        return result_<typename config_t::unique_type>(insert_value_(std::forward<in_value_t>(value)));
+        return iterator(insert_value_(std::forward<in_value_t>(value)).first, this);
     }
     //range
     template<class iterator_t> void insert(iterator_t begin, iterator_t end)
@@ -593,12 +559,12 @@ public:
         return result_<typename config_t::unique_type>(insert_value_(std::forward<args_t>(args)...));
     }
     //with hint
-    template<class... args_t> insert_result_t emplace_hint(const_iterator, args_t &&...args)
+    template<class... args_t> iterator emplace_hint(const_iterator, args_t &&...args)
     {
-        return result_<typename config_t::unique_type>(insert_value_(std::forward<args_t>(args)...));
+        return iterator(insert_value_(std::forward<args_t>(args)...).first, this);
     }
 
-    template<class in_key_t> iterator find(in_key_t const &key)
+    template<class in_key_t> ZZZ_LIB_NODISCARD iterator find(in_key_t const &key)
     {
         if(root_.size == 0)
         {
@@ -606,7 +572,7 @@ public:
         }
         return iterator(find_value_(key), this);
     }
-    template<class in_key_t> const_iterator find(in_key_t const &key) const
+    template<class in_key_t> ZZZ_LIB_NODISCARD const_iterator find(in_key_t const &key) const
     {
         if(root_.size == 0)
         {
@@ -614,6 +580,13 @@ public:
         }
         return const_iterator(find_value_(key), this);
     }
+
+#if __cplusplus >= 202002L
+    template<class in_key_t> ZZZ_LIB_NODISCARD bool contains(in_key_t const &key) const
+    {
+        return find(key) != end();
+    }
+#endif
 
     template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value && !std::is_same<key_type, value_type>::value, void>::type> mapped_type &at(in_key_t const &key)
     {
@@ -655,6 +628,47 @@ public:
         }
         return root_.value[offset].value()->second;
     }
+
+#if __cplusplus >= 201703L
+    template<class... args_t, class self_t = config_t, class = typename std::enable_if<self_t::unique_type::value && !std::is_same<typename self_t::key_type, typename self_t::value_type>::value, void>::type> std::pair<iterator, bool> try_emplace(key_type const &key, args_t &&...args)
+    {
+        iterator it = find(key);
+        if(it != end())
+        {
+            return std::pair<iterator, bool>(it, false);
+        }
+        return emplace(value_type(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(std::forward<args_t>(args)...)));
+    }
+    template<class... args_t, class self_t = config_t, class = typename std::enable_if<self_t::unique_type::value && !std::is_same<typename self_t::key_type, typename self_t::value_type>::value, void>::type> std::pair<iterator, bool> try_emplace(key_type &&key, args_t &&...args)
+    {
+        iterator it = find(key);
+        if(it != end())
+        {
+            return std::pair<iterator, bool>(it, false);
+        }
+        return emplace(value_type(std::piecewise_construct, std::forward_as_tuple(std::move(key)), std::forward_as_tuple(std::forward<args_t>(args)...)));
+    }
+    template<class mapped_arg_t, class self_t = config_t, class = typename std::enable_if<self_t::unique_type::value && !std::is_same<typename self_t::key_type, typename self_t::value_type>::value, void>::type> std::pair<iterator, bool> insert_or_assign(key_type const &key, mapped_arg_t &&obj)
+    {
+        iterator it = find(key);
+        if(it != end())
+        {
+            it->second = std::forward<mapped_arg_t>(obj);
+            return std::pair<iterator, bool>(it, false);
+        }
+        return emplace(value_type(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(std::forward<mapped_arg_t>(obj))));
+    }
+    template<class mapped_arg_t, class self_t = config_t, class = typename std::enable_if<self_t::unique_type::value && !std::is_same<typename self_t::key_type, typename self_t::value_type>::value, void>::type> std::pair<iterator, bool> insert_or_assign(key_type &&key, mapped_arg_t &&obj)
+    {
+        iterator it = find(key);
+        if(it != end())
+        {
+            it->second = std::forward<mapped_arg_t>(obj);
+            return std::pair<iterator, bool>(it, false);
+        }
+        return emplace(value_type(std::piecewise_construct, std::forward_as_tuple(std::move(key)), std::forward_as_tuple(std::forward<mapped_arg_t>(obj))));
+    }
+#endif
 
     iterator erase(const_iterator it)
     {
@@ -708,7 +722,7 @@ public:
         return local_iterator(erase_begin.offset, this);
     }
 
-    size_type count(key_type const &key) const
+    ZZZ_LIB_NODISCARD size_type count(key_type const &key) const
     {
         auto where = find(key);
         if(where == end())
@@ -725,7 +739,7 @@ public:
         }
     }
 
-    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value, void>::type> pair_ii_t equal_range(in_key_t const &key)
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value, void>::type> ZZZ_LIB_NODISCARD pair_ii_t equal_range(in_key_t const &key)
     {
         auto where = find(key);
         if(where == end())
@@ -737,7 +751,7 @@ public:
             return std::make_pair(where, iterator(advance_next_(where.offset), this));
         }
     }
-    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value, void>::type> pair_cici_t equal_range(in_key_t const &key) const
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && config_t::unique_type::value, void>::type> ZZZ_LIB_NODISCARD pair_cici_t equal_range(in_key_t const &key) const
     {
         auto where = find(key);
         if(where == cend())
@@ -749,7 +763,7 @@ public:
             return std::make_pair(where, const_iterator(advance_next_(where.offset), this));
         }
     }
-    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !config_t::unique_type::value, void>::type> pair_lili_t equal_range(in_key_t const &key)
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !config_t::unique_type::value, void>::type> ZZZ_LIB_NODISCARD pair_lili_t equal_range(in_key_t const &key)
     {
         auto where = find(key);
         if(where == end())
@@ -761,7 +775,7 @@ public:
             return std::make_pair(local_iterator(where.offset, this), local_iterator(local_find_equal_(where.offset).first, this));
         }
     }
-    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !config_t::unique_type::value, void>::type> pair_clicli_t equal_range(in_key_t const &key) const
+    template<class in_key_t, class = typename std::enable_if<std::is_convertible<in_key_t, key_type>::value && !config_t::unique_type::value, void>::type> ZZZ_LIB_NODISCARD pair_clicli_t equal_range(in_key_t const &key) const
     {
         auto where = find(key);
         if(where == end())
@@ -774,27 +788,27 @@ public:
         }
     }
 
-    iterator begin()
+    ZZZ_LIB_NODISCARD iterator begin()
     {
         return iterator(find_begin_(), this);
     }
-    iterator end()
+    ZZZ_LIB_NODISCARD iterator end()
     {
         return iterator(root_.size, this);
     }
-    const_iterator begin() const
+    ZZZ_LIB_NODISCARD const_iterator begin() const
     {
         return const_iterator(find_begin_(), this);
     }
-    const_iterator end() const
+    ZZZ_LIB_NODISCARD const_iterator end() const
     {
         return const_iterator(root_.size, this);
     }
-    const_iterator cbegin() const
+    ZZZ_LIB_NODISCARD const_iterator cbegin() const
     {
         return const_iterator(find_begin_(), this);
     }
-    const_iterator cend() const
+    ZZZ_LIB_NODISCARD const_iterator cend() const
     {
         return const_iterator(root_.size, this);
     }
@@ -803,7 +817,7 @@ public:
         return const_iterator(pos, this);
     }
 
-    bool empty() const
+    ZZZ_LIB_NODISCARD bool empty() const
     {
         return root_.size == root_.free_count;
     }
@@ -811,41 +825,41 @@ public:
     {
         clear_all_();
     }
-    size_type size() const
+    ZZZ_LIB_NODISCARD size_type size() const
     {
         return root_.size - root_.free_count;
     }
-    size_type max_size() const
+    ZZZ_LIB_NODISCARD size_type max_size() const
     {
         return offset_empty - 1;
     }
 
-    local_iterator begin(size_type n)
+    ZZZ_LIB_NODISCARD local_iterator begin(size_type n)
     {
         return local_iterator(root_.bucket[n], this);
     }
-    local_iterator end(size_type)
+    ZZZ_LIB_NODISCARD local_iterator end(size_type)
     {
         return local_iterator(offset_empty, this);
     }
-    const_local_iterator begin(size_type n) const
+    ZZZ_LIB_NODISCARD const_local_iterator begin(size_type n) const
     {
         return const_local_iterator(root_.bucket[n], this);
     }
-    const_local_iterator end(size_type) const
+    ZZZ_LIB_NODISCARD const_local_iterator end(size_type) const
     {
         return const_local_iterator(offset_empty, this);
     }
-    const_local_iterator cbegin(size_type n) const
+    ZZZ_LIB_NODISCARD const_local_iterator cbegin(size_type n) const
     {
         return const_local_iterator(root_.bucket[n], this);
     }
-    const_local_iterator cend(size_type) const
+    ZZZ_LIB_NODISCARD const_local_iterator cend(size_type) const
     {
         return const_local_iterator(offset_empty, this);
     }
 
-    size_type bucket_count() const
+    ZZZ_LIB_NODISCARD size_type bucket_count() const
     {
         return root_.bucket_count;
     }
@@ -854,7 +868,7 @@ public:
         return max_size();
     }
 
-    size_type bucket_size(size_type n) const
+    ZZZ_LIB_NODISCARD size_type bucket_size(size_type n) const
     {
         size_type step = 0;
         for(size_type i = root_.bucket[n]; i != offset_empty; i = root_.index[i].next)
@@ -864,7 +878,7 @@ public:
         return step;
     }
 
-    size_type bucket(key_type const &key) const
+    ZZZ_LIB_NODISCARD size_type bucket(key_type const &key) const
     {
         if(root_.size == 0)
         {
@@ -898,17 +912,33 @@ public:
             rehash_(typename config_t::unique_type(), size_type(std::ceil(size() / root_.setting_load_factor)));
         }
     }
-    float max_load_factor() const
+    ZZZ_LIB_NODISCARD float max_load_factor() const
     {
         return root_.setting_load_factor;
     }
-    float load_factor() const
+    ZZZ_LIB_NODISCARD float load_factor() const
     {
         if(root_.size == 0)
         {
             return 0;
         }
         return size() / float(root_.bucket_count);
+    }
+    // shrink the allocated bucket/index/value arrays down to the current element count
+    // note: reallocates and invalidates all iterators/pointers/references
+    void shrink_to_fit()
+    {
+        contiguous_hash temp(size(), get_hasher(), get_key_equal(), get_allocator());
+        temp.max_load_factor(root_.setting_load_factor);
+        temp.reserve(size());
+        for(size_type i = 0; i < root_.size; ++i)
+        {
+            if(root_.index[i].hash)
+            {
+                temp.emplace(std::move_if_noexcept(*root_.value[i].value()));
+            }
+        }
+        swap(temp);
     }
 
 protected:
@@ -1050,7 +1080,7 @@ protected:
         }
         if(root_.capacity != 0)
         {
-            std::memset(root_.index, 0xFFFFFFFF, sizeof(index_t) * root_.capacity);
+            std::memset(static_cast<void *>(root_.index), 0xFFFFFFFF, sizeof(index_t) * root_.capacity);
         }
         root_.size = 0;
         root_.free_count = 0;
@@ -1071,32 +1101,48 @@ protected:
         size_type size = other->size - other->free_count;
         if(size > 0)
         {
-            rehash_(std::true_type(), size);
-            realloc_(size);
-            for(size_type other_i = 0; other_i < other->size; ++other_i)
+            try
             {
-                if(other->index[other_i].hash)
+                rehash_(std::true_type(), size);
+                realloc_(size);
+                for(size_type other_i = 0; other_i < other->size; ++other_i)
                 {
-                    auto i = root_.size;
-                    size_type bucket = other->index[other_i].hash % root_.bucket_count;
-                    if(root_.bucket[bucket] != offset_empty)
+                    if(other->index[other_i].hash)
                     {
-                        root_.index[root_.bucket[bucket]].prev = offset_type(i);
+                        auto i = root_.size;
+                        size_type bucket = other->index[other_i].hash % root_.bucket_count;
+                        if(root_.bucket[bucket] != offset_empty)
+                        {
+                            root_.index[root_.bucket[bucket]].prev = offset_type(i);
+                        }
+                        root_.index[i].prev = offset_empty;
+                        root_.index[i].next = root_.bucket[bucket];
+                        root_.index[i].hash = other->index[other_i].hash;
+                        root_.bucket[bucket] = offset_type(i);
+                        if(move)
+                        {
+                            construct_one_(root_.value[i].value(), std::move(*other->value[other_i].value()));
+                        }
+                        else
+                        {
+                            construct_one_(root_.value[i].value(), *other->value[other_i].value());
+                        }
+                        ++root_.size;
                     }
-                    root_.index[i].prev = offset_empty;
-                    root_.index[i].next = root_.bucket[bucket];
-                    root_.index[i].hash = other->index[other_i].hash;
-                    root_.bucket[bucket] = offset_type(i);
-                    if(move)
-                    {
-                        construct_one_(root_.value[i].value(), std::move(*other->value[other_i].value()));
-                    }
-                    else
-                    {
-                        construct_one_(root_.value[i].value(), *other->value[other_i].value());
-                    }
-                    ++root_.size;
                 }
+            }
+            catch(...)
+            {
+                dealloc_all_();
+                root_.bucket_count = 0;
+                root_.capacity = 0;
+                root_.size = 0;
+                root_.free_count = 0;
+                root_.free_list = offset_empty;
+                root_.bucket = nullptr;
+                root_.index = nullptr;
+                root_.value = nullptr;
+                throw;
             }
         }
     }
@@ -1144,15 +1190,17 @@ protected:
         return size;
     }
 
+    // note: rebuilds the bucket array; invalidates all iterators/pointers/references
     void rehash_(std::true_type, size_type size)
     {
         size = std::min(get_prime_(size), max_size());
+        offset_type *new_bucket = get_bucket_allocator_().allocate(size);
+        std::memset(new_bucket, 0xFFFFFFFF, sizeof(offset_type) * size);
         if(root_.bucket_count != 0)
         {
             get_bucket_allocator_().deallocate(root_.bucket, root_.bucket_count);
         }
-        root_.bucket = get_bucket_allocator_().allocate(size);
-        std::memset(root_.bucket, 0xFFFFFFFF, sizeof(offset_type) * size);
+        root_.bucket = new_bucket;
 
         for(size_type i = 0; i < root_.size; ++i)
         {
@@ -1171,6 +1219,7 @@ protected:
         root_.bucket_count = size;
     }
 
+    // note: rebuilds the bucket array; invalidates all iterators/pointers/references
     void rehash_(std::false_type, size_type size)
     {
         size = std::min(get_prime_(size), max_size());
@@ -1205,6 +1254,7 @@ protected:
         root_.bucket = new_bucket;
     }
 
+    // note: relocates the value/index arrays; invalidates all iterators/pointers/references
     void realloc_(size_type size)
     {
         if(size * sizeof(value_t) > 0x1000)
@@ -1221,12 +1271,21 @@ protected:
         }
         size = std::min(size, max_size());
         index_t *new_index = get_index_allocator_().allocate(size);
-        value_t *new_value = get_value_allocator_().allocate(size);
+        value_t *new_value;
+        try
+        {
+            new_value = get_value_allocator_().allocate(size);
+        }
+        catch(...)
+        {
+            get_index_allocator_().deallocate(new_index, size);
+            throw;
+        }
 
-        std::memset(new_index + root_.capacity, 0xFFFFFFFF, sizeof(index_t) * (size - root_.capacity));
+        std::memset(static_cast<void *>(new_index + root_.capacity), 0xFFFFFFFF, sizeof(index_t) * (size - root_.capacity));
         if(root_.capacity != 0)
         {
-            std::memcpy(new_index, root_.index, sizeof(index_t) * root_.capacity);
+            std::memcpy(static_cast<void *>(new_index), root_.index, sizeof(index_t) * root_.capacity);
             move_construct_and_destroy_(root_.value->value(), root_.value->value() + root_.capacity, new_value->value());
             get_index_allocator_().deallocate(root_.index, root_.capacity);
             get_value_allocator_().deallocate(root_.value, root_.capacity);
@@ -1331,6 +1390,7 @@ protected:
 
     template<class in_t, class... args_t> pair_posi_t insert_value_uncheck_(std::false_type, in_t &&in, args_t &&...args)
     {
+        hash_t hash = get_hasher()(get_key_t()(in, args...));
         size_type offset = root_.free_list == offset_empty ? root_.size : root_.free_list;
         construct_one_(root_.value[offset].value(), std::forward<in_t>(in), std::forward<args_t>(args)...);
         if(offset == root_.free_list)
@@ -1342,7 +1402,6 @@ protected:
         {
             ++root_.size;
         }
-        hash_t hash = get_hasher()(get_key_t()(*root_.value[offset].value()));
         size_type bucket = hash % root_.bucket_count;
         size_type where;
         for(where = root_.bucket[bucket]; where != offset_empty; where = root_.index[where].next)
@@ -1376,9 +1435,8 @@ protected:
         return std::make_pair(offset, true);
     }
 
-    template<class in_key_t> size_type find_value_(in_key_t const &key) const
+    template<class in_key_t> size_type find_value_with_hash_(in_key_t const &key, hash_t hash) const
     {
-        hash_t hash = get_hasher()(key);
         size_type bucket = hash % root_.bucket_count;
 
         for(size_type i = root_.bucket[bucket]; i != offset_empty; i = root_.index[i].next)
@@ -1389,6 +1447,12 @@ protected:
             }
         }
         return root_.size;
+    }
+
+    template<class in_key_t> size_type find_value_(in_key_t const &key) const
+    {
+        hash_t hash = get_hasher()(key);
+        return find_value_with_hash_(key, hash);
     }
 
     size_type remove_value_(std::true_type, key_type const &key)
@@ -1451,4 +1515,139 @@ protected:
 
         destroy_one_(root_.value[offset].value());
     }
+
+    // SFINAE detection of hasher::operator==. When the hasher provides a usable
+    // operator== we return its result; otherwise (e.g. bare function pointers
+    // without a comparison) we conservatively return false so callers fall back
+    // to the recompute-hash path. The int/... overload ranking keeps this
+    // compatible with C++11/14 (no if constexpr required).
+    template<class any_hasher> static auto hasher_equal_test_(any_hasher const &a, any_hasher const &b, int) -> decltype(bool(a == b))
+    {
+        return bool(a == b);
+    }
+    template<class any_hasher> static bool hasher_equal_test_(any_hasher const &, any_hasher const &, ...)
+    {
+        return false;
+    }
+    bool hashers_equal_(contiguous_hash const &right) const
+    {
+        return hasher_equal_test_(get_hasher(), right.get_hasher(), 0);
+    }
+
+    // unique mode: O(N) amortized. size() is already compared by the caller.
+    bool equal_to_(std::true_type, contiguous_hash const &right) const
+    {
+        bool reuse = hashers_equal_(right);
+        for(size_type i = 0; i < root_.size; ++i)
+        {
+            if(!root_.index[i].hash)
+            {
+                continue;
+            }
+            hash_t hash = root_.index[i].hash;
+            key_type const &key = get_key_t()(*root_.value[i].value());
+            size_type r = reuse ? right.find_value_with_hash_(key, hash) : right.find_value_(key);
+            if(r == right.root_.size)
+            {
+                return false;
+            }
+            if(!(*root_.value[i].value() == *right.root_.value[r].value()))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // multi mode: O(N + sum(Mk^2)); with bounded duplication this is O(N).
+    // Equal keys form a contiguous run inside a bucket chain (see
+    // insert_value_uncheck_(std::false_type)), so each distinct key group is
+    // visited exactly once while walking the buckets.
+    bool equal_to_(std::false_type, contiguous_hash const &right) const
+    {
+        bool reuse = hashers_equal_(right);
+        for(size_type b = 0; b < root_.bucket_count; ++b)
+        {
+            size_type i = root_.bucket[b];
+            while(i != offset_empty)
+            {
+                hash_t hash = root_.index[i].hash;
+                key_type const &key = get_key_t()(*root_.value[i].value());
+                std::pair<size_type, size_type> left_group = local_find_equal_(i);
+                size_type group_end = left_group.first;
+                size_type left_count = left_group.second;
+                size_type r = reuse ? right.find_value_with_hash_(key, hash) : right.find_value_(key);
+                if(r == right.root_.size)
+                {
+                    return false;
+                }
+                std::pair<size_type, size_type> right_group = right.local_find_equal_(r);
+                size_type right_group_end = right_group.first;
+                if(left_count != right_group.second)
+                {
+                    return false;
+                }
+                // multiset comparison of the two same-key groups using the
+                // "first occurrence counts both sides" trick (no extra storage).
+                for(size_type a = i; a != group_end; a = root_.index[a].next)
+                {
+                    bool seen = false;
+                    for(size_type p = i; p != a; p = root_.index[p].next)
+                    {
+                        if(*root_.value[p].value() == *root_.value[a].value())
+                        {
+                            seen = true;
+                            break;
+                        }
+                    }
+                    if(seen)
+                    {
+                        continue;
+                    }
+                    size_type left_match = 0;
+                    for(size_type p = i; p != group_end; p = root_.index[p].next)
+                    {
+                        if(*root_.value[p].value() == *root_.value[a].value())
+                        {
+                            ++left_match;
+                        }
+                    }
+                    size_type right_match = 0;
+                    for(size_type p = r; p != right_group_end; p = right.root_.index[p].next)
+                    {
+                        if(*root_.value[a].value() == *right.root_.value[p].value())
+                        {
+                            ++right_match;
+                        }
+                    }
+                    if(left_match != right_match)
+                    {
+                        return false;
+                    }
+                }
+                i = group_end;
+            }
+        }
+        return true;
+    }
+
+    template<class friend_config_t> friend bool operator==(contiguous_hash<friend_config_t> const &left, contiguous_hash<friend_config_t> const &right);
 };
+
+// Unordered equality: same size and, ignoring order, the same multiset of
+// elements. contiguous_hash is unordered, so no relational/operator<=> is
+// provided (mirrors std::unordered_map/unordered_multimap).
+template<class config_t> bool operator==(contiguous_hash<config_t> const &left, contiguous_hash<config_t> const &right)
+{
+    if(left.size() != right.size())
+    {
+        return false;
+    }
+    return left.equal_to_(typename config_t::unique_type(), right);
+}
+#if __cplusplus < 202002L
+template<class config_t> bool operator!=(contiguous_hash<config_t> const &left, contiguous_hash<config_t> const &right)
+{
+    return !(left == right);
+}
+#endif

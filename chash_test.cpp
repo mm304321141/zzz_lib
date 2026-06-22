@@ -12,7 +12,6 @@
 #include <cstring>
 #include <string>
 
-
 #define assert(exp) assert_proc(exp, #exp, __FILE__, __LINE__)
 
 auto assert_proc = [](bool no_error, char const *query, char const *file, size_t line)
@@ -23,10 +22,9 @@ auto assert_proc = [](bool no_error, char const *query, char const *file, size_t
         {
             size_t operator()(std::tuple<char const *, char const *, size_t> const &ref) const
             {
-                return
-                    std::hash<std::uintptr_t>()(reinterpret_cast<std::uintptr_t>(std::get<0>(ref))) ^
-                    std::hash<std::uintptr_t>()(reinterpret_cast<std::uintptr_t>(std::get<1>(ref))) ^
-                    std::hash<size_t>()(std::get<2>(ref));
+                return std::hash<std::uintptr_t>()(reinterpret_cast<std::uintptr_t>(std::get<0>(ref))) ^
+                       std::hash<std::uintptr_t>()(reinterpret_cast<std::uintptr_t>(std::get<1>(ref))) ^
+                       std::hash<size_t>()(std::get<2>(ref));
             }
         };
         static chash_set<std::tuple<char const *, char const *, size_t>, hasher> check;
@@ -41,8 +39,7 @@ int main()
 {
     [&]
     {
-        chash_multiset<int> ch =
-        {
+        chash_multiset<int> ch = {
             1, 2, 3, 5, 3, 3, 4, 5, 6, 7, 1, 2, 3, 4
         };
         auto range = ch.equal_range(3);
@@ -66,37 +63,37 @@ int main()
     };
     assert(false);
 
-    auto testch = [&mtr, &mt, &c = ch, &v]()
+    auto testch = [&ch, &v]()
     {
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(v[i], i));
+            ch.insert(std::make_pair(v[i], i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(i, i));
+            ch.insert(std::make_pair(i, i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.erase(v[i]);
+            ch.erase(v[i]);
         }
-        c.clear();
+        ch.clear();
     };
-    auto testxh = [&mtr, &mt, &c = xh, &v]()
+    auto testxh = [&xh, &v]()
     {
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(v[i], i));
+            xh.insert(std::make_pair(v[i], i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(i, i));
+            xh.insert(std::make_pair(i, i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.erase(v[i]);
+            xh.erase(v[i]);
         }
-        c.clear();
+        xh.clear();
     };
     reset();
     xh.max_load_factor(1);
@@ -136,9 +133,9 @@ int main()
 
     system("pause");
 
-    //for(int i = 0; i < 20000000; ++i)
+    // for(int i = 0; i < 20000000; ++i)
     //{
-    //    ch.insert(std::make_pair(mtr(mt), i));
-    //}
-    //ch.print_tree();
+    //     ch.insert(std::make_pair(mtr(mt), i));
+    // }
+    // ch.print_tree();
 }

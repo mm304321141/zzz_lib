@@ -45,35 +45,35 @@ template<class T> void foo_test(T &hs)
     o.insert({});
     o.emplace(v);
     o.emplace_hint(o.begin(), v);
-    hs.find(k);
+    (void)hs.find(k);
     o.erase(o.cbegin());
     o.erase(k);
     o.erase(b, e);
     o.erase(lb);
     o.erase(lb, le);
-    hs.count(k);
-    hs.equal_range(k);
-    hs.begin();
-    hs.cbegin();
-    hs.end();
-    hs.cend();
-    hs.empty();
-    o.empty();
-    o.size();
-    o.max_size();
+    (void)hs.count(k);
+    (void)hs.equal_range(k);
+    (void)hs.begin();
+    (void)hs.cbegin();
+    (void)hs.end();
+    (void)hs.cend();
+    (void)hs.empty();
+    (void)o.empty();
+    (void)o.size();
+    (void)o.max_size();
     while(lb != le)
     {
         ++lb;
     }
-    hs.bucket_count();
-    hs.max_bucket_count();
-    hs.bucket_size(0);
-    hs.bucket(k);
+    (void)hs.bucket_count();
+    (void)hs.max_bucket_count();
+    (void)hs.bucket_size(0);
+    (void)hs.bucket(k);
     o.reserve(0);
     o.rehash(0);
     o.max_load_factor(0);
-    o.max_load_factor();
-    o.load_factor();
+    (void)o.max_load_factor();
+    (void)o.load_factor();
 }
 
 void foo()
