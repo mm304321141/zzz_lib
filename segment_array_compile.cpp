@@ -45,25 +45,25 @@ template<class T> void foo_test(T &bp)
     o.emplace_front(v);
     o.erase(o.cbegin());
     o.erase(b, e);
-    bp.begin();
-    bp.cbegin();
-    bp.rbegin();
-    bp.crbegin();
-    bp.end();
-    bp.cend();
-    bp.rend();
-    bp.crend();
-    bp.front();
-    bp.back();
-    bp.empty();
-    o.empty();
+    (void)bp.begin();
+    (void)bp.cbegin();
+    (void)bp.rbegin();
+    (void)bp.crbegin();
+    (void)bp.end();
+    (void)bp.cend();
+    (void)bp.rend();
+    (void)bp.crend();
+    (void)bp.front();
+    (void)bp.back();
+    (void)bp.empty();
+    (void)o.empty();
     o.resize(1);
     o.resize(1, v);
-    o.size();
-    o.max_size();
-    o.at(0);
-    o[0];
-    O::rank(b);
+    (void)o.size();
+    (void)o.max_size();
+    (void)o.at(0);
+    (void)o[0];
+    (void)O::rank(b);
 }
 
 void foo()
