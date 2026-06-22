@@ -64,6 +64,17 @@ public:
         root = other.root;
         fork = other.fork;
     }
+    test_allocator &operator=(test_allocator const &other)
+    {
+        if(this != &other)
+        {
+            set = other.set;
+            max = other.max;
+            root = other.root;
+            fork = other.fork;
+        }
+        return *this;
+    }
     template<class U> test_allocator(test_allocator<U> const &other) : set(new std::set<T *>()), max(other.max)
     {
         root = other.root;
@@ -87,12 +98,12 @@ public:
         --alloc_limit;
         return *set->insert(reinterpret_cast<pointer>(new uint8_t[sizeof(T) * n])).first;
     }
-    void deallocate(pointer ptr, size_type n)
+    void deallocate(pointer ptr, size_type /*n*/)
     {
         assert(set->erase(ptr) == 1);
         delete[] reinterpret_cast<uint8_t *>(ptr);
     }
-    template<class U, class ...args_t> void construct(U *ptr, args_t &&...args)
+    template<class U, class... args_t> void construct(U *ptr, args_t &&...args)
     {
         ::new(ptr) U(std::forward<args_t>(args)...);
     }
@@ -108,14 +119,15 @@ public:
     {
         return max;
     }
-    size_type& max_size()
+    size_type &max_size()
     {
         return max;
     }
-    bool operator == (test_allocator const &other)
+    bool operator==(test_allocator const &other)
     {
         return set == other.set;
     }
+
 private:
     std::shared_ptr<std::set<T *>> set;
     size_t max;
@@ -130,9 +142,10 @@ class checker
     {
         if(!b)
         {
-			abort();
+            abort();
         }
     }
+
 public:
     checker() : i(-1)
     {
@@ -154,20 +167,20 @@ public:
         o.i = -1;
         c(i >= 0);
     }
-    checker &operator = (checker const &o)
+    checker &operator=(checker const &o)
     {
         i = o.i;
         c(i >= 0);
         return *this;
     }
-    checker &operator = (checker &&o)
+    checker &operator=(checker &&o)
     {
         i = o.i;
         o.i = -1;
         c(i >= 0);
         return *this;
     }
-    bool operator < (checker const &o) const
+    bool operator<(checker const &o) const
     {
         c(i >= 0);
         c(o.i >= 0);
@@ -246,8 +259,8 @@ int main()
 
     [&]()
     {
-        bpptree_set<std::string> foo = {"1", "2"};
-        assert(!foo.insert(foo.begin(), "2").second);
+        bpptree_set<std::string> foo = { "1", "2" };
+        assert(foo.insert(foo.begin(), "2") == foo.find("2"));
         size_t count = foo.size();
         for(int i = 0; i < 1000000 && count < 32678; ++i)
         {
@@ -262,7 +275,6 @@ int main()
                 ++count;
             }
         }
-        foo.adjust(0);
         assert(foo.size() == count);
         assert(foo.rank(foo.back()) == foo.size() - 1);
         assert(foo.erase("2") == 1);
@@ -278,38 +290,38 @@ int main()
         test_allocator<int> a;
         test_comp c;
         c.is_less = true;
-        bpptree_multiset<int, test_comp, test_allocator<int>> aaa({1, 2, 3}, c, a);
+        bpptree_multiset<int, test_comp, test_allocator<int>> aaa({ 1, 2, 3 }, c, a);
         c.is_less = false;
-        bpptree_multiset<int, test_comp, test_allocator<int>> aaa2({4, 5, 6}, c);
+        bpptree_multiset<int, test_comp, test_allocator<int>> aaa2({ 4, 5, 6 }, c);
         bpptree_multiset<int, test_comp, test_allocator<int>> aaa3(std::move(aaa), a);
         bpptree_multiset<int, test_comp, test_allocator<int>> aaa4(aaa2);
         aaa.swap(aaa2);
         aaa3 = aaa;
         aaa3.emplace(7);
         aaa = aaa3;
-        bpptree_multimap<int, int> bp({{1, 2},{1, 2}});
+        bpptree_multimap<int, int> bp({ { 1, 2 }, { 1, 2 } });
         bpptree_multimap<int, int> const bp2(bp, bpptree_multimap<int, int>::allocator_type());
-        bp.insert({{3, 4},{5, 6}});
-        bp.insert(bp.begin(), {7, 8});
+        bp.insert({ { 3, 4 }, { 5, 6 } });
+        bp.insert(bp.begin(), { 7, 8 });
         bp.erase(bp.begin() + 1, bp.end());
-        bp2.find(0);
-        bp2.slice();
-        bp2.front();
-        bp2.back();
-        bp2.equal_range(2);
-        bp2.lower_bound(2);
-        bp2.upper_bound(2);
-        bp2.range(2, 2);
-        bp2.upper_rank(2);
-        bp2.count(2);
-        bp2.count(2, 2);
+        (void)bp2.find(0);
+        (void)bp2.slice();
+        (void)bp2.front();
+        (void)bp2.back();
+        (void)bp2.equal_range(2);
+        (void)bp2.lower_bound(2);
+        (void)bp2.upper_bound(2);
+        (void)bp2.between(2, 2);
+        (void)bp2.upper_rank(2);
+        (void)bp2.count(2);
+        (void)bp2.count(2, 2);
         for(int i = 0; i < 100000; ++i)
         {
             aaa.emplace(i);
         }
         aaa.clear();
-        bpptree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({{1, "2"},{1, "2"},{1, "2"}}, c);
-        bpptree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({{1, "2"}}, a);
+        bpptree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({ { 1, "2" }, { 1, "2" }, { 1, "2" } }, c);
+        bpptree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({ { 1, "2" } }, a);
         alloc_limit = 2;
         try
         {
@@ -319,17 +331,15 @@ int main()
         {
         }
         alloc_limit = 999999999;
-        bpptree_multimap<std::string, std::string> sss =
-        {
-            {"0", ""},
-            {"1", "11"},
-            {"2", "222"},
+        bpptree_multimap<std::string, std::string> sss = {
+            { "0", "" },
+            { "1", "11" },
+            { "2", "222" },
         };
         sss.emplace("0", "0");
-        sss =
-        {
-            {"0", "0"},
-            {"1", "11"},
+        sss = {
+            { "0", "0" },
+            { "1", "11" },
         };
         sss.erase("1");
         sss.emplace(std::make_pair("1", "1"));
@@ -351,7 +361,7 @@ int main()
             bp.insert(std::make_pair(rand(), i));
             bp1.insert(std::make_pair(rand(), i));
         }
-        bp.rank(bp.begin() + 2);
+        (void)bp.rank(bp.begin() + 2);
         bp1 = bp;
         bpptree_multimap<int, int> bp2 = bp;
         assert(bp.size() == bp1.size());
@@ -398,16 +408,16 @@ int main()
         }
         assert(rb.find(0) == rb.begin());
         assert(bp.find(0) == bp.begin());
-        assert(rb.find(length / 2 - 1) == ----rb.end());
+        assert(rb.find(length / 2 - 1) == -- --rb.end());
         assert(bp.find(length / 2 - 1) == bp.end() - 2);
         assert(rb.count(1) == 2);
         assert(bp.count(1) == 2);
         assert(bp.count(1, 2) == 4);
         assert(bp.count(1, 3) == 6);
-        assert(bp.range(1, 3) == std::make_pair(bp.find(1), bp.find(4)));
-        assert(bp.range(0, 2) == std::make_pair(bp.begin(), bp.begin() + 6));
-        assert(bp.range(2, 3) == bp.slice(4, 8));
-        assert(bp.range(0, length) == bp.slice());
+        assert(bp.between(1, 3) == std::make_pair(bp.find(1), bp.find(4)));
+        assert(bp.between(0, 2) == std::make_pair(bp.begin(), bp.begin() + 6));
+        assert(bp.between(2, 3) == bp.slice(4, 8));
+        assert(bp.between(0, length) == bp.slice());
         assert(bp.front().second == bp.begin()->second);
         assert(bp.front().second == (--bp.rend())->second);
         assert(bp.back().second == (--bp.end())->second);
@@ -464,7 +474,7 @@ int main()
             size_t b = rand() % part;
             assert(cpb.at(a) + b == cpb.at(a + b));
             assert(cpb.begin() + a == cpb.at(a + b) - b);
-            assert(cpb.at(a) - cpb.at(b) == a - b);
+            assert(cpb.at(a) - cpb.at(b) == static_cast<decltype(cpb.at(a) - cpb.at(b))>(a - b));
         }
         for(int i = 0; i < length * 2 + length / 2; ++i)
         {
@@ -512,37 +522,37 @@ int main()
         }
     };
 
-    auto testbp = [&mtr, &mt, &c = bp, &v]()
+    auto testbp = [&bp, &v]()
     {
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(v[i], i));
+            bp.insert(std::make_pair(v[i], i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(i, i));
+            bp.insert(std::make_pair(i, i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.erase(v[i]);
+            bp.erase(v[i]);
         }
-        c.clear();
+        bp.clear();
     };
-    auto testrb = [&mtr, &mt, &c = rb, &v]()
+    auto testrb = [&rb, &v]()
     {
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(v[i], i));
+            rb.insert(std::make_pair(v[i], i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(i, i));
+            rb.insert(std::make_pair(i, i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.erase(v[i]);
+            rb.erase(v[i]);
         }
-        c.clear();
+        rb.clear();
     };
     reset();
     auto bs1 = t();
@@ -576,9 +586,9 @@ int main()
 
     system("pause");
 
-    //for(int i = 0; i < 20000000; ++i)
+    // for(int i = 0; i < 20000000; ++i)
     //{
-    //    bp.insert(std::make_pair(mtr(mt), i));
-    //}
-    //bp.print_tree();
+    //     bp.insert(std::make_pair(mtr(mt), i));
+    // }
+    // bp.print_tree();
 }
