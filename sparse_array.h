@@ -1,34 +1,47 @@
 ﻿#pragma once
 
+#ifndef ZZZ_LIB_NODISCARD
+#if __cplusplus >= 201703L
+#define ZZZ_LIB_NODISCARD [[nodiscard]]
+#else
+#define ZZZ_LIB_NODISCARD
+#endif
+#endif
+
 #include <cstdint>
+#include <cstddef>
 #include <algorithm>
 #include <cstring>
 #include <cassert>
 #include <cstdlib>
+#include <memory>
 #include <new>
+#include <iterator>
 #include <type_traits>
 #include <utility>
+#include <string>
+#include <sstream>
 
 struct sparse_array_default_config
 {
     typedef void *handle_t;
     enum
     {
-        memory_size = 512,  // 内存是按块分配,这里定义每个内存块大小(类型不同,最小值也不同,过小编译报错)
-        atomic_length = 4,  // 最小连续数据长度(类型不同,最小值也不同,过小编译报错)
-        invalid_handle = 0, // 非法内存句柄(可以认为是nil)
+        memory_size = 512,  // memory is allocated per block; this defines each block's size (the minimum varies by type; too small fails to compile)
+        atomic_length = 4,  // minimum contiguous data length (varies by type; too small fails to compile)
+        invalid_handle = 0, // invalid memory handle (treat as nil)
     };
-    // 分配一块memory_size长度的内存
+    // allocate a block of memory_size bytes
     handle_t alloc()
     {
         return ::malloc(memory_size);
     }
-    // 回收一块已分配的内存
+    // release a previously allocated block
     void dealloc(handle_t handle)
     {
         ::free(handle);
     }
-    // 从内存句柄得到内存地址
+    // resolve a memory handle to its address
     void *get(handle_t handle)
     {
         return handle;
@@ -47,7 +60,7 @@ public:
         atomic_length = config_t::atomic_length,
         invalid_handle = config_t::invalid_handle,
     };
-    // 内存片段
+    // memory range
     struct sparse_range
     {
         uint32_t index;
@@ -55,7 +68,7 @@ public:
         uint16_t offset;
         handle_t handle;
     };
-    // 红黑树节点
+    // red-black tree node
     struct sparse_range_set_base
     {
         handle_t parent_handle;
@@ -65,8 +78,8 @@ public:
         uint32_t nil : 1;
         uint32_t length : 30;
     };
-    // 数据
-    struct dump_data
+    // snapshot data
+    struct snapshot_data
     {
         handle_t parent_handle;
         handle_t left_handle;
@@ -77,7 +90,7 @@ public:
         uint16_t free_offset;
         uint16_t free_cross;
     };
-    // 红黑树根节点+内存适配器
+    // red-black tree root + memory adapter
     class sparse_range_tree
     {
     public:
@@ -116,20 +129,20 @@ public:
         };
         mutable sparse_range_root root_;
     };
-    // 红黑树数据节点,内存片段集合(数据是有序的)
+    // red-black tree data node, set of memory ranges (data is sorted)
     struct sparse_range_set : public sparse_range_set_base
     {
         uint32_t end;
         sparse_range begin[1];
     };
-    // 空闲内存链表
+    // free memory list node
     struct memory_blcok_free
     {
         handle_t handle;
         uint16_t offset;
         uint16_t cross;
     };
-    // 数据块元素(数据/空闲链表节点)
+    // data block element (data / free-list node)
     struct memory_block_data
     {
         union
@@ -138,7 +151,7 @@ public:
             memory_blcok_free free;
         };
     };
-    // 数据块
+    // data block
     struct memory_block
     {
         handle_t next_handle;
@@ -158,27 +171,27 @@ public:
     };
     enum
     {
-        // 每个片段集合有多少个片段
+        // number of ranges per range-set
         range_length = (memory_size - sizeof(sparse_range_set)) / sizeof(sparse_range) + 1,
-        // 每个数据块有多少个元素
+        // number of elements per data block
         block_length = (memory_size - sizeof(memory_block)) / sizeof(memory_block_data) + 1,
     };
-    // operator[]代理
+    // operator[] proxy
     class index_proxy
     {
     public:
         operator value_t() const
         {
-            return self_.get(index_);
+            return self_.get_value_(index_);
         }
         index_proxy const &operator=(value_t const &value) const
         {
-            self_.set(index_, value);
+            self_.set_value_(index_, value);
             return *this;
         }
         index_proxy const &operator=(index_proxy const &other) const
         {
-            self_.set(index_, other.self_.get(other.index_));
+            self_.set_value_(index_, other.self_.get_value_(other.index_));
             return *this;
         }
         index_proxy(uint32_t index, self_t &self) : index_(index), self_(self)
@@ -212,7 +225,7 @@ public:
     {
         for(handle_t rb_it = rb_get_most_left_(); rb_it != rb_nil_();)
         {
-            // 平凡析构类型,没必要逐个析构
+            // trivially destructible: no per-element destruction needed
             if(!std::is_trivially_destructible<value_t>::value)
             {
                 sparse_range_set *range_set = deref_<sparse_range_set>(rb_it);
@@ -238,21 +251,21 @@ public:
         }
     }
 
-    // 禁止拷贝(隐式浅拷贝会导致 double-free)
+    // disable copy (implicit shallow copy would cause double-free)
     sparse_array(self_t const &) = delete;
     self_t &operator=(self_t const &) = delete;
 
-    //move构造(转移所有成员,源对象置为合法空状态)
+    // move constructor (transfer all members; leave source in a valid empty state)
     sparse_array(self_t &&other) noexcept
         : index_tree_()
     {
-        // 转移allocator(config_t部分)
+        // transfer allocator (config_t portion)
         index_tree_.allocator() = std::move(other.index_tree_.allocator());
-        // 转移红黑树头状态(root/most_left/most_right/length/nil等)
+        // transfer rb-tree header state (root/most_left/most_right/length/nil etc.)
         *index_tree_.root() = *other.index_tree_.root();
         block_handle_ = other.block_handle_;
         free_ = other.free_;
-        // 将源对象恢复到与默认构造后完全一致的状态
+        // restore source to a state identical to default construction
         other.block_handle_ = handle_t(invalid_handle);
         other.free_.handle = handle_t(invalid_handle);
         other.rb_clear_();
@@ -260,31 +273,295 @@ public:
         other.index_tree_.root()->nil = 1;
     }
 
-    //move赋值(先释放自身资源再接管,确保不泄漏不双重释放)
+    // move assignment (release own resources before taking over to avoid leak / double-free)
     self_t &operator=(self_t &&other) noexcept
     {
         if(this != &other)
         {
-            self_t::~sparse_array();
+            this->~sparse_array();
             ::new(this) self_t(std::move(other));
         }
         return *this;
     }
 
-    // 内存适配器
+    // noexcept swap (swap rb-tree header / allocator / data list / free list — all members)
+    void swap(self_t &other) noexcept
+    {
+        using std::swap;
+        swap(*index_tree_.root(), *other.index_tree_.root());
+        swap(index_tree_.allocator(), other.index_tree_.allocator());
+        swap(block_handle_, other.block_handle_);
+        swap(free_, other.free_);
+    }
+
+    // bidirectional iterator (folded form: const/reverse controlled by template params); only stops at non-default slots
+    template<bool IsConst, bool IsReverse>
+    class iterator_impl
+    {
+    public:
+        typedef std::bidirectional_iterator_tag iterator_category;
+        typedef value_t value_type;
+        typedef std::ptrdiff_t difference_type;
+        typedef value_t reference;
+        typedef value_t *pointer;
+
+    private:
+        typedef typename std::conditional<IsConst, self_t const, self_t>::type owner_t;
+        friend class sparse_array;
+        template<bool, bool> friend class iterator_impl;
+
+        owner_t *owner_;
+        handle_t node_;
+        uint32_t ri_;
+        uint32_t vi_;
+
+        value_t *slot_() const
+        {
+            sparse_range_set *set = owner_->template deref_<sparse_range_set>(node_);
+            sparse_range *rng = set->begin + ri_;
+            return owner_->template deref_<memory_block>(rng->handle)->data[rng->offset].data + vi_;
+        }
+        bool at_default_() const
+        {
+            return !(*slot_() != value_t());
+        }
+        void raw_step_forward_()
+        {
+            sparse_range_set *set = owner_->template deref_<sparse_range_set>(node_);
+            ++vi_;
+            if(vi_ < set->begin[ri_].length)
+            {
+                return;
+            }
+            vi_ = 0;
+            ++ri_;
+            if(ri_ < set->end)
+            {
+                return;
+            }
+            ri_ = 0;
+            node_ = owner_->template rb_move_<true>(node_);
+        }
+        void raw_step_backward_()
+        {
+            if(owner_->rb_is_nil_(node_))
+            {
+                node_ = owner_->rb_get_most_right_();
+                if(owner_->rb_is_nil_(node_))
+                {
+                    return;
+                }
+            }
+            else if(vi_ > 0)
+            {
+                --vi_;
+                return;
+            }
+            else if(ri_ > 0)
+            {
+                --ri_;
+                vi_ = owner_->template deref_<sparse_range_set>(node_)->begin[ri_].length - 1;
+                return;
+            }
+            else
+            {
+                node_ = owner_->template rb_move_<false>(node_);
+                if(owner_->rb_is_nil_(node_))
+                {
+                    ri_ = 0;
+                    vi_ = 0;
+                    return;
+                }
+            }
+            sparse_range_set *set = owner_->template deref_<sparse_range_set>(node_);
+            ri_ = set->end - 1;
+            vi_ = set->begin[ri_].length - 1;
+        }
+        void skip_forward_()
+        {
+            while(!owner_->rb_is_nil_(node_) && at_default_())
+            {
+                raw_step_forward_();
+            }
+        }
+        void skip_backward_()
+        {
+            while(!owner_->rb_is_nil_(node_) && at_default_())
+            {
+                raw_step_backward_();
+            }
+        }
+        void advance_()
+        {
+            if(IsReverse)
+            {
+                raw_step_backward_();
+                skip_backward_();
+            }
+            else
+            {
+                raw_step_forward_();
+                skip_forward_();
+            }
+        }
+        void retreat_()
+        {
+            if(IsReverse)
+            {
+                raw_step_forward_();
+                skip_forward_();
+            }
+            else
+            {
+                raw_step_backward_();
+                skip_backward_();
+            }
+        }
+
+    public:
+        iterator_impl() : owner_(NULL), node_(handle_t(invalid_handle)), ri_(0), vi_(0)
+        {
+        }
+        iterator_impl(owner_t *owner, handle_t node, uint32_t ri, uint32_t vi) : owner_(owner), node_(node), ri_(ri), vi_(vi)
+        {
+        }
+        template<bool C = IsConst, typename std::enable_if<C, int>::type = 0>
+        iterator_impl(iterator_impl<false, IsReverse> const &other) : owner_(other.owner_), node_(other.node_), ri_(other.ri_), vi_(other.vi_)
+        {
+        }
+        reference operator*() const
+        {
+            return *slot_();
+        }
+        // index corresponding to the current slot
+        uint32_t where() const
+        {
+            return owner_->template deref_<sparse_range_set>(node_)->begin[ri_].index + vi_;
+        }
+        iterator_impl &operator++()
+        {
+            advance_();
+            return *this;
+        }
+        iterator_impl operator++(int)
+        {
+            iterator_impl tmp = *this;
+            advance_();
+            return tmp;
+        }
+        iterator_impl &operator--()
+        {
+            retreat_();
+            return *this;
+        }
+        iterator_impl operator--(int)
+        {
+            iterator_impl tmp = *this;
+            retreat_();
+            return tmp;
+        }
+        bool operator==(iterator_impl const &other) const
+        {
+            return owner_ == other.owner_ && node_ == other.node_ && ri_ == other.ri_ && vi_ == other.vi_;
+        }
+        bool operator!=(iterator_impl const &other) const
+        {
+            return !(*this == other);
+        }
+    };
+    typedef iterator_impl<false, false> iterator;
+    typedef iterator_impl<true, false> const_iterator;
+    typedef iterator_impl<false, true> reverse_iterator;
+    typedef iterator_impl<true, true> const_reverse_iterator;
+
+    ZZZ_LIB_NODISCARD iterator begin()
+    {
+        iterator it(this, rb_get_most_left_(), 0, 0);
+        it.skip_forward_();
+        return it;
+    }
+    ZZZ_LIB_NODISCARD iterator end()
+    {
+        return iterator(this, rb_nil_(), 0, 0);
+    }
+    ZZZ_LIB_NODISCARD const_iterator begin() const
+    {
+        const_iterator it(this, rb_get_most_left_(), 0, 0);
+        it.skip_forward_();
+        return it;
+    }
+    ZZZ_LIB_NODISCARD const_iterator end() const
+    {
+        return const_iterator(this, rb_nil_(), 0, 0);
+    }
+    ZZZ_LIB_NODISCARD const_iterator cbegin() const
+    {
+        return begin();
+    }
+    ZZZ_LIB_NODISCARD const_iterator cend() const
+    {
+        return end();
+    }
+    ZZZ_LIB_NODISCARD reverse_iterator rbegin()
+    {
+        handle_t node = rb_get_most_right_();
+        if(rb_is_nil_(node))
+        {
+            return reverse_iterator(this, node, 0, 0);
+        }
+        sparse_range_set *set = deref_<sparse_range_set>(node);
+        reverse_iterator it(this, node, set->end - 1, set->begin[set->end - 1].length - 1);
+        it.skip_backward_();
+        return it;
+    }
+    ZZZ_LIB_NODISCARD reverse_iterator rend()
+    {
+        return reverse_iterator(this, rb_nil_(), 0, 0);
+    }
+    ZZZ_LIB_NODISCARD const_reverse_iterator rbegin() const
+    {
+        handle_t node = rb_get_most_right_();
+        if(rb_is_nil_(node))
+        {
+            return const_reverse_iterator(this, node, 0, 0);
+        }
+        sparse_range_set *set = deref_<sparse_range_set>(node);
+        const_reverse_iterator it(this, node, set->end - 1, set->begin[set->end - 1].length - 1);
+        it.skip_backward_();
+        return it;
+    }
+    ZZZ_LIB_NODISCARD const_reverse_iterator rend() const
+    {
+        return const_reverse_iterator(this, rb_nil_(), 0, 0);
+    }
+    ZZZ_LIB_NODISCARD const_reverse_iterator crbegin() const
+    {
+        return rbegin();
+    }
+    ZZZ_LIB_NODISCARD const_reverse_iterator crend() const
+    {
+        return rend();
+    }
+    // whether empty (no non-default elements)
+    ZZZ_LIB_NODISCARD bool empty() const
+    {
+        return begin() == end();
+    }
+
+    // memory adapter
     config_t const &allocator() const
     {
         return index_tree_.allocator();
     }
-    // 内存适配器
+    // memory adapter
     config_t &allocator()
     {
         return index_tree_.allocator();
     }
-    // dump(配合allocator,请自己保存allocator状态)
-    dump_data dump() const
+    // snapshot (used together with allocator; save allocator state yourself; formerly dump, memory-image-level serialization)
+    ZZZ_LIB_NODISCARD snapshot_data snapshot() const
     {
-        dump_data d;
+        snapshot_data d;
         d.parent_handle = index_tree_.root()->parent_handle;
         d.left_handle = index_tree_.root()->left_handle;
         d.right_handle = index_tree_.root()->right_handle;
@@ -295,10 +572,10 @@ public:
         d.free_cross = free_.cross;
         return d;
     }
-    // load_dump(配合allocator,load后恢复allocator状态)
-    void load_dump(dump_data const &d)
+    // restore (used together with allocator; restore allocator state after restore; formerly load_dump, memory-image-level deserialization)
+    void restore(snapshot_data const &d)
     {
-        clear();
+        reset();
         index_tree_.root()->parent_handle = d.parent_handle;
         index_tree_.root()->left_handle = d.left_handle;
         index_tree_.root()->right_handle = d.right_handle;
@@ -308,8 +585,8 @@ public:
         free_.offset = d.free_offset;
         free_.cross = d.free_cross;
     }
-    // 元素数量(这里不是真正数量,实际没有什么上限,这里只是对齐后的最大下标
-    uint32_t size() const
+    // span (largest aligned valid index + 1; not the actual element count)
+    ZZZ_LIB_NODISCARD uint32_t span() const
     {
         if(rb_is_nil_(rb_get_root_()))
         {
@@ -322,8 +599,8 @@ public:
             return last->index + last->length;
         }
     }
-    // 获取元素
-    value_t get(uint32_t index) const
+    // internal: read element (no real default-slot entity at the storage level; returned by value)
+    value_t get_value_(uint32_t index) const
     {
         sparse_range *range = find_index_(index, NULL);
         if(range == NULL)
@@ -332,21 +609,29 @@ public:
         }
         return deref_<memory_block>(range->handle)->data[range->offset].data[index - range->index];
     }
-    // 添加元素
-    void set(uint32_t index, value_t const &value)
+    // internal: write element (writing the default value is equivalent to reset)
+    void set_value_(uint32_t index, value_t const &value)
     {
         handle_t find;
         sparse_range *range = find_index_(index, &find);
+        if(!(value != value_t()))
+        {
+            if(range != NULL)
+            {
+                erase_index_range_(index, 1);
+            }
+            return;
+        }
         if(range != NULL)
         {
             deref_<memory_block>(range->handle)->data[range->offset].data[index - range->index] = value;
         }
-        else if(value != value_t())
+        else
         {
             create_new_range_(find, index, &value, 1);
         }
     }
-    // 批量获取元素
+    // batch get elements
     void get_multi(uint32_t index, value_t *out_arr, uint32_t length) const
     {
         assert(length == 0 || out_arr != NULL);
@@ -378,7 +663,7 @@ public:
             out_arr += copy_length;
         }
     }
-    // 批量设置元素
+    // batch set elements
     void set_multi(uint32_t index, value_t const *in_arr, uint32_t length)
     {
         assert(length == 0 || in_arr != NULL);
@@ -448,30 +733,73 @@ public:
             }
         }
     }
-    // 清空
-    void clear()
+    // whether a slot holds a non-default value
+    ZZZ_LIB_NODISCARD bool test(uint32_t index) const
     {
-        self_t::~sparse_array();
+        sparse_range *range = find_index_(index, NULL);
+        if(range == NULL)
+        {
+            return false;
+        }
+        return deref_<memory_block>(range->handle)->data[range->offset].data[index - range->index] != value_t();
+    }
+    // reset a single slot to default
+    void reset(uint32_t index)
+    {
+        erase_index_range_(index, 1);
+    }
+    // reset [first, last) to default
+    void reset(uint32_t first, uint32_t last)
+    {
+        if(last > first)
+        {
+            erase_index_range_(first, last - first);
+        }
+    }
+    // reset all
+    void reset()
+    {
+        this->~sparse_array();
         ::new(this) self_t();
     }
-    // 擦除部分区间
-    void clear(uint32_t index, uint32_t length)
+    // subscript access (read-only, by value)
+    ZZZ_LIB_NODISCARD value_t operator[](uint32_t index) const
     {
-        erase_index_range_(index, length);
+        return get_value_(index);
     }
-    // 下标方式访问
-    value_t operator[](uint32_t index) const
-    {
-        return get(index);
-    }
-    // 下标方式访问
+    // subscript access
     index_proxy operator[](uint32_t index)
     {
         return index_proxy(index, *this);
     }
+    // debug output: print all non-default index = value pairs
+    template<class ostream_t>
+    ostream_t &print(ostream_t &os) const
+    {
+        os << "sparse_array{";
+        bool first = true;
+        for(const_iterator it = begin(); it != end(); ++it)
+        {
+            if(!first)
+            {
+                os << ", ";
+            }
+            first = false;
+            os << '[' << it.where() << "] = " << *it;
+        }
+        os << '}';
+        return os;
+    }
+    // debug output: return string representation
+    std::string to_string() const
+    {
+        std::ostringstream oss;
+        print(oss);
+        return oss.str();
+    }
 
 private:
-    // 从片段集合树中找到片段
+    // find a range in the range-set tree
     sparse_range *find_index_(uint32_t index, handle_t *out_handle) const
     {
         handle_t find = rb_special_bound_(index);
@@ -497,10 +825,20 @@ private:
         }
         return range;
     }
-    // 分配一个数据块
+    // allocate a node / data block; throws bad_alloc on failure (returned invalid_handle or malloc returning NULL)
+    handle_t alloc_node_()
+    {
+        handle_t handle = index_tree_.alloc();
+        if(handle == handle_t(invalid_handle))
+        {
+            throw std::bad_alloc();
+        }
+        return handle;
+    }
+    // allocate a data block
     handle_t alloc_block_(memory_block **out_block)
     {
-        handle_t new_handle = index_tree_.alloc();
+        handle_t new_handle = alloc_node_();
         memory_block *block = deref_<memory_block>(new_handle);
         block->next_handle = block_handle_;
         block->prev_handle = handle_t(invalid_handle);
@@ -515,7 +853,7 @@ private:
         }
         return block_handle_;
     }
-    // 回收一个数据块
+    // free a data block
     void dealloc_block_(handle_t handle)
     {
         memory_block *block = deref_<memory_block>(handle);
@@ -533,7 +871,7 @@ private:
         }
         index_tree_.dealloc(handle);
     }
-    // 分配一块内存(优先匹配合适大小,找不到就拆分大内存,再找不到就开辟新内存块)
+    // allocate a chunk of memory (prefer exact-size match; otherwise split a larger free chunk; otherwise allocate a new block)
     void alloc_(uint32_t cross, handle_t &out_handle, uint16_t &out_offset)
     {
         assert(cross >= 1);
@@ -588,7 +926,7 @@ private:
             index_tree_.root()->length -= cross;
         }
     }
-    // 回收一块内存(优先合并到相邻内存)
+    // free a chunk of memory (prefer coalescing with adjacent free chunks)
     void dealloc_(handle_t handle, uint16_t offset, uint32_t cross)
     {
         assert(cross >= 1);
@@ -629,7 +967,7 @@ private:
         free_.offset = offset;
         free_.cross = cross;
     }
-    // 真正的批量设置元素(前面的set_multi会过滤掉为默认值的元素)
+    // actual batch set (set_multi above filters out default-valued elements)
     void set_multi_without_check_(uint32_t index, value_t const *in_arr, uint32_t length)
     {
         handle_t find;
@@ -657,7 +995,7 @@ private:
             in_arr += copy_length;
         }
     }
-    // 擦除一段数据(恢复到默认值)
+    // erase a span of data (restore to default)
     void erase_index_range_(uint32_t index, uint32_t length)
     {
         handle_t find;
@@ -713,7 +1051,47 @@ private:
         return where;
     }
 
-    // 创建一个新的片段
+    // destroy `constructed` elements and free a chunk (used for failure rollback)
+    void destroy_and_free_chunk_(handle_t handle, uint16_t offset, uint32_t cross, uint32_t constructed)
+    {
+        if(!std::is_trivially_destructible<value_t>::value && constructed > 0)
+        {
+            value_t *data = deref_<memory_block>(handle)->data[offset].data;
+            for(uint32_t i = 0; i < constructed; ++i)
+            {
+                data[i].~value_t();
+            }
+        }
+        dealloc_(handle, offset, cross);
+    }
+    // RAII guard for a freshly allocated chunk: destroys constructed elements and frees the chunk if not committed
+    struct chunk_guard
+    {
+        self_t *self;
+        handle_t handle;
+        uint16_t offset;
+        uint32_t cross;
+        uint32_t constructed;
+        bool active;
+        chunk_guard(self_t *s, handle_t h, uint16_t o, uint32_t c)
+            : self(s), handle(h), offset(o), cross(c), constructed(0), active(true)
+        {
+        }
+        void commit()
+        {
+            active = false;
+        }
+        ~chunk_guard()
+        {
+            if(active)
+            {
+                self->destroy_and_free_chunk_(handle, offset, cross, constructed);
+            }
+        }
+        chunk_guard(chunk_guard const &) = delete;
+        chunk_guard &operator=(chunk_guard const &) = delete;
+    };
+    // create a new range
     void create_new_range_(handle_t where, uint32_t index, value_t const *arr, uint32_t length)
     {
         assert(index % atomic_length + length <= atomic_length);
@@ -725,105 +1103,138 @@ private:
             index - index % atomic_length, atomic_length, 0, handle_t(invalid_handle)
         };
         alloc_(1, range_insert.handle, range_insert.offset);
+        // once the chunk is allocated, take ownership with a guard so any later throw frees the chunk (avoiding orphan blocks)
+        chunk_guard guard(this, range_insert.handle, range_insert.offset, 1);
         memory_block_data *data = deref_<memory_block>(range_insert.handle)->data + range_insert.offset;
         init_range_data_(data->data + (index - range_insert.index), data->data, data->data + atomic_length, arr, length);
+        guard.constructed = atomic_length;
         insert_range_(where, &range_insert);
+        guard.commit();
     }
-    // 初始化片段数据
+    // initialize range data (strong exception safety: roll back constructed elements if a throw occurs midway)
     void init_range_data_(value_t *ptr, value_t *begin, value_t *end, value_t const *arr, uint32_t length)
     {
-        for(value_t *it = begin; it != end;)
+        value_t *it = begin;
+        try
         {
-            if(it == ptr)
+            while(it != end)
             {
-                while(length-- > 0)
+                if(it == ptr)
                 {
-                    ::new(it++) value_t(*arr++);
+                    it = std::uninitialized_copy_n(arr, length, it);
+                    ptr = NULL;
                 }
-                ptr = NULL;
+                else
+                {
+                    ::new(it) value_t();
+                    ++it;
+                }
             }
-            else
+        }
+        catch(...)
+        {
+            for(value_t *rollback = begin; rollback != it; ++rollback)
             {
-                ::new(it++) value_t();
+                rollback->~value_t();
+            }
+            throw;
+        }
+    }
+    // relocate `count` elements from src to dst (preferring move_if_noexcept); on throw, roll back constructed dst without touching src
+    void relocate_values_(value_t *src, value_t *dst, uint32_t count)
+    {
+        uint32_t i = 0;
+        try
+        {
+            for(; i < count; ++i)
+            {
+                ::new(dst + i) value_t(std::move_if_noexcept(src[i]));
+            }
+        }
+        catch(...)
+        {
+            for(uint32_t j = 0; j < i; ++j)
+            {
+                dst[j].~value_t();
+            }
+            throw;
+        }
+    }
+    // destroy `count` elements (skipped for trivially destructible types)
+    void destroy_values_(value_t *p, uint32_t count)
+    {
+        if(!std::is_trivially_destructible<value_t>::value)
+        {
+            for(uint32_t i = 0; i < count; ++i)
+            {
+                p[i].~value_t();
             }
         }
     }
-    // 调整片段头部大小
+    // resize range head (first relocate old data into a new chunk and commit, then destroy old data and free the old chunk)
     void adjust_range_head_(handle_t, sparse_range *range, int32_t change)
     {
         assert(change != 0);
         assert(range->length / atomic_length + change >= 1);
         assert(range->length / atomic_length + change <= block_length);
         sparse_range adjust = *range;
-        alloc_(range->length / atomic_length + change, adjust.handle, adjust.offset);
+        uint32_t new_cross = range->length / atomic_length + change;
+        alloc_(new_cross, adjust.handle, adjust.offset);
+        value_t *old_data = deref_<memory_block>(range->handle)->data[range->offset].data;
         if(change > 0)
         {
-            value_t *from = deref_<memory_block>(range->handle)->data[range->offset].data;
             value_t *to = deref_<memory_block>(adjust.handle)->data[adjust.offset + change].data;
-            for(value_t *end = from + range->length; from != end; ++from, ++to)
-            {
-                ::new(to) value_t(std::move(*from));
-                from->~value_t();
-            }
+            chunk_guard guard(this, adjust.handle, adjust.offset, new_cross);
+            relocate_values_(old_data, to, range->length);
+            guard.commit();
         }
         else
         {
-            value_t *from = deref_<memory_block>(range->handle)->data[range->offset].data;
-            value_t *to = deref_<memory_block>(adjust.handle)->data[adjust.offset].data;
             uint32_t cut_length = uint32_t(-change) * atomic_length;
-            for(value_t *end = from + cut_length; from != end; ++from)
-            {
-                from->~value_t();
-            }
-            for(value_t *end = from + (range->length - cut_length); from != end; ++from, ++to)
-            {
-                ::new(to) value_t(std::move(*from));
-                from->~value_t();
-            }
+            value_t *to = deref_<memory_block>(adjust.handle)->data[adjust.offset].data;
+            chunk_guard guard(this, adjust.handle, adjust.offset, new_cross);
+            relocate_values_(old_data + cut_length, to, range->length - cut_length);
+            guard.commit();
         }
+        // commit succeeded: destroy all old elements (relocated ones are in move-from state; trimmed ones were never relocated) and free the old chunk
+        destroy_values_(old_data, range->length);
         dealloc_(range->handle, range->offset, range->length / atomic_length);
         adjust.index -= change * atomic_length;
         adjust.length += change * atomic_length;
         *range = adjust;
     }
-    // 调整片段尾部大小
+    // resize range tail
     void adjust_range_tail_(handle_t, sparse_range *range, int32_t change)
     {
         assert(change != 0);
         assert(range->length / atomic_length + change >= 1);
         assert(range->length / atomic_length + change <= block_length);
         sparse_range adjust = *range;
-        alloc_(range->length / atomic_length + change, adjust.handle, adjust.offset);
+        uint32_t new_cross = range->length / atomic_length + change;
+        alloc_(new_cross, adjust.handle, adjust.offset);
+        value_t *old_data = deref_<memory_block>(range->handle)->data[range->offset].data;
         if(change > 0)
         {
-            value_t *from = deref_<memory_block>(range->handle)->data[range->offset].data;
             value_t *to = deref_<memory_block>(adjust.handle)->data[adjust.offset].data;
-            for(value_t *end = from + range->length; from != end; ++from, ++to)
-            {
-                ::new(to) value_t(std::move(*from));
-                from->~value_t();
-            }
+            chunk_guard guard(this, adjust.handle, adjust.offset, new_cross);
+            relocate_values_(old_data, to, range->length);
+            guard.commit();
         }
         else
         {
-            value_t *from = deref_<memory_block>(range->handle)->data[range->offset].data;
-            value_t *to = deref_<memory_block>(adjust.handle)->data[adjust.offset + change].data;
             uint32_t cut_length = uint32_t(-change) * atomic_length;
-            for(value_t *end = from + (range->length - cut_length); from != end; ++from, ++to)
-            {
-                ::new(to) value_t(std::move(*from));
-                from->~value_t();
-            }
-            for(value_t *end = from + cut_length; from != end; ++from)
-            {
-                from->~value_t();
-            }
+            value_t *to = deref_<memory_block>(adjust.handle)->data[adjust.offset + change].data;
+            chunk_guard guard(this, adjust.handle, adjust.offset, new_cross);
+            relocate_values_(old_data, to, range->length - cut_length);
+            guard.commit();
         }
+        // commit succeeded: destroy all old elements (relocated ones are in move-from state; trimmed ones were never relocated) and free the old chunk
+        destroy_values_(old_data, range->length);
         dealloc_(range->handle, range->offset, range->length / atomic_length);
         adjust.length += change * atomic_length;
         *range = adjust;
     }
-    // 尝试合并数据到相邻的片段
+    // try to merge data into adjacent ranges
     bool merge_range_(uint32_t index, value_t const *arr, uint32_t length)
     {
         uint32_t fix_index = index - index % atomic_length;
@@ -849,8 +1260,7 @@ private:
             to += atomic_length;
             for(value_t *end = from + range_after->length; from != end; ++from, ++to)
             {
-                ::new(to) value_t(std::move(*from));
-                from->~value_t();
+                ::new(to) value_t(std::move_if_noexcept(*from));
             }
             remove_range_(find_after, range_after);
             return true;
@@ -872,12 +1282,12 @@ private:
         }
         return false;
     }
-    // 拆分片段集合,2/3
+    // split a range-set, 2/3
     void split_range_set_(handle_t where_left, handle_t where_right)
     {
         sparse_range_set *range_set_left = deref_<sparse_range_set>(where_left);
         sparse_range_set *range_set_right = deref_<sparse_range_set>(where_right);
-        handle_t handle = index_tree_.alloc();
+        handle_t handle = alloc_node_();
         sparse_range_set *range_set = deref_<sparse_range_set>(handle);
         enum
         {
@@ -891,11 +1301,11 @@ private:
         std::memmove(range_set_right->begin, range_set_right->begin + move_size, range_set_right->end * sizeof(sparse_range));
         rb_insert_(handle);
     }
-    // 拆分片段集合,1/2
+    // split a range-set, 1/2
     void split_range_set_(handle_t where)
     {
         sparse_range_set *range_set_left = deref_<sparse_range_set>(where);
-        handle_t handle = index_tree_.alloc();
+        handle_t handle = alloc_node_();
         sparse_range_set *range_set = deref_<sparse_range_set>(handle);
         enum
         {
@@ -906,12 +1316,12 @@ private:
         range_set->end = move_size;
         rb_insert_(handle);
     }
-    // 插入一块片段
+    // insert a range
     void insert_range_(handle_t where, sparse_range *range)
     {
         if(rb_is_nil_(rb_get_root_()))
         {
-            handle_t handle = index_tree_.alloc();
+            handle_t handle = alloc_node_();
             sparse_range_set *range_set = deref_<sparse_range_set>(handle);
             range_set->end = 1;
             *range_set->begin = *range;
@@ -986,7 +1396,7 @@ private:
         }
         set_insert_range_(range_set, range);
     }
-    // 强制插入片段
+    // unconditional insert of a range
     void set_insert_range_(sparse_range_set *range_set, sparse_range *range)
     {
         sparse_range *const end = range_set->begin + range_set->end;
@@ -998,7 +1408,7 @@ private:
         *where = *range;
         ++range_set->end;
     }
-    // 合并片段集合
+    // merge range-sets
     void merge_range_set_(handle_t left, handle_t right)
     {
         sparse_range_set *range_set_left = deref_<sparse_range_set>(left);
@@ -1008,9 +1418,22 @@ private:
         rb_erase_(right);
         index_tree_.dealloc(right);
     }
-    // 移除一个片段
+    // destroy elements within a range (skipped for trivially destructible types)
+    void destroy_range_values_(sparse_range const *range)
+    {
+        if(!std::is_trivially_destructible<value_t>::value)
+        {
+            value_t *data = deref_<memory_block>(range->handle)->data[range->offset].data;
+            for(value_t *it = data, *end = it + range->length; it != end; ++it)
+            {
+                it->~value_t();
+            }
+        }
+    }
+    // remove a range
     void remove_range_(handle_t where, sparse_range *range)
     {
+        destroy_range_values_(range);
         dealloc_(range->handle, range->offset, range->length / atomic_length);
         sparse_range_set *range_set = deref_<sparse_range_set>(where);
         if(range_set->end == 1)
@@ -1099,13 +1522,13 @@ private:
         }
         --range_set->end;
     }
-    // 从句柄得到对象
+    // resolve an object from a handle
     template<typename T> T *deref_(handle_t handle) const
     {
         assert(handle != handle_t(invalid_handle));
         return static_cast<T *>(index_tree_.deref(handle));
     }
-    // 红黑树节点
+    // red-black tree node
     sparse_range_set_base const *rb_deref_(handle_t handle) const
     {
         return handle == handle_t(invalid_handle) ? (sparse_range_set_base const *)&index_tree_ : (sparse_range_set_base const *)deref_<sparse_range_set>(handle);
@@ -1596,10 +2019,10 @@ private:
     }
 
 private:
-    // 索引树
+    // index tree
     sparse_range_tree index_tree_;
-    // 数据链表(纯粹为了析构)
+    // data block list (kept solely for destruction)
     handle_t block_handle_;
-    // 空闲数据链表
+    // free data list
     memory_blcok_free free_;
 };

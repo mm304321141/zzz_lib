@@ -9,30 +9,30 @@
 template<class T> void foo_test()
 {
     typedef sparse_array<T> array_t;
-    typedef typename array_t::dump_data dump_t;
+    typedef typename array_t::snapshot_data snapshot_t;
 
     array_t a;
     T v = T();
     T buf[4] = {};
 
     //single element set / get
-    a.set(1, v);
+    a[1] = v;
     a[2] = v;
     a[3] = a[2];
-    v = a.get(2);
+    v = a[2];
     v = a[3];
 
     // bulk set / get
     a.set_multi(0, buf, 4);
     a.get_multi(0, buf, 4);
 
-    // size
-    uint32_t n = a.size();
+    // span
+    uint32_t n = a.span();
 
-    // dump / load_dump
-    dump_t d = a.dump();
+    // snapshot / restore
+    snapshot_t d = a.snapshot();
     array_t b;
-    b.load_dump(d);
+    b.restore(d);
 
     // allocator (mutable + const)
     array_t const &ca = a;
@@ -40,14 +40,14 @@ template<class T> void foo_test()
     ca.allocator();
 
     // const access
-    v = ca.get(1);
     v = ca[1];
-    n += ca.size();
-    ca.dump();
+    v = ca[1];
+    n += ca.span();
+    (void)ca.snapshot();
 
-    // partial / full clear
-    a.clear(0, 2);
-    a.clear();
+    // partial / full reset
+    a.reset(0, 2);
+    a.reset();
 
     //move ctor / move assign
     array_t c(std::move(a));

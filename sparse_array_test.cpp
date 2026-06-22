@@ -70,6 +70,7 @@ int main()
 {
     const uint32_t count = 10000000;
     typedef sparse_array<int> sa1_t;
+    (void)sizeof(sa1_t);
     typedef sparse_array<int, sparse_array_debug_config> sa2_t;
     sa2_t array1;
     sa2_t array2;
@@ -80,13 +81,13 @@ int main()
     if(false && ifs.good())
     {
         auto &allocator = array1.allocator();
-        sa2_t::dump_data dump;
+        sa2_t::snapshot_data dump;
         auto read = [&ifs](void *p, size_t l)
         {
             ifs.read(reinterpret_cast<char *>(p), l);
         };
         read(&dump, sizeof dump);
-        array1.load_dump(dump);
+        array1.restore(dump);
         size_t map_size;
         read(&map_size, sizeof map_size);
         while(map_size-- > 0)
@@ -120,10 +121,9 @@ int main()
         }
     }
 
-
     for(uint32_t i = 0; i < count; ++i)
     {
-        int c1, c2, r, b, e, s, l;
+        int c1, c2 = 0, r = 0, b, e, s = 0, l = 0;
         if((c1 = (std::rand() & 1)))
         {
             r = std::rand();
@@ -144,14 +144,14 @@ int main()
             else
             {
                 std::fill(array3 + s, array3 + s + l, 0);
-                array1.clear(s, l);
+                array1.reset(s, s + l);
             }
         }
         array1.get_multi(0, array4, 32768);
         if(std::memcmp(array3, array4, sizeof(int) * 32768) != 0)
         {
             auto &map = array1.allocator().mem_map;
-            auto dump = array1.dump();
+            auto dump = array1.snapshot();
             std::ofstream ofs("./test_dump.bin", std::ios::out | std::ios::binary);
             auto write = [&ofs](void const *p, size_t l)
             {
