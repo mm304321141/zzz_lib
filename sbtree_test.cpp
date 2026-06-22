@@ -11,7 +11,6 @@
 #include <set>
 #include <cstring>
 
-
 #define assert(exp) assert_proc(exp, #exp, __FILE__, __LINE__)
 
 auto assert_proc = [](bool no_error, char const *query, char const *file, size_t line)
@@ -41,11 +40,13 @@ protected:
                 assert(false);
             }
             std::string fork =
-                !b_t::is_nil_(b_t::get_left_(node)) && !b_t::is_nil_(b_t::get_right_(node)) ? "┫" :
-                b_t::is_nil_(b_t::get_left_(node)) && b_t::is_nil_(b_t::get_right_(node)) ? "* " :
-                !b_t::is_nil_(b_t::get_right_(node)) ? "┛" : "┓";
-            std::string next_left = type == 0 ? "" : type == 1 ? "┃" : "  ";
-            std::string next_right = type == 0 ? "" : type == 1 ? "  " : "┃";
+                !b_t::is_nil_(b_t::get_left_(node)) && !b_t::is_nil_(b_t::get_right_(node)) ? "┫" : b_t::is_nil_(b_t::get_left_(node)) && b_t::is_nil_(b_t::get_right_(node)) ? "* "
+                                                                                                : !b_t::is_nil_(b_t::get_right_(node))                                        ? "┛"
+                                                                                                                                                                              : "┓";
+            std::string next_left = type == 0 ? "" : type == 1 ? "┃"
+                                                               : "  ";
+            std::string next_right = type == 0 ? "" : type == 1 ? "  "
+                                                                : "┃";
             print_tree_fork(view, b_t::get_right_(node), level + 1, head + next_right, "┏", 1);
             view((head + with + fork).c_str(), b_t::rank(typename b_t::iterator(node)), static_cast<typename b_t::value_node_t *>(node)->value);
             print_tree_fork(view, b_t::get_left_(node), level + 1, head + next_left, "┗", 2);
@@ -54,18 +55,13 @@ protected:
 
     uint64_t calc_depth(typename b_t::node_t *node, size_t level)
     {
-        return level
-            + (b_t::is_nil_(b_t::get_left_(node)) ? 0 : calc_depth(b_t::get_left_(node), level + 1))
-            + (b_t::is_nil_(b_t::get_right_(node)) ? 0 : calc_depth(b_t::get_right_(node), level + 1))
-            ;
+        return level + (b_t::is_nil_(b_t::get_left_(node)) ? 0 : calc_depth(b_t::get_left_(node), level + 1)) + (b_t::is_nil_(b_t::get_right_(node)) ? 0 : calc_depth(b_t::get_right_(node), level + 1));
     }
     double calc_diff(double avg, typename b_t::node_t *node, size_t level)
     {
-        return std::abs(double(level) - avg)
-            + (b_t::is_nil_(b_t::get_left_(node)) ? 0 : calc_diff(avg, b_t::get_left_(node), level + 1))
-            + (b_t::is_nil_(b_t::get_right_(node)) ? 0 : calc_diff(avg, b_t::get_right_(node), level + 1))
-            ;
+        return std::abs(double(level) - avg) + (b_t::is_nil_(b_t::get_left_(node)) ? 0 : calc_diff(avg, b_t::get_left_(node), level + 1)) + (b_t::is_nil_(b_t::get_right_(node)) ? 0 : calc_diff(avg, b_t::get_right_(node), level + 1));
     }
+
 public:
     template<class view_value> void print_tree(bool body = true)
     {
@@ -96,7 +92,6 @@ struct print_tree_value
     }
 };
 
-
 template<class key_t, class value_t, class comparator_t = std::less<value_t>, class allocator_t = std::allocator<value_t>>
 class sbtree_mmap_test : public sbtree_multimap<key_t, value_t, comparator_t, allocator_t>
 {
@@ -115,6 +110,7 @@ protected:
         }
         return true;
     }
+
 public:
     bool check()
     {
@@ -125,7 +121,7 @@ public:
 struct test_comp
 {
     bool is_less = 0;
-    bool operator()(int l, int r)
+    bool operator()(int l, int r) const
     {
         if(is_less)
         {
@@ -160,6 +156,17 @@ public:
         root = other.root;
         fork = other.fork;
     }
+    test_allocator &operator=(test_allocator const &other)
+    {
+        if(this != &other)
+        {
+            set = other.set;
+            max = other.max;
+            root = other.root;
+            fork = other.fork;
+        }
+        return *this;
+    }
     template<class U> test_allocator(test_allocator<U> const &other) : set(new std::set<T *>()), max(other.max)
     {
         root = other.root;
@@ -183,12 +190,12 @@ public:
         --alloc_limit;
         return *set->insert(reinterpret_cast<pointer>(new uint8_t[sizeof(T) * n])).first;
     }
-    void deallocate(pointer ptr, size_type n)
+    void deallocate(pointer ptr, size_type /*n*/)
     {
         assert(set->erase(ptr) == 1);
         delete[] reinterpret_cast<uint8_t *>(ptr);
     }
-    template<class U, class ...args_t> void construct(U *ptr, args_t &&...args)
+    template<class U, class... args_t> void construct(U *ptr, args_t &&...args)
     {
         ::new(ptr) U(std::forward<args_t>(args)...);
     }
@@ -204,14 +211,15 @@ public:
     {
         return max;
     }
-    size_type& max_size()
+    size_type &max_size()
     {
         return max;
     }
-    bool operator == (test_allocator const &other)
+    bool operator==(test_allocator const &other)
     {
         return set == other.set;
     }
+
 private:
     std::shared_ptr<std::set<T *>> set;
     size_t max;
@@ -267,33 +275,33 @@ int main()
         test_allocator<int> a;
         test_comp c;
         c.is_less = true;
-        sbtree_multiset<int, test_comp, test_allocator<int>> aaa({1, 2, 3}, c, a);
+        sbtree_multiset<int, test_comp, test_allocator<int>> aaa({ 1, 2, 3 }, c, a);
         c.is_less = false;
-        sbtree_multiset<int, test_comp, test_allocator<int>> aaa2({4, 5, 6}, c);
+        sbtree_multiset<int, test_comp, test_allocator<int>> aaa2({ 4, 5, 6 }, c);
         sbtree_multiset<int, test_comp, test_allocator<int>> aaa3(std::move(aaa), a);
         sbtree_multiset<int, test_comp, test_allocator<int>> aaa4(aaa2);
         aaa.swap(aaa2);
         aaa3 = aaa;
         aaa3.emplace(7);
         aaa = aaa3;
-        sbtree_multimap<int, int> sb({{1, 2},{1, 2}});
+        sbtree_multimap<int, int> sb({ { 1, 2 }, { 1, 2 } });
         sbtree_multimap<int, int> const sb2(sb, sbtree_multimap<int, int>::allocator_type());
-        sb.insert({{3, 4},{5, 6}});
-        sb.insert(sb.begin(), {7, 8});
+        sb.insert({ { 3, 4 }, { 5, 6 } });
+        sb.insert(sb.begin(), { 7, 8 });
         sb.erase(sb.begin() + 1, sb.end());
-        sb2.find(0);
-        sb2.slice();
-        sb2.front();
-        sb2.back();
-        sb2.equal_range(2);
-        sb2.lower_bound(2);
-        sb2.upper_bound(2);
-        sb2.range(2, 2);
-        sb2.rank(2);
-        sb2.count(2);
-        sb2.count(2, 2);
-        sbtree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({{1, "2"},{1, "2"},{1, "2"}}, c);
-        sbtree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({{1, "2"}}, a);
+        (void)sb2.find(0);
+        (void)sb2.slice();
+        (void)sb2.front();
+        (void)sb2.back();
+        (void)sb2.equal_range(2);
+        (void)sb2.lower_bound(2);
+        (void)sb2.upper_bound(2);
+        (void)sb2.between(2, 2);
+        (void)sb2.rank(2);
+        (void)sb2.count(2);
+        (void)sb2.count(2, 2);
+        sbtree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> ttt({ { 1, "2" }, { 1, "2" }, { 1, "2" } }, c);
+        sbtree_multimap<int, std::string, test_comp, test_allocator<std::pair<int const, std::string>>> tttt({ { 1, "2" } }, a);
         alloc_limit = 2;
         try
         {
@@ -303,17 +311,15 @@ int main()
         {
         }
         alloc_limit = 999999999;
-        sbtree_multimap<std::string, std::string> sss =
-        {
-            {"0", ""},
-            {"1", "11"},
-            {"2", "222"},
+        sbtree_multimap<std::string, std::string> sss = {
+            { "0", "" },
+            { "1", "11" },
+            { "2", "222" },
         };
         sss.emplace("0", "0");
-        sss =
-        {
-            {"0", "0"},
-            {"1", "11"},
+        sss = {
+            { "0", "0" },
+            { "1", "11" },
         };
         sss.erase("1");
         sss.emplace(std::make_pair("1", "1"));
@@ -335,7 +341,7 @@ int main()
             sb.insert(std::make_pair(rand(), i));
             sb1.insert(std::make_pair(rand(), i));
         }
-        sb.rank(sb.begin() + 2);
+        (void)sb.rank(sb.begin() + 2);
         sb1 = sb;
         sbtree_multimap<int, int> sb2 = sb;
         assert(sb.size() == sb1.size());
@@ -382,16 +388,16 @@ int main()
         }
         assert(rb.find(0) == rb.begin());
         assert(sb.find(0) == sb.begin());
-        assert(rb.find(length / 2 - 1) == ----rb.end());
+        assert(rb.find(length / 2 - 1) == -- --rb.end());
         assert(sb.find(length / 2 - 1) == sb.end() - 2);
         assert(rb.count(1) == 2);
         assert(sb.count(1) == 2);
         assert(sb.count(1, 2) == 4);
         assert(sb.count(1, 3) == 6);
-        assert(sb.range(1, 3) == std::make_pair(sb.find(1), sb.find(4)));
-        assert(sb.range(0, 2) == std::make_pair(sb.begin(), sb.begin() + 6));
-        assert(sb.range(2, 3) == sb.slice(4, 8));
-        assert(sb.range(0, length) == sb.slice());
+        assert(sb.between(1, 3) == std::make_pair(sb.find(1), sb.find(4)));
+        assert(sb.between(0, 2) == std::make_pair(sb.begin(), sb.begin() + 6));
+        assert(sb.between(2, 3) == sb.slice(4, 8));
+        assert(sb.between(0, length) == sb.slice());
         assert(sb.front().second == sb.begin()->second);
         assert(sb.front().second == (--sb.rend())->second);
         assert(sb.back().second == (--sb.end())->second);
@@ -448,7 +454,7 @@ int main()
             size_t b = rand() % part;
             assert(csb.at(a) + b == csb.at(a + b));
             assert(csb.begin() + a == csb.at(a + b) - b);
-            assert(csb.at(a) - csb.at(b) == a - b);
+            assert(csb.at(a) - csb.at(b) == static_cast<decltype(csb.at(a) - csb.at(b))>(a - b));
         }
 
         for(int i = 0; i < length * 2 + length / 2; ++i)
@@ -499,37 +505,37 @@ int main()
         }
     };
 
-    auto testsb = [&mtr, &mt, &c = sb, &v]()
+    auto testsb = [&sb, &v]()
     {
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(i, i));
+            sb.insert(std::make_pair(i, i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(v[i], i));
+            sb.insert(std::make_pair(v[i], i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.erase(v[i]);
+            sb.erase(v[i]);
         }
-        c.clear();
+        sb.clear();
     };
-    auto testrb = [&mtr, &mt, &c = rb, &v]()
+    auto testrb = [&rb, &v]()
     {
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(i, i));
+            rb.insert(std::make_pair(i, i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.insert(std::make_pair(v[i], i));
+            rb.insert(std::make_pair(v[i], i));
         }
         for(int i = 0; i < int(v.size()); ++i)
         {
-            c.erase(v[i]);
+            rb.erase(v[i]);
         }
-        c.clear();
+        rb.clear();
     };
     reset();
     auto ss1 = t();
@@ -561,14 +567,13 @@ int main()
         << "sb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se2 - ss2).count() << std::endl
         << "rb time 2(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re2 - rs2).count() << std::endl
         << "sb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(se3 - ss3).count() << std::endl
-        << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl
-        ;
+        << "rb time 3(ms) = " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(re3 - rs3).count() << std::endl;
 
     system("pause");
 
-    //for(int i = 0; i < 20000000; ++i)
+    // for(int i = 0; i < 20000000; ++i)
     //{
-    //    sb.insert(std::make_pair(mtr(mt), i));
-    //}
-    //sb.print_tree();
+    //     sb.insert(std::make_pair(mtr(mt), i));
+    // }
+    // sb.print_tree();
 }

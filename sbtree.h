@@ -1,11 +1,42 @@
 ﻿#pragma once
 
+#ifndef ZZZ_LIB_NODISCARD
+#if __cplusplus >= 201703L
+#define ZZZ_LIB_NODISCARD [[nodiscard]]
+#else
+#define ZZZ_LIB_NODISCARD
+#endif
+#endif
+
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
+#include <utility>
+
+namespace size_balanced_tree_detail
+{
+    // void_t helper (std::void_t is C++17); single type parameter avoids the
+    // C++11 alias-template SFINAE caveat (CWG1558).
+    template<class T> struct make_void
+    {
+        typedef void type;
+    };
+    // node_t::size element type: config_t::size_type when the config provides one,
+    // otherwise std::size_t (the historical default, so behaviour is unchanged
+    // unless a config deliberately opts into a narrower type to save memory).
+    template<class config_t, class = void> struct config_size_type
+    {
+        typedef std::size_t type;
+    };
+    template<class config_t> struct config_size_type<config_t, typename make_void<typename config_t::size_type>::type>
+    {
+        typedef typename config_t::size_type type;
+    };
+} // namespace size_balanced_tree_detail
 
 template<class config_t>
 class size_balanced_tree
@@ -24,12 +55,15 @@ public:
     typedef value_type const *const_pointer;
 
 protected:
+    // node_t::size honours the config's (optionally narrower) size_type to save
+    // memory at large node counts; defaults to std::size_t when unspecified.
+    typedef typename size_balanced_tree_detail::config_size_type<config_t>::type node_size_type;
     struct node_t
     {
         node_t *parent;
         node_t *left;
         node_t *right;
-        size_t size;
+        node_size_type size;
     };
     struct value_node_t : public node_t
     {
@@ -58,109 +92,14 @@ protected:
     };
 
 public:
-    class iterator
+    // one implementation covers all four public iterator flavours; IsConst selects
+    // the dereference constness and IsReverse internalises the reversed traversal
+    //(no std::reverse_iterator wrapper).
+    template<bool is_const, bool is_reverse> class iterator_impl
     {
     public:
         typedef std::random_access_iterator_tag iterator_category;
-        typedef typename size_balanced_tree::value_type value_type;
-        typedef typename size_balanced_tree::difference_type difference_type;
-        typedef typename size_balanced_tree::reference reference;
-        typedef typename size_balanced_tree::pointer pointer;
-
-    public:
-        explicit iterator(node_t *in_node) : node(in_node)
-        {
-        }
-        iterator(iterator const &) = default;
-        iterator &operator+=(difference_type diff)
-        {
-            node = size_balanced_tree::sbt_advance_(node, diff);
-            return *this;
-        }
-        iterator &operator-=(difference_type diff)
-        {
-            node = size_balanced_tree::sbt_advance_(node, -diff);
-            return *this;
-        }
-        iterator operator+(difference_type diff) const
-        {
-            return iterator(size_balanced_tree::sbt_advance_(node, diff));
-        }
-        iterator operator-(difference_type diff) const
-        {
-            return iterator(size_balanced_tree::sbt_advance_(node, -diff));
-        }
-        difference_type operator-(iterator const &other) const
-        {
-            return static_cast<difference_type>(size_balanced_tree::sbt_rank_(node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node));
-        }
-        iterator &operator++()
-        {
-            node = size_balanced_tree::bst_move_<true>(node);
-            return *this;
-        }
-        iterator &operator--()
-        {
-            node = size_balanced_tree::bst_move_<false>(node);
-            return *this;
-        }
-        iterator operator++(int)
-        {
-            iterator save(*this);
-            ++*this;
-            return save;
-        }
-        iterator operator--(int)
-        {
-            iterator save(*this);
-            --*this;
-            return save;
-        }
-        reference operator*() const
-        {
-            return static_cast<value_node_t *>(node)->value;
-        }
-        pointer operator->() const
-        {
-            return &static_cast<value_node_t *>(node)->value;
-        }
-        reference operator[](difference_type index) const
-        {
-            return *(*this + index);
-        }
-        bool operator>(iterator const &other) const
-        {
-            return *this - other > 0;
-        }
-        bool operator<(iterator const &other) const
-        {
-            return *this - other < 0;
-        }
-        bool operator>=(iterator const &other) const
-        {
-            return *this - other >= 0;
-        }
-        bool operator<=(iterator const &other) const
-        {
-            return *this - other <= 0;
-        }
-        bool operator==(iterator const &other) const
-        {
-            return node == other.node;
-        }
-        bool operator!=(iterator const &other) const
-        {
-            return node != other.node;
-        }
-
-    private:
-        friend class size_balanced_tree;
-        node_t *node;
-    };
-    class const_iterator
-    {
-    public:
-        typedef std::random_access_iterator_tag iterator_category;
+        // NOTE: operator+= / operator-= / operator+ / operator- / operator[] are O(log N), not O(1). Declared as random_access for algorithm compatibility.
         typedef typename size_balanced_tree::value_type value_type;
         typedef typename size_balanced_tree::difference_type difference_type;
         typedef typename size_balanced_tree::reference reference;
@@ -168,318 +107,119 @@ public:
         typedef typename size_balanced_tree::pointer pointer;
         typedef typename size_balanced_tree::const_pointer const_pointer;
 
+    private:
+        typedef typename std::conditional<is_const, const_reference, reference>::type deref_reference;
+        typedef typename std::conditional<is_const, const_pointer, pointer>::type deref_pointer;
+
     public:
-        explicit const_iterator(node_t *in_node) : node(in_node)
+        explicit iterator_impl(node_t *in_node) : node(in_node)
         {
         }
-        const_iterator(iterator const &other) : node(other.node)
+        iterator_impl(iterator_impl const &) = default;
+        // non-const -> const, same direction (implicit)
+        template<bool enable = is_const> iterator_impl(iterator_impl<false, is_reverse> const &other, typename std::enable_if<enable, int>::type = 0) : node(other.node)
         {
         }
-        const_iterator(const_iterator const &) = default;
-        const_iterator &operator+=(difference_type diff)
+        // forward -> reverse, same constness (explicit, mirrors the legacy ++ on construction)
+        template<bool enable = is_reverse> explicit iterator_impl(iterator_impl<is_const, false> const &other, typename std::enable_if<enable, void *>::type = nullptr) : node(other.node)
         {
-            node = size_balanced_tree::sbt_advance_(node, diff);
+            ++*this;
+        }
+        iterator_impl &operator+=(difference_type diff)
+        {
+            node = size_balanced_tree::sbt_advance_(node, is_reverse ? -diff : diff);
             return *this;
         }
-        const_iterator &operator-=(difference_type diff)
+        iterator_impl &operator-=(difference_type diff)
         {
-            node = size_balanced_tree::sbt_advance_(node, -diff);
+            node = size_balanced_tree::sbt_advance_(node, is_reverse ? diff : -diff);
             return *this;
         }
-        const_iterator operator+(difference_type diff) const
+        iterator_impl operator+(difference_type diff) const
         {
-            return const_iterator(size_balanced_tree::sbt_advance_(node, diff));
+            return iterator_impl(size_balanced_tree::sbt_advance_(node, is_reverse ? -diff : diff));
         }
-        const_iterator operator-(difference_type diff) const
+        iterator_impl operator-(difference_type diff) const
         {
-            return const_iterator(size_balanced_tree::sbt_advance_(node, -diff));
+            return iterator_impl(size_balanced_tree::sbt_advance_(node, is_reverse ? diff : -diff));
         }
-        difference_type operator-(const_iterator const &other) const
+        difference_type operator-(iterator_impl const &other) const
         {
-            return static_cast<difference_type>(size_balanced_tree::sbt_rank_(node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node));
+            return is_reverse ? static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(node)) : static_cast<difference_type>(size_balanced_tree::sbt_rank_(node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node));
         }
-        const_iterator &operator++()
+        iterator_impl &operator++()
         {
-            node = size_balanced_tree::bst_move_<true>(node);
+            node = size_balanced_tree::bst_move_<!is_reverse>(node);
             return *this;
         }
-        const_iterator &operator--()
+        iterator_impl &operator--()
         {
-            node = size_balanced_tree::bst_move_<false>(node);
+            node = size_balanced_tree::bst_move_<is_reverse>(node);
             return *this;
         }
-        const_iterator operator++(int)
+        iterator_impl operator++(int)
         {
-            const_iterator save(*this);
+            iterator_impl save(*this);
             ++*this;
             return save;
         }
-        const_iterator operator--(int)
+        iterator_impl operator--(int)
         {
-            const_iterator save(*this);
+            iterator_impl save(*this);
             --*this;
             return save;
         }
-        const_reference operator*() const
+        deref_reference operator*() const
         {
             return static_cast<value_node_t *>(node)->value;
         }
-        const_pointer operator->() const
+        deref_pointer operator->() const
         {
             return &static_cast<value_node_t *>(node)->value;
         }
-        const_reference operator[](difference_type index) const
+        deref_reference operator[](difference_type index) const
         {
             return *(*this + index);
         }
-        bool operator>(const_iterator const &other) const
+        bool operator>(iterator_impl const &other) const
         {
             return *this - other > 0;
         }
-        bool operator<(const_iterator const &other) const
+        bool operator<(iterator_impl const &other) const
         {
             return *this - other < 0;
         }
-        bool operator>=(const_iterator const &other) const
+        bool operator>=(iterator_impl const &other) const
         {
             return *this - other >= 0;
         }
-        bool operator<=(const_iterator const &other) const
+        bool operator<=(iterator_impl const &other) const
         {
             return *this - other <= 0;
         }
-        bool operator==(const_iterator const &other) const
+        bool operator==(iterator_impl const &other) const
         {
             return node == other.node;
         }
-        bool operator!=(const_iterator const &other) const
+        bool operator!=(iterator_impl const &other) const
         {
             return node != other.node;
         }
-
-    private:
-        friend class size_balanced_tree;
-        node_t *node;
-    };
-    class reverse_iterator
-    {
-    public:
-        typedef std::random_access_iterator_tag iterator_category;
-        typedef typename size_balanced_tree::value_type value_type;
-        typedef typename size_balanced_tree::difference_type difference_type;
-        typedef typename size_balanced_tree::reference reference;
-        typedef typename size_balanced_tree::pointer pointer;
-
-    public:
-        explicit reverse_iterator(node_t *in_node) : node(in_node)
+        // only reverse iterators expose base(), returning the matching forward iterator
+        template<bool other_reverse = is_reverse, typename std::enable_if<other_reverse, int>::type = 0> iterator_impl<is_const, false> base() const
         {
-        }
-        explicit reverse_iterator(iterator const &other) : node(other.node)
-        {
-            ++*this;
-        }
-        reverse_iterator(reverse_iterator const &) = default;
-        reverse_iterator &operator+=(difference_type diff)
-        {
-            node = size_balanced_tree::sbt_advance_(node, -diff);
-            return *this;
-        }
-        reverse_iterator &operator-=(difference_type diff)
-        {
-            node = size_balanced_tree::sbt_advance_(node, diff);
-            return *this;
-        }
-        reverse_iterator operator+(difference_type diff) const
-        {
-            return reverse_iterator(size_balanced_tree::sbt_advance_(node, -diff));
-        }
-        reverse_iterator operator-(difference_type diff) const
-        {
-            return reverse_iterator(size_balanced_tree::sbt_advance_(node, diff));
-        }
-        difference_type operator-(reverse_iterator const &other) const
-        {
-            return static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(node));
-        }
-        reverse_iterator &operator++()
-        {
-            node = size_balanced_tree::bst_move_<false>(node);
-            return *this;
-        }
-        reverse_iterator &operator--()
-        {
-            node = size_balanced_tree::bst_move_<true>(node);
-            return *this;
-        }
-        reverse_iterator operator++(int)
-        {
-            reverse_iterator save(*this);
-            ++*this;
-            return save;
-        }
-        reverse_iterator operator--(int)
-        {
-            reverse_iterator save(*this);
-            --*this;
-            return save;
-        }
-        reference operator*() const
-        {
-            return static_cast<value_node_t *>(node)->value;
-        }
-        pointer operator->() const
-        {
-            return &static_cast<value_node_t *>(node)->value;
-        }
-        reference operator[](difference_type index) const
-        {
-            return *(*this + index);
-        }
-        bool operator>(reverse_iterator const &other) const
-        {
-            return *this - other > 0;
-        }
-        bool operator<(reverse_iterator const &other) const
-        {
-            return *this - other < 0;
-        }
-        bool operator>=(reverse_iterator const &other) const
-        {
-            return *this - other >= 0;
-        }
-        bool operator<=(reverse_iterator const &other) const
-        {
-            return *this - other <= 0;
-        }
-        bool operator==(reverse_iterator const &other) const
-        {
-            return node == other.node;
-        }
-        bool operator!=(reverse_iterator const &other) const
-        {
-            return node != other.node;
-        }
-        iterator base() const
-        {
-            return ++iterator(node);
+            return ++iterator_impl<is_const, false>(node);
         }
 
     private:
+        template<bool, bool> friend class iterator_impl;
         friend class size_balanced_tree;
         node_t *node;
     };
-    class const_reverse_iterator
-    {
-    public:
-        typedef std::random_access_iterator_tag iterator_category;
-        typedef typename size_balanced_tree::value_type value_type;
-        typedef typename size_balanced_tree::difference_type difference_type;
-        typedef typename size_balanced_tree::reference reference;
-        typedef typename size_balanced_tree::const_reference const_reference;
-        typedef typename size_balanced_tree::pointer pointer;
-        typedef typename size_balanced_tree::const_pointer const_pointer;
-
-    public:
-        explicit const_reverse_iterator(node_t *in_node) : node(in_node)
-        {
-        }
-        explicit const_reverse_iterator(const_iterator const &other) : node(other.node)
-        {
-            ++*this;
-        }
-        const_reverse_iterator(reverse_iterator const &other) : node(other.node)
-        {
-        }
-        const_reverse_iterator(const_reverse_iterator const &) = default;
-        const_reverse_iterator &operator+=(difference_type diff)
-        {
-            node = size_balanced_tree::sbt_advance_(node, -diff);
-            return *this;
-        }
-        const_reverse_iterator &operator-=(difference_type diff)
-        {
-            node = size_balanced_tree::sbt_advance_(node, diff);
-            return *this;
-        }
-        const_reverse_iterator operator+(difference_type diff) const
-        {
-            return const_reverse_iterator(size_balanced_tree::sbt_advance_(node, -diff));
-        }
-        const_reverse_iterator operator-(difference_type diff) const
-        {
-            return const_reverse_iterator(size_balanced_tree::sbt_advance_(node, diff));
-        }
-        difference_type operator-(const_reverse_iterator const &other) const
-        {
-            return static_cast<difference_type>(size_balanced_tree::sbt_rank_(other.node)) - static_cast<difference_type>(size_balanced_tree::sbt_rank_(node));
-        }
-        const_reverse_iterator &operator++()
-        {
-            node = size_balanced_tree::bst_move_<false>(node);
-            return *this;
-        }
-        const_reverse_iterator &operator--()
-        {
-            node = size_balanced_tree::bst_move_<true>(node);
-            return *this;
-        }
-        const_reverse_iterator operator++(int)
-        {
-            const_reverse_iterator save(*this);
-            ++*this;
-            return save;
-        }
-        const_reverse_iterator operator--(int)
-        {
-            const_reverse_iterator save(*this);
-            --*this;
-            return save;
-        }
-        const_reference operator*() const
-        {
-            return static_cast<value_node_t *>(node)->value;
-        }
-        const_pointer operator->() const
-        {
-            return &static_cast<value_node_t *>(node)->value;
-        }
-        const_reference operator[](difference_type index) const
-        {
-            return *(*this + index);
-        }
-        bool operator>(const_reverse_iterator const &other) const
-        {
-            return *this - other > 0;
-        }
-        bool operator<(const_reverse_iterator const &other) const
-        {
-            return *this - other < 0;
-        }
-        bool operator>=(const_reverse_iterator const &other) const
-        {
-            return *this - other >= 0;
-        }
-        bool operator<=(const_reverse_iterator const &other) const
-        {
-            return *this - other <= 0;
-        }
-        bool operator==(const_reverse_iterator const &other) const
-        {
-            return node == other.node;
-        }
-        bool operator!=(const_reverse_iterator const &other) const
-        {
-            return node != other.node;
-        }
-        const_iterator base() const
-        {
-            return ++iterator(node);
-        }
-
-    private:
-        friend class size_balanced_tree;
-        node_t *node;
-    };
+    typedef iterator_impl<false, false> iterator;
+    typedef iterator_impl<true, false> const_iterator;
+    typedef iterator_impl<false, true> reverse_iterator;
+    typedef iterator_impl<true, true> const_reverse_iterator;
 
 protected:
     //full
@@ -527,7 +267,7 @@ public:
         sbt_copy_<std::false_type>(nullptr, other.get_root_());
     }
     //move
-    size_balanced_tree(size_balanced_tree &&other) : size_balanced_tree(key_compare(), other.get_root_allocator_(), node_allocator_t())
+    size_balanced_tree(size_balanced_tree &&other) noexcept : size_balanced_tree(key_compare(), other.get_root_allocator_(), node_allocator_t())
     {
         std::swap(get_root_allocator_(), other.get_root_allocator_());
         std::swap(head_.root, other.head_.root);
@@ -625,25 +365,25 @@ public:
     iterator insert(value_type const &value)
     {
         check_max_size_();
-        return iterator(sbt_insert_<false>(sbt_create_node_(value)));
+        return iterator(sbt_insert_check_(sbt_create_node_(value)));
     }
     //single element
     template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, iterator>::type insert(in_value_t &&value)
     {
         check_max_size_();
-        return iterator(sbt_insert_<false>(sbt_create_node_(std::forward<in_value_t>(value))));
+        return iterator(sbt_insert_check_(sbt_create_node_(std::forward<in_value_t>(value))));
     }
     //with hint
     iterator insert(const_iterator hint, value_type const &value)
     {
         check_max_size_();
-        return iterator(sbt_insert_hint_(hint.node, sbt_create_node_(value)));
+        return iterator(sbt_insert_hint_check_(hint.node, sbt_create_node_(value)));
     }
     //with hint
     template<class in_value_t> typename std::enable_if<std::is_convertible<in_value_t, value_type>::value, iterator>::type insert(const_iterator hint, in_value_t &&value)
     {
         check_max_size_();
-        return iterator(sbt_insert_hint_(hint.node, sbt_create_node_(std::forward<in_value_t>(value))));
+        return iterator(sbt_insert_hint_check_(hint.node, sbt_create_node_(std::forward<in_value_t>(value))));
     }
     //range
     template<class iterator_t> void insert(iterator_t begin, iterator_t end)
@@ -663,25 +403,243 @@ public:
     template<class... args_t> iterator emplace(args_t &&...args)
     {
         check_max_size_();
-        return iterator(sbt_insert_<false>(sbt_create_node_(std::forward<args_t>(args)...)));
+        return iterator(sbt_insert_check_(sbt_create_node_(std::forward<args_t>(args)...)));
     }
     //with hint
     template<class... args_t> iterator emplace_hint(const_iterator hint, args_t &&...args)
     {
         check_max_size_();
-        return iterator(sbt_insert_hint_(hint.node, sbt_create_node_(std::forward<args_t>(args)...)));
+        return iterator(sbt_insert_hint_check_(hint.node, sbt_create_node_(std::forward<args_t>(args)...)));
+    }
+    // unique map only, mirrors std::map::operator[]
+    template<class k_t = key_type, typename std::enable_if<config_t::unique_type::value && !std::is_same<value_type, k_t const>::value, int>::type = 0> mapped_type &operator[](key_type const &key)
+    {
+        // single descent: locate the key or the slot it would occupy, then reuse
+        // that slot for the insert instead of searching from the root a second time.
+        node_t *parent = nil_();
+        bool is_left = true;
+        node_t *where = sbt_find_or_insert_pos_(key, parent, is_left);
+        if(is_nil_(where))
+        {
+            check_max_size_();
+            where = sbt_insert_at_pos_(parent, is_left, sbt_create_node_(value_type(key, mapped_type())));
+        }
+        return static_cast<value_node_t *>(where)->value.second;
     }
 
-    iterator find(key_type const &key)
+#if __cplusplus >= 201703L
+    template<class... args_t, class self_t = config_t, class = typename std::enable_if<self_t::unique_type::value && !std::is_same<typename self_t::value_type, typename self_t::key_type const>::value, void>::type> std::pair<iterator, bool> try_emplace(key_type const &key, args_t &&...args)
+    {
+        iterator it = find(key);
+        if(it != end())
+        {
+            return std::pair<iterator, bool>(it, false);
+        }
+        return std::pair<iterator, bool>(emplace(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(std::forward<args_t>(args)...)), true);
+    }
+    template<class... args_t, class self_t = config_t, class = typename std::enable_if<self_t::unique_type::value && !std::is_same<typename self_t::value_type, typename self_t::key_type const>::value, void>::type> std::pair<iterator, bool> try_emplace(key_type &&key, args_t &&...args)
+    {
+        iterator it = find(key);
+        if(it != end())
+        {
+            return std::pair<iterator, bool>(it, false);
+        }
+        return std::pair<iterator, bool>(emplace(std::piecewise_construct, std::forward_as_tuple(std::move(key)), std::forward_as_tuple(std::forward<args_t>(args)...)), true);
+    }
+    template<class mapped_arg_t, class self_t = config_t, class = typename std::enable_if<self_t::unique_type::value && !std::is_same<typename self_t::value_type, typename self_t::key_type const>::value, void>::type> std::pair<iterator, bool> insert_or_assign(key_type const &key, mapped_arg_t &&obj)
+    {
+        iterator it = find(key);
+        if(it != end())
+        {
+            it->second = std::forward<mapped_arg_t>(obj);
+            return std::pair<iterator, bool>(it, false);
+        }
+        return std::pair<iterator, bool>(emplace(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(std::forward<mapped_arg_t>(obj))), true);
+    }
+    template<class mapped_arg_t, class self_t = config_t, class = typename std::enable_if<self_t::unique_type::value && !std::is_same<typename self_t::value_type, typename self_t::key_type const>::value, void>::type> std::pair<iterator, bool> insert_or_assign(key_type &&key, mapped_arg_t &&obj)
+    {
+        iterator it = find(key);
+        if(it != end())
+        {
+            it->second = std::forward<mapped_arg_t>(obj);
+            return std::pair<iterator, bool>(it, false);
+        }
+        return std::pair<iterator, bool>(emplace(std::piecewise_construct, std::forward_as_tuple(std::move(key)), std::forward_as_tuple(std::forward<mapped_arg_t>(obj))), true);
+    }
+#endif
+
+#if __cplusplus >= 201703L
+    // Owning handle for an extracted node (mirrors std::map::node_type). The
+    // node stays alive and unlinked from any tree until the handle is consumed
+    // by insert() or destroyed.
+    class node_type
+    {
+        friend class size_balanced_tree;
+        node_t *node_;
+        node_allocator_t alloc_;
+        bool has_alloc_;
+        node_type(node_t *node, node_allocator_t const &alloc) : node_(node), alloc_(alloc), has_alloc_(true)
+        {
+        }
+        void release_() noexcept
+        {
+            node_ = nullptr;
+            has_alloc_ = false;
+        }
+        void destroy_() noexcept
+        {
+            if(node_ != nullptr)
+            {
+                value_node_t *value_node = static_cast<value_node_t *>(node_);
+                std::allocator_traits<node_allocator_t>::destroy(alloc_, value_node);
+                alloc_.deallocate(value_node, 1);
+                node_ = nullptr;
+            }
+        }
+
+    public:
+        node_type() noexcept : node_(nullptr), has_alloc_(false)
+        {
+        }
+        node_type(node_type &&other) noexcept : node_(other.node_), alloc_(other.alloc_), has_alloc_(other.has_alloc_)
+        {
+            other.release_();
+        }
+        node_type &operator=(node_type &&other) noexcept
+        {
+            if(this != &other)
+            {
+                destroy_();
+                node_ = other.node_;
+                alloc_ = other.alloc_;
+                has_alloc_ = other.has_alloc_;
+                other.release_();
+            }
+            return *this;
+        }
+        node_type(node_type const &) = delete;
+        node_type &operator=(node_type const &) = delete;
+        ~node_type()
+        {
+            destroy_();
+        }
+        bool empty() const noexcept
+        {
+            return node_ == nullptr;
+        }
+        explicit operator bool() const noexcept
+        {
+            return node_ != nullptr;
+        }
+        value_type &value() const
+        {
+            return static_cast<value_node_t *>(node_)->value;
+        }
+        auto &key() const
+        {
+            return static_cast<value_node_t *>(node_)->value.first;
+        }
+        mapped_type &mapped() const
+        {
+            return static_cast<value_node_t *>(node_)->value.second;
+        }
+    };
+
+    node_type extract(const_iterator where)
+    {
+        if(where == cend() || is_nil_(where.node))
+        {
+            return node_type();
+        }
+        node_t *node = where.node;
+        sbt_erase_<false>(node);
+        return node_type(node, get_node_allocator_());
+    }
+    node_type extract(key_type const &key)
+    {
+        iterator it = find(key);
+        if(it == end())
+        {
+            return node_type();
+        }
+        return extract(const_iterator(it.node));
+    }
+    iterator insert(node_type &&handle)
+    {
+        if(handle.empty())
+        {
+            return end();
+        }
+        node_t *node = handle.node_;
+        if(config_t::unique_type::value)
+        {
+            node_t *where = sbt_insert_unique_(node);
+            if(where == node)
+            {
+                handle.release_();
+                return iterator(node);
+            }
+            return iterator(where);
+        }
+        node_t *where = sbt_insert_<false>(node);
+        handle.release_();
+        return iterator(where);
+    }
+    void merge(size_balanced_tree &other)
+    {
+        if(this == &other)
+        {
+            return;
+        }
+        iterator it = other.begin();
+        while(it != other.end())
+        {
+            node_t *node = it.node;
+            iterator next = it;
+            ++next;
+            bool skip = false;
+            if(config_t::unique_type::value)
+            {
+                node_t *exist = bst_lower_bound_(get_key_(node));
+                if(!is_nil_(exist) && !get_comparator_()(get_key_(node), get_key_(exist)))
+                {
+                    skip = true;
+                }
+            }
+            if(!skip)
+            {
+                other.sbt_erase_<false>(node);
+                if(config_t::unique_type::value)
+                {
+                    sbt_insert_unique_(node);
+                }
+                else
+                {
+                    sbt_insert_<false>(node);
+                }
+            }
+            it = next;
+        }
+    }
+#endif
+
+    ZZZ_LIB_NODISCARD iterator find(key_type const &key)
     {
         node_t *where = bst_lower_bound_(key);
         return (is_nil_(where) || get_comparator_()(key, get_key_(where))) ? iterator(nil_()) : iterator(where);
     }
-    const_iterator find(key_type const &key) const
+    ZZZ_LIB_NODISCARD const_iterator find(key_type const &key) const
     {
         node_t *where = bst_lower_bound_(key);
         return (is_nil_(where) || get_comparator_()(key, get_key_(where))) ? const_iterator(nil_()) : const_iterator(where);
     }
+
+#if __cplusplus >= 202002L
+    ZZZ_LIB_NODISCARD bool contains(key_type const &key) const
+    {
+        return find(key) != end();
+    }
+#endif
 
     iterator erase(const_iterator where)
     {
@@ -720,12 +678,12 @@ public:
         }
     }
 
-    size_type count(key_type const &key) const
+    ZZZ_LIB_NODISCARD size_type count(key_type const &key) const
     {
         pair_cici_t range = equal_range(key);
         return std::distance(range.first, range.second);
     }
-    size_type count(key_type const &min, key_type const &max) const
+    ZZZ_LIB_NODISCARD size_type count(key_type const &min, key_type const &max) const
     {
         if(get_comparator_()(max, min))
         {
@@ -734,7 +692,7 @@ public:
         return sbt_rank_(bst_upper_bound_(max)) - sbt_rank_(bst_lower_bound_(min));
     }
 
-    pair_ii_t range(key_type const &min, key_type const &max)
+    ZZZ_LIB_NODISCARD pair_ii_t between(key_type const &min, key_type const &max)
     {
         if(get_comparator_()(max, min))
         {
@@ -742,7 +700,7 @@ public:
         }
         return pair_ii_t(iterator(bst_lower_bound_(min)), iterator(bst_upper_bound_(max)));
     }
-    pair_cici_t range(key_type const &min, key_type const &max) const
+    ZZZ_LIB_NODISCARD pair_cici_t between(key_type const &min, key_type const &max) const
     {
         if(get_comparator_()(max, min))
         {
@@ -752,7 +710,7 @@ public:
     }
 
     //reverse index when index < 0
-    pair_ii_t slice(difference_type slice_begin = 0, difference_type slice_end = 0)
+    ZZZ_LIB_NODISCARD pair_ii_t slice(difference_type slice_begin = 0, difference_type slice_end = 0)
     {
         difference_type s_size = size();
         if(slice_begin < 0)
@@ -770,7 +728,7 @@ public:
         return pair_ii_t(at(slice_begin), at(slice_end));
     }
     //reverse index when index < 0
-    pair_cici_t slice(difference_type slice_begin = 0, difference_type slice_end = 0) const
+    ZZZ_LIB_NODISCARD pair_cici_t slice(difference_type slice_begin = 0, difference_type slice_end = 0) const
     {
         difference_type s_size = size();
         if(slice_begin < 0)
@@ -788,104 +746,104 @@ public:
         return pair_cici_t(at(slice_begin), at(slice_end));
     }
 
-    iterator lower_bound(key_type const &key)
+    ZZZ_LIB_NODISCARD iterator lower_bound(key_type const &key)
     {
         return iterator(bst_lower_bound_(key));
     }
-    const_iterator lower_bound(key_type const &key) const
+    ZZZ_LIB_NODISCARD const_iterator lower_bound(key_type const &key) const
     {
         return const_iterator(bst_lower_bound_(key));
     }
-    iterator upper_bound(key_type const &key)
+    ZZZ_LIB_NODISCARD iterator upper_bound(key_type const &key)
     {
         return iterator(bst_upper_bound_(key));
     }
-    const_iterator upper_bound(key_type const &key) const
+    ZZZ_LIB_NODISCARD const_iterator upper_bound(key_type const &key) const
     {
         return const_iterator(bst_upper_bound_(key));
     }
 
-    pair_ii_t equal_range(key_type const &key)
+    ZZZ_LIB_NODISCARD pair_ii_t equal_range(key_type const &key)
     {
         node_t *lower, *upper;
         std::tie(lower, upper) = bst_equal_range_(key);
         return pair_ii_t(iterator(lower), iterator(upper));
     }
-    pair_cici_t equal_range(key_type const &key) const
+    ZZZ_LIB_NODISCARD pair_cici_t equal_range(key_type const &key) const
     {
         node_t *lower, *upper;
         std::tie(lower, upper) = bst_equal_range_(key);
         return pair_cici_t(const_iterator(lower), const_iterator(upper));
     }
 
-    iterator begin()
+    ZZZ_LIB_NODISCARD iterator begin()
     {
         return iterator(get_most_left_());
     }
-    iterator end()
+    ZZZ_LIB_NODISCARD iterator end()
     {
         return iterator(nil_());
     }
-    const_iterator begin() const
+    ZZZ_LIB_NODISCARD const_iterator begin() const
     {
         return const_iterator(get_most_left_());
     }
-    const_iterator end() const
+    ZZZ_LIB_NODISCARD const_iterator end() const
     {
         return const_iterator(nil_());
     }
-    const_iterator cbegin() const
+    ZZZ_LIB_NODISCARD const_iterator cbegin() const
     {
         return const_iterator(get_most_left_());
     }
-    const_iterator cend() const
+    ZZZ_LIB_NODISCARD const_iterator cend() const
     {
         return const_iterator(nil_());
     }
-    reverse_iterator rbegin()
+    ZZZ_LIB_NODISCARD reverse_iterator rbegin()
     {
         return reverse_iterator(get_most_right_());
     }
-    reverse_iterator rend()
+    ZZZ_LIB_NODISCARD reverse_iterator rend()
     {
         return reverse_iterator(nil_());
     }
-    const_reverse_iterator rbegin() const
+    ZZZ_LIB_NODISCARD const_reverse_iterator rbegin() const
     {
         return const_reverse_iterator(get_most_right_());
     }
-    const_reverse_iterator rend() const
+    ZZZ_LIB_NODISCARD const_reverse_iterator rend() const
     {
         return const_reverse_iterator(nil_());
     }
-    const_reverse_iterator crbegin() const
+    ZZZ_LIB_NODISCARD const_reverse_iterator crbegin() const
     {
         return const_reverse_iterator(get_most_right_());
     }
-    const_reverse_iterator crend() const
+    ZZZ_LIB_NODISCARD const_reverse_iterator crend() const
     {
         return const_reverse_iterator(nil_());
     }
 
-    reference front()
+    ZZZ_LIB_NODISCARD reference front()
     {
         return static_cast<value_node_t *>(get_most_left_())->value;
     }
-    reference back()
+    ZZZ_LIB_NODISCARD reference back()
     {
         return static_cast<value_node_t *>(get_most_right_())->value;
     }
 
-    const_reference front() const
+    ZZZ_LIB_NODISCARD const_reference front() const
     {
         return static_cast<value_node_t *>(get_most_left_())->value;
     }
-    const_reference back() const
+    ZZZ_LIB_NODISCARD const_reference back() const
     {
         return static_cast<value_node_t *>(get_most_right_())->value;
     }
 
-    bool empty() const
+    ZZZ_LIB_NODISCARD bool empty() const
     {
         return is_nil_(get_root_());
     }
@@ -896,44 +854,44 @@ public:
         set_most_left_(nil_());
         set_most_right_(nil_());
     }
-    size_type size() const
+    ZZZ_LIB_NODISCARD size_type size() const
     {
         return get_size_(get_root_());
     }
-    size_type max_size() const noexcept
+    ZZZ_LIB_NODISCARD size_type max_size() const noexcept
     {
         return std::allocator_traits<node_allocator_t>::max_size(get_node_allocator_());
     }
 
     //if(index >= size) return end
-    iterator at(size_type index)
+    ZZZ_LIB_NODISCARD iterator at(size_type index)
     {
         return iterator(sbt_at_(index));
     }
     //if(index >= size) return end
-    const_iterator at(size_type index) const
+    ZZZ_LIB_NODISCARD const_iterator at(size_type index) const
     {
         return const_iterator(sbt_at_(index));
     }
 
     //rank(begin) == 0, key rank
-    size_type rank(key_type const &key) const
+    ZZZ_LIB_NODISCARD size_type rank(key_type const &key) const
     {
         return bst_lower_rank_(key);
     }
     //rank(begin) == 0, rank of iterator
-    static size_type rank(const_iterator where)
+    ZZZ_LIB_NODISCARD static size_type rank(const_iterator where)
     {
         return sbt_rank_(where.node);
     }
 
     //rank(begin) == 0, key rank current best
-    size_type lower_rank(key_type const &key) const
+    ZZZ_LIB_NODISCARD size_type lower_rank(key_type const &key) const
     {
         return bst_lower_rank_(key);
     }
     //rank(begin) == 0, key rank when insert
-    size_type upper_rank(key_type const &key) const
+    ZZZ_LIB_NODISCARD size_type upper_rank(key_type const &key) const
     {
         return bst_upper_rank_(key);
     }
@@ -1288,7 +1246,7 @@ protected:
             }
             else
             {
-                u_step = -step;
+                u_step = size_type(0) - static_cast<size_type>(step);
                 if(get_size_(get_left_(node)) >= u_step)
                 {
                     step += get_size_(get_right_(get_left_(node))) + 1;
@@ -1453,6 +1411,151 @@ protected:
         return node;
     }
 
+    // single-pass search primitive: descends once from the root looking for key.
+    // On a hit, returns the existing node (parent_out/is_left_out are untouched).
+    // On a miss, returns nil_() and reports the insertion slot through parent_out
+    // (the future parent, nil_() when the tree is empty) and is_left_out (the side
+    // under that parent). This lets callers share one descent between the lookup
+    // and the subsequent insert / iterator construction instead of searching twice.
+    node_t *sbt_find_or_insert_pos_(key_type const &key, node_t *&parent_out, bool &is_left_out) const
+    {
+        node_t *node = get_root_(), *where = nil_();
+        bool is_left = true;
+        while(!is_nil_(node))
+        {
+            where = node;
+            if(get_comparator_()(key, get_key_(node)))
+            {
+                is_left = true;
+                node = get_left_(node);
+            }
+            else if(get_comparator_()(get_key_(node), key))
+            {
+                is_left = false;
+                node = get_right_(node);
+            }
+            else
+            {
+                return node;
+            }
+        }
+        parent_out = where;
+        is_left_out = is_left;
+        return nil_();
+    }
+
+    // links node at the slot returned by sbt_find_or_insert_pos_ (parent == nil_()
+    // means the tree was empty); commits size bookkeeping / rebalancing exactly as
+    // the legacy single-pass insert path did.
+    node_t *sbt_insert_at_pos_(node_t *parent, bool is_left, node_t *node)
+    {
+        if(is_nil_(parent))
+        {
+            bst_init_node_(nil_(), node);
+            set_root_(node);
+            set_most_left_(node);
+            set_most_right_(node);
+            return node;
+        }
+        sbt_insert_at_<true>(is_left, parent, node);
+        return node;
+    }
+
+    // unique insert: if an equal key already exists the new node is not linked in
+    // and the existing node is returned instead (the caller discards the new node)
+    node_t *sbt_insert_unique_(node_t *key)
+    {
+        node_t *parent = nil_();
+        bool is_left = true;
+        node_t *where = sbt_find_or_insert_pos_(get_key_(key), parent, is_left);
+        if(!is_nil_(where))
+        {
+            return where;
+        }
+        return sbt_insert_at_pos_(parent, is_left, key);
+    }
+
+    // routes single inserts through the unique check when the config asks for it;
+    // the duplicate node created up front is destroyed when insertion is rejected
+    node_t *sbt_insert_check_(node_t *node)
+    {
+        if(config_t::unique_type::value)
+        {
+            node_t *where = sbt_insert_unique_(node);
+            if(where != node)
+            {
+                sbt_destroy_node_(node);
+            }
+            return where;
+        }
+        return sbt_insert_<false>(node);
+    }
+
+    node_t *sbt_insert_hint_check_(node_t *hint, node_t *node)
+    {
+        if(config_t::unique_type::value)
+        {
+            node_t *where = sbt_insert_hint_unique_(hint, node);
+            if(where != node)
+            {
+                sbt_destroy_node_(node);
+            }
+            return where;
+        }
+        return sbt_insert_hint_(hint, node);
+    }
+
+    // unique-mode hint insert. Mirrors the multi-mode sbt_insert_hint_ fast paths
+    // but with strict (non-equal) comparisons so an O(1) link only happens when the
+    // hint provably brackets a brand-new key. Any inconclusive case (bad hint, or a
+    // possible duplicate) falls back to the full single-pass unique search, which
+    // both de-duplicates and inserts. Returns the existing node on duplicate (the
+    // passed-in node stays unlinked for the caller to destroy), else returns node.
+    node_t *sbt_insert_hint_unique_(node_t *where, node_t *key)
+    {
+        node_t *other;
+        if(is_nil_(get_root_()))
+        {
+            bst_init_node_(nil_(), key);
+            set_root_(key);
+            set_most_left_(key);
+            set_most_right_(key);
+            return key;
+        }
+        else if(where == get_most_left_())
+        {
+            // hint == begin(): valid only when key sorts strictly before the front.
+            if(get_comparator_()(get_key_(key), get_key_(where)))
+            {
+                sbt_insert_at_<true>(true, where, key);
+                return key;
+            }
+        }
+        else if(where == nil_())
+        {
+            // hint == end(): valid only when key sorts strictly after the back.
+            if(get_comparator_()(get_key_(get_most_right_()), get_key_(key)))
+            {
+                sbt_insert_at_<true>(false, get_most_right_(), key);
+                return key;
+            }
+        }
+        else if(get_comparator_()(get_key_(other = bst_move_<false>(where)), get_key_(key)) && get_comparator_()(get_key_(key), get_key_(where)))
+        {
+            // predecessor(where) < key < *where: key is new and slots between them.
+            if(is_nil_(get_right_(other)))
+            {
+                sbt_insert_at_<true>(false, other, key);
+            }
+            else
+            {
+                sbt_insert_at_<true>(true, where, key);
+            }
+            return key;
+        }
+        return sbt_insert_unique_(key);
+    }
+
     template<bool is_leftish> node_t *sbt_insert_(node_t *key)
     {
         if(is_nil_(get_root_()))
@@ -1467,7 +1570,6 @@ protected:
         bool is_left = true;
         while(!is_nil_(node))
         {
-            set_size_(node, get_size_(node) + 1);
             where = node;
             if(is_leftish)
             {
@@ -1486,7 +1588,10 @@ protected:
                 node = get_right_(node);
             }
         }
-        sbt_insert_at_<false>(is_left, where, key);
+        // descend without touching sizes first: the comparator may throw, and
+        // nothing is committed until the position is settled; sbt_insert_at_<true>
+        // then commits the size bookkeeping up the path once insertion happens.
+        sbt_insert_at_<true>(is_left, where, key);
         return key;
     }
 
@@ -1798,12 +1903,12 @@ protected:
             value_node_t *node = static_cast<value_node_t *>(memory->get_root_());
             memory->sbt_erase_<true>(node);
             std::allocator_traits<node_allocator_t>::destroy(get_node_allocator_(), node);
-            std::allocator_traits<node_allocator_t>::construct(get_node_allocator_(), node, std::move(static_cast<value_node_t *>(other)->value));
+            std::allocator_traits<node_allocator_t>::construct(get_node_allocator_(), node, std::move_if_noexcept(static_cast<value_node_t *>(other)->value));
             return node;
         }
         else
         {
-            return sbt_create_node_(std::move(static_cast<value_node_t *>(other)->value));
+            return sbt_create_node_(std::move_if_noexcept(static_cast<value_node_t *>(other)->value));
         }
     }
 
@@ -1859,3 +1964,71 @@ protected:
         return new_node;
     }
 };
+
+template<class config_t> bool operator==(size_balanced_tree<config_t> const &left, size_balanced_tree<config_t> const &right)
+{
+    return left.size() == right.size() && std::equal(left.begin(), left.end(), right.begin());
+}
+#if __cplusplus >= 202002L
+#include <compare>
+namespace size_balanced_tree_detail
+{
+// Apple Clang's libc++ (< LLVM17) does not provide std::lexicographical_compare_three_way.
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 170000
+    template<class It1, class It2>
+    constexpr auto lex_three_way(It1 f1, It1 l1, It2 f2, It2 l2)
+        -> decltype(std::compare_three_way{}(*f1, *f2))
+    {
+        using cat = decltype(std::compare_three_way{}(*f1, *f2));
+        while(f1 != l1 && f2 != l2)
+        {
+            if(auto c = std::compare_three_way{}(*f1, *f2); c != 0)
+            {
+                return c;
+            }
+            ++f1;
+            ++f2;
+        }
+        if(f1 != l1)
+        {
+            return cat::greater;
+        }
+        if(f2 != l2)
+        {
+            return cat::less;
+        }
+        return std::compare_three_way{}(0, 0);
+    }
+#else
+    template<class It1, class It2> constexpr auto lex_three_way(It1 f1, It1 l1, It2 f2, It2 l2)
+    {
+        return std::lexicographical_compare_three_way(f1, l1, f2, l2);
+    }
+#endif
+} // namespace size_balanced_tree_detail
+template<class config_t> auto operator<=>(size_balanced_tree<config_t> const &left, size_balanced_tree<config_t> const &right)
+{
+    return size_balanced_tree_detail::lex_three_way(left.begin(), left.end(), right.begin(), right.end());
+}
+#else
+template<class config_t> bool operator!=(size_balanced_tree<config_t> const &left, size_balanced_tree<config_t> const &right)
+{
+    return !(left == right);
+}
+template<class config_t> bool operator<(size_balanced_tree<config_t> const &left, size_balanced_tree<config_t> const &right)
+{
+    return std::lexicographical_compare(left.begin(), left.end(), right.begin(), right.end());
+}
+template<class config_t> bool operator>(size_balanced_tree<config_t> const &left, size_balanced_tree<config_t> const &right)
+{
+    return right < left;
+}
+template<class config_t> bool operator<=(size_balanced_tree<config_t> const &left, size_balanced_tree<config_t> const &right)
+{
+    return !(right < left);
+}
+template<class config_t> bool operator>=(size_balanced_tree<config_t> const &left, size_balanced_tree<config_t> const &right)
+{
+    return !(left < right);
+}
+#endif
